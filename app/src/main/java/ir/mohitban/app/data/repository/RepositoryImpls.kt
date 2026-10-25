@@ -115,7 +115,7 @@ class FuelRepositoryImpl(
         val old = if (entry.id != 0L) dao.get(entry.id) else null
         val id = db.withTransaction {
             val newId = if (entry.id == 0L) dao.insert(entry.toEntity()) else {
-                dao.update(entry.toEntity()); entry.id
+                dao.update(entry.copy(editedAt = System.currentTimeMillis()).toEntity()); entry.id
             }
             // keep the vehicle's odometer at the highest reading recorded so far
             entry.vehicleId?.let { db.vehicleDao().raiseOdometer(it, entry.odometer) }

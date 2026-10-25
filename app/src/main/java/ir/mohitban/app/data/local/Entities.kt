@@ -74,4 +74,5 @@ data class FuelEntryEntity(
     @ColumnInfo(name = "snap_station") val snapStation: String,
     val createdAt: Long,
     val vehicleId: Long? = null,
+    val editedAt: Long? = null,
 )

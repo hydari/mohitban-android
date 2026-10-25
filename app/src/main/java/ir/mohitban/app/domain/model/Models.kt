@@ -75,6 +75,8 @@ data class FuelEntry(
     val snapshot: EntrySnapshot,
     val createdAt: Long = System.currentTimeMillis(),
     val vehicleId: Long? = null,
+    /** Set when the ranger edited the entry after saving it (shown only in the records list). */
+    val editedAt: Long? = null,
 )
 
 data class QuarterSummary(

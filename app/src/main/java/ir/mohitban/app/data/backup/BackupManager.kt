@@ -146,6 +146,7 @@ class BackupManager(
         put("snapVehicleModel", snapVehicleModel); put("snapProvince", snapProvince); put("snapCity", snapCity)
         put("snapArea", snapArea); put("snapStation", snapStation); put("createdAt", createdAt)
         put("vehicleId", vehicleId ?: JSONObject.NULL)
+        put("editedAt", editedAt ?: JSONObject.NULL)
     }
 
     private fun JSONObject.toEntry() = FuelEntryEntity(
@@ -156,5 +157,6 @@ class BackupManager(
         snapVehicleType = str("snapVehicleType"), snapVehicleModel = str("snapVehicleModel"), snapProvince = str("snapProvince"),
         snapCity = str("snapCity"), snapArea = str("snapArea"), snapStation = str("snapStation"), createdAt = optLong("createdAt"),
         vehicleId = if (!has("vehicleId") || isNull("vehicleId")) 1L else optLong("vehicleId"),
+        editedAt = if (!has("editedAt") || isNull("editedAt")) null else optLong("editedAt"),
     )
 }

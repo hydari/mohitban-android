@@ -24,6 +24,10 @@ import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Call
+import androidx.compose.material.icons.outlined.Email
+import ir.mohitban.app.ui.components.Developer
+import ir.mohitban.app.ui.components.DeveloperDialog
 import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Restore
@@ -158,7 +162,7 @@ fun SettingsScreen(
                         Column(Modifier.padding(horizontal = 14.dp, vertical = 6.dp)) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 MField(vm.g1, { vm.g1 = it }, label = "بنزین نرخ ۱", numeric = NumericMode.Grouped, maxLength = 9, modifier = Modifier.weight(1f), leadingIcon = Icons.Outlined.WaterDrop)
-                                MField(vm.g2, { vm.g2 = it }, label = "بنزین نرخ ۲", numeric = NumericMode.Grouped, maxLength = 9, modifier = Modifier.weight(1f))
+                                MField(vm.g2, { vm.g2 = it }, label = "بنزین نرخ ۲", numeric = NumericMode.Grouped, maxLength = 9, modifier = Modifier.weight(1f), leadingIcon = Icons.Outlined.WaterDrop)
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 MField(vm.g3, { vm.g3 = it }, label = "بنزین نرخ ۳", numeric = NumericMode.Grouped, maxLength = 9, modifier = Modifier.weight(1f), leadingIcon = Icons.Outlined.WaterDrop)
@@ -197,9 +201,18 @@ fun SettingsScreen(
                 )
 
                 SectionTitle("درباره")
+                var showDev by remember { mutableStateOf(false) }
+                val ctx = LocalContext.current
                 AppCard(Modifier.fillMaxWidth()) {
-                    SettingRow(Icons.Outlined.Info, "محیط‌یار — نسخه ${ir.mohitban.app.BuildConfigCompat.versionName(LocalContext.current).fa()}", "طراح و برنامه‌نویس: مهندس محمدرضا حیدری", null)
+                    Column {
+                        SettingRow(Icons.Outlined.Info, "محیط‌یار — نسخه ${ir.mohitban.app.BuildConfigCompat.versionName(ctx).fa()}", "طراح و برنامه‌نویس: ${Developer.NAME}") { showDev = true }
+                        Divider()
+                        SettingRow(Icons.Outlined.Call, "تلفن تماس", Developer.PHONE.fa()) { Developer.call(ctx) }
+                        Divider()
+                        SettingRow(Icons.Outlined.Email, "ایمیل", Developer.EMAIL) { Developer.mail(ctx) }
+                    }
                 }
+                if (showDev) DeveloperDialog(onDismiss = { showDev = false })
                 Spacer(Modifier.height(120.dp))
             }
         }

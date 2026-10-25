@@ -107,6 +107,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.sp
+import ir.mohitban.app.ui.components.Developer
+import ir.mohitban.app.ui.components.DeveloperDialog
+import ir.mohitban.app.ui.components.glossSweep
 
 data class DashboardState(
     val profile: RangerProfile? = null,
@@ -202,6 +208,8 @@ fun DashboardScreen(
             ) {
                 // ---------- header card (liquid glass): photo | name, rank ✔ · 📍 station | DoE logo ----------
                 GlassCard(Modifier.fillMaxWidth().padding(top = 14.dp), dark = true, radius = 28.dp) {
+                  Column(Modifier.weight(1f)) {
+                  Row(verticalAlignment = Alignment.CenterVertically) {
                     GlassRing(70.dp, Modifier.padding(start = 12.dp, top = 12.dp, bottom = 12.dp), onClick = onProfile) {
                         Box(
                             Modifier.fillMaxSize().clip(CircleShape)
@@ -218,7 +226,12 @@ fun DashboardScreen(
                     }
                     Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
                         Text(
-                            profile?.fullName ?: "", style = MaterialTheme.typography.titleLarge, color = Color.White,
+                            profile?.fullName ?: "",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Black,
+                                shadow = Shadow(Color(0x99000000), Offset(0f, 2f), 6f),
+                            ),
+                            color = Color(0xFF62E592),
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                         val rank = profile?.rank?.takeIf { it.isNotBlank() }
@@ -245,6 +258,18 @@ fun DashboardScreen(
                         }
                     }
                     ShimmerLogo(size = 64.dp, modifier = Modifier.padding(end = 12.dp))
+                  }
+                    // organisation plates under the logo: white, green text, same glossy sweep
+                    val province = profile?.province.orEmpty().trim().removePrefix("استان").trim()
+                    Column(
+                        Modifier.align(Alignment.End).padding(end = 12.dp, bottom = 12.dp, start = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(5.dp),
+                    ) {
+                        OrgPlate("سازمان حفاظت محیط زیست", 11.sp)
+                        if (province.isNotEmpty()) OrgPlate("اداره کل حفاظت محیط زیست استان $province", 10.sp)
+                    }
+                  }
                 }
 
                 // ---------- main action ----------
@@ -253,7 +278,6 @@ fun DashboardScreen(
                     Column(Modifier.weight(1f).padding(vertical = 14.dp)) {
                         Text("ثبت هزینه سوخت", style = MaterialTheme.typography.titleLarge, color = MColors.Ink)
                         Text("بنزین یا گاز، رسید و امضا", style = MaterialTheme.typography.bodySmall, color = Color(0xFF3E4A44), modifier = Modifier.padding(top = 4.dp))
-                        Text("فرم رسمی آماده ارسال", style = MaterialTheme.typography.bodySmall, color = Color(0xFF3E4A44))
                     }
                     CircleIcon(
                         Icons.AutoMirrored.Outlined.KeyboardArrowRight, MColors.Green.copy(alpha = 0.14f), MColors.Green,
@@ -317,7 +341,7 @@ fun DashboardScreen(
                 // ---------- season summary ----------
                 val entries = state.seasonEntries
                 if (entries.isNotEmpty()) {
-                    GlassCard(Modifier.fillMaxWidth().padding(top = 14.dp), dark = true) {
+                    GlassCard(Modifier.fillMaxWidth().padding(top = 14.dp), dark = true, onClick = onReport) {
                         Column(Modifier.padding(16.dp).weight(1f)) {
                             Text("جمع ${vm.season.title} ${vm.year.fa()}", style = MaterialTheme.typography.labelMedium, color = Color(0xCCFFFFFF))
                             Text("${entries.sumOf { it.total }.rial()} ریال", style = MaterialTheme.typography.titleLarge, color = Color.White, modifier = Modifier.padding(top = 2.dp))
@@ -332,11 +356,22 @@ fun DashboardScreen(
                 }
 
                 // ---------- credit ----------
-                Text(
-                    "طراح و برنامه‌نویس: مهندس محمدرضا حیدری",
-                    style = MaterialTheme.typography.bodySmall, color = Color(0xE6FFFFFF),
-                    textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
-                )
+                var showDev by remember { mutableStateOf(false) }
+                Column(
+                    Modifier.fillMaxWidth().padding(top = 24.dp).clip(RoundedCornerShape(14.dp)).clickable { showDev = true }.padding(vertical = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        "طراح و برنامه‌نویس: ${Developer.NAME}",
+                        style = MaterialTheme.typography.bodySmall, color = Color(0xE6FFFFFF), textAlign = TextAlign.Center,
+                    )
+                    Text(
+                        "محیط‌یار نسخه ${ir.mohitban.app.BuildConfigCompat.versionName(context).fa()}",
+                        style = MaterialTheme.typography.labelSmall, color = Color(0xB3FFFFFF), textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+                if (showDev) DeveloperDialog(onDismiss = { showDev = false })
                 Spacer(Modifier.height(124.dp))
             }
             BottomBar(MainTab.HOME, onTab, Modifier.align(Alignment.BottomCenter))
@@ -376,4 +411,23 @@ private fun VerifiedBadge(modifier: Modifier = Modifier) {
             .background(Brush.verticalGradient(listOf(Color(0xFF4CD07D), Color(0xFF1E8C47)))),
         contentAlignment = Alignment.Center,
     ) { Icon(Icons.Outlined.Check, "تأیید شده", tint = Color.White, modifier = Modifier.size(11.dp)) }
+}
+
+/** White glossy plate with green text, used for the organisation names under the logo. */
+@Composable
+private fun OrgPlate(text: String, size: androidx.compose.ui.unit.TextUnit) {
+    Box(
+        Modifier
+            .shadow(4.dp, RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(10.dp))
+            .background(Brush.verticalGradient(listOf(Color.White, Color(0xFFEFF6F1))))
+            .border(1.dp, Color(0xFFCFE3D5), RoundedCornerShape(10.dp))
+            .glossSweep()
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    ) {
+        Text(
+            text, color = MColors.Green, textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = size, fontWeight = FontWeight.Bold),
+        )
+    }
 }

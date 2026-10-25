@@ -62,6 +62,7 @@ fun FuelEntryEntity.toDomain() = FuelEntry(
     ),
     createdAt = createdAt,
     vehicleId = vehicleId,
+    editedAt = editedAt,
 )
 
 fun FuelEntry.toEntity() = FuelEntryEntity(
@@ -85,4 +86,5 @@ fun FuelEntry.toEntity() = FuelEntryEntity(
     snapStation = snapshot.station,
     createdAt = createdAt,
     vehicleId = vehicleId,
+    editedAt = editedAt,
 )

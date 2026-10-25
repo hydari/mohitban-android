@@ -80,6 +80,7 @@ import ir.mohitban.app.ui.common.appViewModel
 import ir.mohitban.app.ui.components.AppCard
 import ir.mohitban.app.ui.components.BottomBar
 import ir.mohitban.app.ui.components.CircleIcon
+import ir.mohitban.app.ui.components.TagBadge
 import ir.mohitban.app.ui.components.ConfirmDialog
 import ir.mohitban.app.ui.components.EmptyState
 import ir.mohitban.app.ui.components.MainTab
@@ -251,7 +252,11 @@ private fun EntryCard(e: FuelEntry, onOpen: () -> Unit, onPdf: () -> Unit, onIma
                     size = 42.dp,
                 )
                 Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
-                    Text("${e.fuelType.short} | ${e.amount.amountText()} ${e.fuelType.unit}", style = MaterialTheme.typography.titleSmall)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("${e.fuelType.short} | ${e.amount.amountText()} ${e.fuelType.unit}", style = MaterialTheme.typography.titleSmall)
+                        // only the ranger sees this; reports and exports never mention edits
+                        if (e.editedAt != null) TagBadge("ویرایش شده", Color(0xFFFFF1D6), Color(0xFFB7791F), Modifier.padding(start = 6.dp))
+                    }
                     Text(
                         "${e.date.formatLong().fa()} | کیلومتر ${e.odometer.rial()}",
                         style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 3.dp),

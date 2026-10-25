@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
@@ -220,4 +221,36 @@ fun SkeuoBell(ringing: Boolean, count: Int, onClick: () -> Unit, modifier: Modif
             }
         }
     }
+}
+
+/**
+ * The same glossy light sweep as [ShimmerLogo], for any content (e.g. the white name plates
+ * under the logo): the highlight is painted only over the content's own pixels.
+ */
+fun Modifier.glossSweep(): Modifier = composed {
+    val t = rememberInfiniteTransition(label = "gloss")
+    val sweep by t.animateFloat(
+        initialValue = -1f, targetValue = 2f,
+        animationSpec = infiniteRepeatable(tween(2600, delayMillis = 900, easing = LinearEasing)),
+        label = "glossSweep",
+    )
+    this
+        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .drawWithContent {
+            drawContent()
+            val w = size.width
+            val x = sweep * w
+            drawRect(
+                Brush.linearGradient(
+                    0f to Color.Transparent,
+                    0.45f to Color.White.copy(alpha = 0f),
+                    0.5f to Color.White.copy(alpha = 0.85f),
+                    0.55f to Color.White.copy(alpha = 0f),
+                    1f to Color.Transparent,
+                    start = Offset(x - w * 0.35f, 0f),
+                    end = Offset(x + w * 0.35f, size.height),
+                ),
+                blendMode = BlendMode.SrcAtop,
+            )
+        }
 }

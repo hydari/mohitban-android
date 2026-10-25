@@ -381,7 +381,7 @@ fun BottomBar(current: MainTab, onSelect: (MainTab) -> Unit, modifier: Modifier 
                 }
             }
             .border(
-                if (glass) 1.dp else 1.5.dp,
+                if (glass) 1.dp else 0.8.dp,
                 if (glass) Brush.verticalGradient(listOf(Color(0x99FFFFFF), Color(0x1AFFFFFF)))
                 else Brush.verticalGradient(listOf(MColors.Green2, MColors.Green)),
                 shape,
