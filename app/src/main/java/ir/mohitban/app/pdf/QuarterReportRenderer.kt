@@ -281,7 +281,7 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
             var x = W - M
             for (i in 0 until ws.size - 1) { x -= ws[i]; c.drawLine(x, t, x, t + h, grid) }
         }
-        fun cells(t: Float, values: List<String>, paint: android.graphics.Paint) {
+        fun cells(t: Float, values: List<String>, paint: android.text.TextPaint) {
             var x = W - M
             values.forEachIndexed { i, v ->
                 PdfKit.fitLine(c, v, x - ws[i] / 2, t + 14f, paint, ws[i] - 6f, Align.CENTER)
