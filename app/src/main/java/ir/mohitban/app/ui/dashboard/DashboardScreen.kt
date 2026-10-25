@@ -45,7 +45,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
+import ir.mohitban.app.ui.components.GlassBackdrop
+import ir.mohitban.app.ui.components.LocalGlassBackdrop
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -150,18 +160,21 @@ fun DashboardScreen(
     val profile = state.profile
     val photo by rememberStoredImage(profile?.photoPath, 300)
 
-    Box(Modifier.fillMaxSize().background(MColors.GreenDark)) {
+    val blurred = ImageBitmap.imageResource(R.drawable.bg_forest_blur)
+    var rootSize by remember { mutableStateOf(IntSize.Zero) }
+    Box(Modifier.fillMaxSize().background(MColors.GreenDark).onSizeChanged { rootSize = it }) {
         Image(painterResource(R.drawable.bg_forest), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         Box(
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
-                    0f to Color(0x8008241A),
-                    0.3f to Color(0x1F08241A),
-                    0.6f to Color(0x0D08241A),
-                    1f to Color(0x8C06180C),
+                    0f to Color(0x9908201A),
+                    0.28f to Color(0x2608201A),
+                    0.6f to Color(0x1A08201A),
+                    1f to Color(0xA606180C),
                 ),
             ),
         )
+        CompositionLocalProvider(LocalGlassBackdrop provides GlassBackdrop(blurred, rootSize)) {
         Column(
             Modifier
                 .fillMaxSize()
@@ -327,6 +340,7 @@ fun DashboardScreen(
                 )
             }
             Spacer(Modifier.height(120.dp))
+        }
         }
         BottomBar(MainTab.HOME, onTab, Modifier.align(Alignment.BottomCenter))
     }

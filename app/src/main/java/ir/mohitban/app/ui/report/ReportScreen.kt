@@ -82,6 +82,7 @@ import ir.mohitban.app.ui.components.MainTab
 import ir.mohitban.app.ui.components.OutlinePill
 import ir.mohitban.app.ui.components.PillButton
 import ir.mohitban.app.ui.components.SectionTitle
+import ir.mohitban.app.ui.components.SuccessDialog
 import ir.mohitban.app.ui.components.SignatureField
 import ir.mohitban.app.ui.components.TopBar
 import ir.mohitban.app.ui.components.rememberSignatureFieldState
@@ -137,6 +138,7 @@ fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?) {
     var busy by remember { mutableStateOf(false) }
     var preview by remember { mutableStateOf<List<Bitmap>?>(null) }
     var pendingSave by remember { mutableStateOf<File?>(null) }
+    var savedOk by remember { mutableStateOf(false) }
 
     val defaultSigPath = vm.defaultSignature(summary, profile)
     val defaultSig by rememberStoredImage(defaultSigPath, 600)
@@ -147,7 +149,7 @@ fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?) {
         if (uri != null && f != null) {
             runCatching {
                 context.contentResolver.openOutputStream(uri)?.use { out -> f.inputStream().use { it.copyTo(out) } }
-            }.onSuccess { Toast.makeText(context, "گزارش ذخیره شد", Toast.LENGTH_SHORT).show() }
+            }.onSuccess { savedOk = true }
         }
         pendingSave = null
     }
@@ -280,6 +282,8 @@ fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?) {
         }
         BottomBar(MainTab.REPORTS, onTab, Modifier.align(Alignment.BottomCenter))
     }
+
+    if (savedOk) SuccessDialog("گزارش ذخیره شد", onFinished = { savedOk = false })
 
     viewReceipt?.let { path ->
         val img by rememberStoredImage(path, 1800)

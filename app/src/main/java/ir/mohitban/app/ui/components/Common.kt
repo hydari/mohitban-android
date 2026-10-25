@@ -35,6 +35,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import kotlin.math.roundToInt
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -134,7 +147,18 @@ fun AppCard(
     )
 }
 
-/** Frosted-glass card used on top of the forest picture. */
+/**
+ * What the glass cards blur: a pre-blurred copy of the full-screen background picture and the
+ * size of the screen area it is drawn into (ContentScale.Crop). Provided by the dashboard.
+ */
+class GlassBackdrop(val blurred: ImageBitmap, val rootSize: IntSize)
+
+val LocalGlassBackdrop = staticCompositionLocalOf<GlassBackdrop?> { null }
+
+/**
+ * Frosted-glass (glassmorphism) card: the blurred background is drawn behind the card at the
+ * card's own screen position, then a translucent tint, a light edge and a soft shadow on top.
+ */
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
@@ -144,15 +168,39 @@ fun GlassCard(
     content: @Composable RowScope.() -> Unit,
 ) {
     val shape = RoundedCornerShape(radius)
+    val backdrop = LocalGlassBackdrop.current
+    var position by remember { mutableStateOf(Offset.Zero) }
     Row(
         modifier = modifier
-            .then(if (!dark) Modifier.shadow(14.dp, shape, ambientColor = Color.Black, spotColor = Color(0x66000000)) else Modifier)
+            .shadow(if (dark) 6.dp else 16.dp, shape, ambientColor = Color.Black, spotColor = Color(0x55000000))
             .clip(shape)
+            .onGloballyPositioned { position = it.positionInRoot() }
+            .drawBehind {
+                if (backdrop != null) {
+                    val img = backdrop.blurred
+                    val root = backdrop.rootSize
+                    val scale = maxOf(root.width.toFloat() / img.width, root.height.toFloat() / img.height)
+                    val w = img.width * scale
+                    val h = img.height * scale
+                    val dx = (root.width - w) / 2f - position.x
+                    val dy = (root.height - h) / 2f - position.y
+                    drawImage(
+                        img,
+                        dstOffset = IntOffset(dx.roundToInt(), dy.roundToInt()),
+                        dstSize = IntSize(w.roundToInt(), h.roundToInt()),
+                        filterQuality = FilterQuality.Low,
+                    )
+                }
+            }
             .background(
-                if (dark) Brush.verticalGradient(listOf(Color(0x8A1B3F2A), Color(0x7A102A1A)))
-                else Brush.verticalGradient(listOf(Color(0xE0EEF6F0), Color(0xD2E1EFE5))),
+                if (dark) Brush.verticalGradient(listOf(Color(0x47FFFFFF), Color(0x1FFFFFFF)))
+                else Brush.verticalGradient(listOf(Color(0xC7F4FAF6), Color(0xB3E8F2EC))),
             )
-            .border(1.dp, if (dark) MColors.GlassDarkBorder else MColors.GlassBorder, shape)
+            .border(
+                1.dp,
+                Brush.verticalGradient(listOf(Color(0xB3FFFFFF), Color(0x26FFFFFF))),
+                shape,
+            )
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         verticalAlignment = Alignment.CenterVertically,
         content = content,

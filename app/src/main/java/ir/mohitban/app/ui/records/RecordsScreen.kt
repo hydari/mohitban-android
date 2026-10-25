@@ -1,5 +1,19 @@
 package ir.mohitban.app.ui.records
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import ir.mohitban.app.ui.components.GreenButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -145,6 +159,7 @@ fun RecordsScreen(onEdit: (Long) -> Unit, onTab: (MainTab) -> Unit, onBack: (() 
     val filter by vm.filter.collectAsStateWithLifecycle()
     val entries by vm.entries.collectAsStateWithLifecycle()
     var toDelete by remember { mutableStateOf<FuelEntry?>(null) }
+    var preview by remember { mutableStateOf<FuelEntry?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -183,6 +198,7 @@ fun RecordsScreen(onEdit: (Long) -> Unit, onTab: (MainTab) -> Unit, onBack: (() 
                             items(monthEntries, key = { it.id }) { e ->
                                 EntryCard(
                                     e,
+                                    onOpen = { preview = e },
                                     onPdf = {
                                         scope.launch {
                                             val f = withContext(Dispatchers.IO) { context.container.fuelForm.createPdf(e) }
@@ -207,6 +223,8 @@ fun RecordsScreen(onEdit: (Long) -> Unit, onTab: (MainTab) -> Unit, onBack: (() 
         BottomBar(MainTab.RECORDS, onTab, Modifier.align(Alignment.BottomCenter))
     }
 
+    preview?.let { e -> FormPreviewDialog(e, onDismiss = { preview = null }) }
+
     toDelete?.let { e ->
         ConfirmDialog(
             title = "حذف ثبت سوخت",
@@ -220,9 +238,9 @@ fun RecordsScreen(onEdit: (Long) -> Unit, onTab: (MainTab) -> Unit, onBack: (() 
 }
 
 @Composable
-private fun EntryCard(e: FuelEntry, onPdf: () -> Unit, onImage: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun EntryCard(e: FuelEntry, onOpen: () -> Unit, onPdf: () -> Unit, onImage: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     val gas = e.fuelType == FuelType.CNG
-    AppCard(Modifier.fillMaxWidth()) {
+    AppCard(Modifier.fillMaxWidth(), onClick = onOpen) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircleIcon(
@@ -285,5 +303,72 @@ private fun Action(icon: ImageVector, text: String, modifier: Modifier, danger: 
         val c = if (danger) MColors.Error else MColors.Green
         Icon(icon, null, tint = c, modifier = Modifier.size(16.dp))
         Text(text, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = c, modifier = Modifier.padding(start = 4.dp))
+    }
+}
+
+/** Shows the official form of an entry as an image, with options to send it as image or PDF. */
+@Composable
+private fun FormPreviewDialog(e: FuelEntry, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val image by produceState<ImageBitmap?>(null, e.id) {
+        value = withContext(Dispatchers.IO) {
+            val f = context.container.fuelForm.createPng(e)
+            BitmapFactory.decodeFile(f.absolutePath)?.asImageBitmap()
+        }
+    }
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(Color(0xF2101410))
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(16.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "فرم هزینه سوخت | ${e.date.format().fa()}",
+                    style = MaterialTheme.typography.titleMedium, color = Color.White, modifier = Modifier.weight(1f),
+                )
+                Box(
+                    Modifier.size(40.dp).clip(CircleShape).background(Color(0x33FFFFFF)).clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Outlined.Close, "بستن", tint = Color.White) }
+            }
+            Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 14.dp), contentAlignment = Alignment.Center) {
+                val img = image
+                if (img == null) {
+                    CircularProgressIndicator(color = Color.White)
+                } else {
+                    Image(
+                        img, "فرم هزینه سوخت", contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp)),
+                    )
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                GreenButton(
+                    "ارسال تصویر",
+                    onClick = {
+                        scope.launch {
+                            val f = withContext(Dispatchers.IO) { context.container.fuelForm.createPng(e) }
+                            Share.file(context, f, "image/png")
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+                GreenButton(
+                    "ارسال PDF",
+                    onClick = {
+                        scope.launch {
+                            val f = withContext(Dispatchers.IO) { context.container.fuelForm.createPdf(e) }
+                            Share.file(context, f, "application/pdf")
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
     }
 }

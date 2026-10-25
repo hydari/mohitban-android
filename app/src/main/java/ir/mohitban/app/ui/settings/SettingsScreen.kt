@@ -63,6 +63,7 @@ import ir.mohitban.app.ui.components.MainTab
 import ir.mohitban.app.ui.components.NumericMode
 import ir.mohitban.app.ui.components.PillButton
 import ir.mohitban.app.ui.components.SectionTitle
+import ir.mohitban.app.ui.components.SuccessDialog
 import ir.mohitban.app.ui.components.TopBar
 import ir.mohitban.app.ui.theme.MColors
 import kotlinx.coroutines.Dispatchers
@@ -116,6 +117,8 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     var confirmRestore by remember { mutableStateOf<android.net.Uri?>(null) }
     var working by remember { mutableStateOf(false) }
+    var success by remember { mutableStateOf<String?>(null) }
+    var restored by remember { mutableStateOf(false) }
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         if (uri != null) {
@@ -123,8 +126,8 @@ fun SettingsScreen(
             scope.launch {
                 val ok = withContext(Dispatchers.IO) { runCatching { context.container.backup.export(uri) }.isSuccess }
                 working = false
-                if (ok) vm.markBackup()
-                Toast.makeText(context, if (ok) "فایل پشتیبان ذخیره شد" else "ساخت پشتیبان ناموفق بود", Toast.LENGTH_LONG).show()
+                if (ok) { vm.markBackup(); success = "فایل پشتیبان ذخیره شد" }
+                else Toast.makeText(context, "ساخت پشتیبان ناموفق بود", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -167,7 +170,8 @@ fun SettingsScreen(
                             )
                             PillButton("ذخیره نرخ‌ها", icon = Icons.Outlined.Check, onClick = {
                                 vm.saveRates { ok ->
-                                    Toast.makeText(context, if (ok) "نرخ‌ها ذخیره شد" else "همه نرخ‌ها باید بزرگ‌تر از صفر باشند", Toast.LENGTH_SHORT).show()
+                                    if (ok) success = "نرخ‌ها ذخیره شد"
+                                    else Toast.makeText(context, "همه نرخ‌ها باید بزرگ‌تر از صفر باشند", Toast.LENGTH_SHORT).show()
                                 }
                             }, modifier = Modifier.padding(bottom = 10.dp))
                         }
@@ -207,6 +211,9 @@ fun SettingsScreen(
         }
     }
 
+    success?.let { msg -> SuccessDialog(msg, onFinished = { success = null }) }
+    if (restored) SuccessDialog("اطلاعات بازیابی شد", onFinished = { restored = false; onRestored() })
+
     confirmRestore?.let { uri ->
         ConfirmDialog(
             title = "بازیابی اطلاعات",
@@ -221,8 +228,7 @@ fun SettingsScreen(
                     val result = withContext(Dispatchers.IO) { runCatching { context.container.backup.restore(uri) } }
                     working = false
                     if (result.isSuccess) {
-                        Toast.makeText(context, "اطلاعات بازیابی شد", Toast.LENGTH_LONG).show()
-                        onRestored()
+                        restored = true
                     } else {
                         Toast.makeText(context, "فایل پشتیبان معتبر نیست", Toast.LENGTH_LONG).show()
                     }

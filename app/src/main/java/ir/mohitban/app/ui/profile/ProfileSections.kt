@@ -89,15 +89,19 @@ fun PersonalSection(form: ProfileForm, errors: Map<String, String>, onChange: (P
     }
     MField(form.fullName, { onChange(form.copy(fullName = it)) }, label = "نام و نام خانوادگی", leadingIcon = Icons.Outlined.Person, placeholder = "علی رضایی", error = errors["fullName"])
     MField(form.fatherName, { onChange(form.copy(fatherName = it)) }, label = "نام پدر", leadingIcon = Icons.Outlined.Person, placeholder = "حسن", error = errors["fatherName"])
-    val idOk = form.nationalId.length == 10 && errors["nationalId"] == null && ir.mohitban.app.core.text.Validators.nationalId(form.nationalId) == null
+    // national ID is checked live: as soon as 10 digits are typed an invalid code shows an error
+    val idCheck = ir.mohitban.app.core.text.Validators.nationalId(form.nationalId)
+    val idLiveError = if (form.nationalId.length == 10) idCheck else null
+    val idOk = form.nationalId.length == 10 && idCheck == null
     MField(
         form.nationalId, { onChange(form.copy(nationalId = it)) }, label = "کد ملی", leadingIcon = Icons.Outlined.Badge,
-        numeric = NumericMode.Digits, maxLength = 10, placeholder = "۱۰ رقم", error = errors["nationalId"],
+        numeric = NumericMode.Digits, maxLength = 10, placeholder = "۱۰ رقم", error = errors["nationalId"] ?: idLiveError,
         success = if (idOk) "کد ملی معتبر است" else null,
     )
+    val mobileLiveError = if (form.mobile.length == 11) ir.mohitban.app.core.text.Validators.mobile(form.mobile) else null
     MField(
         form.mobile, { onChange(form.copy(mobile = it)) }, label = "شماره همراه", leadingIcon = Icons.Outlined.PhoneAndroid,
-        numeric = NumericMode.Digits, maxLength = 11, placeholder = "۰۹۱۲۳۴۵۶۷۸۹", error = errors["mobile"],
+        numeric = NumericMode.Digits, maxLength = 11, placeholder = "۰۹۱۲۳۴۵۶۷۸۹", error = errors["mobile"] ?: mobileLiveError,
     )
     ComboField(form.rank, { onChange(form.copy(rank = it)) }, Suggestions.ranks, label = "درجه / سمت", leadingIcon = Icons.Outlined.Park, placeholder = "محیط‌بان", error = errors["rank"])
 }

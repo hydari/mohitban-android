@@ -61,6 +61,7 @@ import ir.mohitban.app.ui.components.ConfirmDialog
 import ir.mohitban.app.ui.components.PillButton
 import ir.mohitban.app.ui.components.PlateView
 import ir.mohitban.app.ui.components.SectionTitle
+import ir.mohitban.app.ui.components.SuccessDialog
 import ir.mohitban.app.ui.components.TagBadge
 import ir.mohitban.app.ui.components.TopBar
 import ir.mohitban.app.ui.theme.MColors
@@ -107,12 +108,7 @@ class ProfileEditViewModel(private val repo: ProfileRepository) : ViewModel() {
 fun ProfileEditScreen(onBack: () -> Unit) {
     val vm = appViewModel(key = "edit_profile") { c, _ -> ProfileEditViewModel(c.profileRepository) }
     val context = LocalContext.current
-    LaunchedEffect(vm.saved) {
-        if (vm.saved) {
-            Toast.makeText(context, "تغییرات ذخیره شد", Toast.LENGTH_SHORT).show()
-            onBack()
-        }
-    }
+    if (vm.saved) SuccessDialog("تغییرات ذخیره شد", onFinished = onBack)
     Column(Modifier.fillMaxSize().background(MColors.Bg)) {
         TopBar("ویرایش اطلاعات فردی", onBack = onBack)
         if (!vm.loaded) return@Column
@@ -277,12 +273,7 @@ class VehicleEditViewModel(
 fun VehicleEditScreen(vehicleId: Long, onBack: () -> Unit, onSaved: (Long) -> Unit) {
     val vm = appViewModel(key = "vehicle_$vehicleId") { c, _ -> VehicleEditViewModel(c.profileRepository, c.settingsRepository, vehicleId) }
     val context = LocalContext.current
-    LaunchedEffect(vm.savedId) {
-        vm.savedId?.let {
-            Toast.makeText(context, "اطلاعات وسیله ذخیره شد", Toast.LENGTH_SHORT).show()
-            onSaved(it)
-        }
-    }
+    vm.savedId?.let { id -> SuccessDialog("اطلاعات وسیله ذخیره شد", onFinished = { onSaved(id) }) }
     Column(Modifier.fillMaxSize().background(MColors.Bg)) {
         TopBar(if (vehicleId == 0L) "افزودن وسیله نقلیه" else "ویرایش وسیله نقلیه", onBack = onBack)
         if (!vm.loaded) return@Column

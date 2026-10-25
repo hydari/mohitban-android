@@ -2,7 +2,13 @@ package ir.mohitban.app.ui.fuel
 
 import android.graphics.Bitmap
 import android.graphics.PointF
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.material.icons.outlined.Crop
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -70,6 +76,8 @@ fun ReceiptCropScreen(rawPath: String, onDone: (String) -> Unit, onCancel: () ->
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
     val corners = remember { mutableStateListOf<Offset>() }
     var busy by remember { mutableStateOf(true) }
+    /** The straightened receipt waiting for the user's approval. */
+    var result by remember { mutableStateOf<Bitmap?>(null) }
 
     suspend fun detect(b: Bitmap) {
         val c = withContext(Dispatchers.Default) { ReceiptCropper.detect(b) }
@@ -92,13 +100,25 @@ fun ReceiptCropScreen(rawPath: String, onDone: (String) -> Unit, onCancel: () ->
                 modifier = Modifier.size(40.dp).clip(RoundedCornerShape(20.dp)).clickable(onClick = onCancel).padding(8.dp),
             )
             Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
-                Text("برش رسید", style = MaterialTheme.typography.titleMedium, color = Color.White)
-                Text("گوشه‌ها را روی لبه‌های رسید قرار دهید", style = MaterialTheme.typography.labelSmall, color = Color(0xB3FFFFFF))
+                Text(if (result == null) "برش رسید" else "پیش‌نمایش رسید", style = MaterialTheme.typography.titleMedium, color = Color.White)
+                Text(
+                    if (result == null) "گوشه‌ها را روی لبه‌های رسید قرار دهید" else "اگر رسید خوانا است، تأیید کنید تا روی فرم قرار بگیرد",
+                    style = MaterialTheme.typography.labelSmall, color = Color(0xB3FFFFFF),
+                )
             }
         }
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
             val b = bitmap
-            if (b == null || corners.size != 4) {
+            val r = result
+            if (r != null) {
+                val img = remember(r) { r.asImageBitmap() }
+                AnimatedVisibility(visible = true, enter = fadeIn() + scaleIn(initialScale = 0.9f)) {
+                    Image(
+                        img, "رسید برش‌خورده", contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
+                    )
+                }
+            } else if (b == null || corners.size != 4) {
                 CircularProgressIndicator(color = Color.White)
             } else {
                 val density = LocalDensity.current
@@ -163,42 +183,58 @@ fun ReceiptCropScreen(rawPath: String, onDone: (String) -> Unit, onCancel: () ->
             }
         }
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                ToolButton(Icons.Outlined.RotateRight, "چرخش", Modifier.weight(1f)) {
-                    val b = bitmap ?: return@ToolButton
-                    scope.launch {
+            val r = result
+            if (r != null) {
+                // ---------- step 2: confirm the straightened receipt ----------
+                PillButton(
+                    "تأیید و قرار دادن روی فرم",
+                    icon = Icons.Outlined.Check,
+                    loading = busy,
+                    onClick = {
                         busy = true
-                        val r = withContext(Dispatchers.Default) { ReceiptCropper.rotate90(b) }
-                        bitmap = r
-                        detect(r)
-                        busy = false
-                    }
-                }
-                ToolButton(Icons.Outlined.CropFree, "کل تصویر", Modifier.weight(1f)) {
-                    val b = bitmap ?: return@ToolButton
-                    corners.clear()
-                    corners.addAll(ReceiptCropper.defaultCorners(b.width, b.height, 0f).map { Offset(it.x, it.y) })
-                }
-            }
-            PillButton(
-                "تأیید برش",
-                icon = Icons.Outlined.Check,
-                loading = busy,
-                modifier = Modifier.padding(top = 12.dp),
-                onClick = {
-                    val b = bitmap ?: return@PillButton
-                    if (corners.size != 4) return@PillButton
-                    busy = true
-                    scope.launch {
-                        val path = withContext(Dispatchers.Default) {
-                            val out = ReceiptCropper.warp(b, corners.map { PointF(it.x, it.y) })
-                            files.saveJpeg(out, "receipt", 90)
+                        scope.launch {
+                            val path = withContext(Dispatchers.IO) { files.saveJpeg(r, "receipt", 90) }
+                            runCatching { File(rawPath).delete() }
+                            onDone(path)
                         }
-                        runCatching { File(rawPath).delete() }
-                        onDone(path)
+                    },
+                )
+                ToolButton(Icons.Outlined.Crop, "ویرایش برش", Modifier.fillMaxWidth().padding(top = 10.dp)) { result = null }
+            } else {
+                // ---------- step 1: adjust the corners ----------
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    ToolButton(Icons.Outlined.RotateRight, "چرخش", Modifier.weight(1f)) {
+                        val b = bitmap ?: return@ToolButton
+                        scope.launch {
+                            busy = true
+                            val rotated = withContext(Dispatchers.Default) { ReceiptCropper.rotate90(b) }
+                            bitmap = rotated
+                            detect(rotated)
+                            busy = false
+                        }
                     }
-                },
-            )
+                    ToolButton(Icons.Outlined.CropFree, "کل تصویر", Modifier.weight(1f)) {
+                        val b = bitmap ?: return@ToolButton
+                        corners.clear()
+                        corners.addAll(ReceiptCropper.defaultCorners(b.width, b.height, 0f).map { Offset(it.x, it.y) })
+                    }
+                }
+                PillButton(
+                    "برش و پیش‌نمایش",
+                    icon = Icons.Outlined.Check,
+                    loading = busy,
+                    modifier = Modifier.padding(top = 12.dp),
+                    onClick = {
+                        val b = bitmap ?: return@PillButton
+                        if (corners.size != 4) return@PillButton
+                        busy = true
+                        scope.launch {
+                            result = withContext(Dispatchers.Default) { ReceiptCropper.warp(b, corners.map { PointF(it.x, it.y) }) }
+                            busy = false
+                        }
+                    },
+                )
+            }
         }
     }
 }

@@ -44,6 +44,7 @@ import ir.mohitban.app.domain.repository.ProfileRepository
 import ir.mohitban.app.ui.common.appViewModel
 import ir.mohitban.app.ui.components.PillButton
 import ir.mohitban.app.ui.components.StepIndicator
+import ir.mohitban.app.ui.components.SuccessDialog
 import ir.mohitban.app.ui.profile.LocationSection
 import ir.mohitban.app.ui.profile.PersonalSection
 import ir.mohitban.app.ui.profile.ProfileForm
@@ -125,7 +126,7 @@ private val SUBTITLES = listOf(
 @Composable
 fun OnboardingScreen(onFinished: () -> Unit) {
     val vm = appViewModel { c, h -> OnboardingViewModel(c.profileRepository, c.fuelRepository, h) }
-    LaunchedEffect(vm.done) { if (vm.done) onFinished() }
+    if (vm.done) SuccessDialog("ثبت‌نام با موفقیت انجام شد", onFinished = onFinished)
     BackHandler(enabled = vm.step > 0) { vm.back() }
     val scroll = rememberScrollState()
     LaunchedEffect(vm.step) { scroll.animateScrollTo(0) }

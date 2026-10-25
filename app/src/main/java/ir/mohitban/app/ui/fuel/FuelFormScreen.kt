@@ -73,6 +73,8 @@ import ir.mohitban.app.ui.common.appViewModel
 import ir.mohitban.app.ui.components.AppCard
 import ir.mohitban.app.ui.components.TagBadge
 import ir.mohitban.app.ui.components.CircleIcon
+import ir.mohitban.app.ui.components.AnimatedCheck
+import ir.mohitban.app.ui.components.GreenButton
 import ir.mohitban.app.ui.components.FieldLabel
 import ir.mohitban.app.ui.components.FieldMessage
 import ir.mohitban.app.ui.components.JalaliDatePickerDialog
@@ -394,14 +396,11 @@ fun FuelFormScreen(
                 }
             },
             confirmButton = {
-                TextButton(
+                GreenButton(
+                    if (vm.saving) "در حال ثبت…" else "ثبت نهایی",
                     enabled = !vm.saving,
-                    onClick = {
-                        scope.launch {
-                            vm.save(driverSig.bitmap, passengerSig.bitmap, passengerCleared = passengerSig.isEmpty)
-                        }
-                    },
-                ) { Text(if (vm.saving) "در حال ثبت…" else "ثبت نهایی", color = MColors.Green, style = MaterialTheme.typography.labelLarge) }
+                    onClick = { vm.save(driverSig.bitmap, passengerSig.bitmap, passengerCleared = passengerSig.isEmpty) },
+                )
             },
             dismissButton = { TextButton(onClick = { vm.showConfirm = false }) { Text("ویرایش", color = MColors.Muted) } },
         )
@@ -412,7 +411,7 @@ fun FuelFormScreen(
         AlertDialog(
             onDismissRequest = onDone,
             containerColor = Color.White,
-            icon = { CircleIcon(Icons.Outlined.Check, MColors.GreenLight, MColors.Green, size = 56.dp, iconSize = 30.dp) },
+            icon = { AnimatedCheck(size = 72.dp) },
             title = { Text("فرم هزینه سوخت ثبت شد", style = MaterialTheme.typography.titleMedium) },
             text = { Text("فرم رسمی را می‌توانید به صورت PDF یا تصویر برای اداره ارسال کنید.", style = MaterialTheme.typography.bodyMedium, color = MColors.Muted) },
             confirmButton = {
