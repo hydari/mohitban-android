@@ -48,6 +48,7 @@ fun JalaliDatePickerDialog(
     onDismiss: () -> Unit,
     onConfirm: (JalaliDate) -> Unit,
     maxDate: JalaliDate? = JalaliDate.today(),
+    title: String = "تاریخ سوخت‌گیری",
 ) {
     val today = remember { JalaliDate.today() }
     var selected by remember { mutableStateOf(initial) }
@@ -66,7 +67,7 @@ fun JalaliDatePickerDialog(
                 .background(Color.White)
                 .padding(16.dp),
         ) {
-            Text("تاریخ سوخت‌گیری", style = MaterialTheme.typography.labelMedium, color = MColors.Muted)
+            Text(title, style = MaterialTheme.typography.labelMedium, color = MColors.Muted)
             Text(selected.formatLong().fa(), style = MaterialTheme.typography.titleLarge, color = MColors.Green)
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {

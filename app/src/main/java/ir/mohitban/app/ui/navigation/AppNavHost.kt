@@ -53,6 +53,7 @@ object Routes {
     const val EDIT_PROFILE = "edit_profile"
     const val VEHICLES = "vehicles"
     const val ALERTS = "alerts"
+    const val SHIFT = "shift"
     const val VEHICLE = "vehicle/{id}"
 
     fun fuel(id: Long = 0L) = "fuel?entryId=$id"
@@ -118,6 +119,7 @@ fun AppNavHost(openReportsRequest: Int = 0) {
                 onProfile = { nav.navigate(Routes.EDIT_PROFILE) },
                 onSettings = { nav.openTab(MainTab.SETTINGS) },
                 onAlerts = { nav.navigate(Routes.ALERTS) },
+                onShift = { nav.navigate(Routes.SHIFT) },
                 onTab = { nav.openTab(it) },
             )
         }
@@ -185,6 +187,9 @@ fun AppNavHost(openReportsRequest: Int = 0) {
                     nav.openTab(if (target == AlertTarget.REPORTS) MainTab.REPORTS else MainTab.SETTINGS)
                 },
             )
+        }
+        composable(Routes.SHIFT) {
+            ir.mohitban.app.ui.shift.ShiftScreen(onBack = { nav.popBackStack() })
         }
         composable(Routes.VEHICLES) {
             VehiclesScreen(onBack = { nav.popBackStack() }, onEdit = { nav.navigate(Routes.vehicle(it)) })

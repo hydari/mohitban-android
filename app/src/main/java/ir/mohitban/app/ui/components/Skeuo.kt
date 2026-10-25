@@ -97,16 +97,19 @@ fun ShimmerLogo(size: Dp = 60.dp, modifier: Modifier = Modifier) {
  * shadow; [content] fills the inner disc.
  */
 @Composable
-fun GlassRing(size: Dp, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, content: @Composable () -> Unit) {
+fun GlassRing(size: Dp, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, rim: Color? = null, content: @Composable () -> Unit) {
     Box(
         modifier
             .size(size)
-            .shadow(14.dp, CircleShape, ambientColor = Color.Black, spotColor = Color(0x80000000))
+            .shadow(14.dp, CircleShape, ambientColor = rim ?: Color.Black, spotColor = rim ?: Color(0x80000000))
             .clip(CircleShape)
-            .background(Brush.linearGradient(listOf(Color(0x8CFFFFFF), Color(0x29FFFFFF), Color(0x52FFFFFF)), start = Offset.Zero, end = Offset.Infinite))
+            .background(
+                if (rim != null) Brush.linearGradient(listOf(lerpColor(rim, Color.White, 0.35f), rim, lerpColor(rim, Color.Black, 0.25f)), start = Offset.Zero, end = Offset.Infinite)
+                else Brush.linearGradient(listOf(Color(0x8CFFFFFF), Color(0x29FFFFFF), Color(0x52FFFFFF)), start = Offset.Zero, end = Offset.Infinite),
+            )
             .border(1.dp, Brush.verticalGradient(listOf(Color(0xF2FFFFFF), Color(0x33FFFFFF))), CircleShape)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(3.dp),
+            .padding(if (rim != null) 3.5.dp else 3.dp),
         contentAlignment = Alignment.Center,
     ) {
         content()

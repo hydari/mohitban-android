@@ -136,11 +136,11 @@ class FuelFormRenderer(private val context: Context, private val files: FileStor
             // centre the plate over the dotted line
             val tmp = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
             val probe = Canvas(tmp)
-            val plateH = if (s.plate is ir.mohitban.app.domain.model.Plate.Car) 27f else 20f
+            val plateH = if (s.plate is ir.mohitban.app.domain.model.Plate.Car) 27f else 25f
             val pw = PdfKit.plate(probe, s.plate, 400f, 0f, plateH)
             tmp.recycle()
             val cx = (areaLeft + areaRight) / 2
-            val cy = if (s.plate is ir.mohitban.app.domain.model.Plate.Car) y - 9f else y - 10f
+            val cy = if (s.plate is ir.mohitban.app.domain.model.Plate.Car) y - 9f else y - 12f
             val ph = if (s.plate is ir.mohitban.app.domain.model.Plate.Car) plateH else plateH * 1.45f
             // white gap behind the plate only (never reaches the city row above)
             c.drawRect(cx - pw / 2 - 3f, cy - ph / 2 - 1.5f, cx + pw / 2 + 3f, y + 4f, PdfKit.fill(Color.WHITE))

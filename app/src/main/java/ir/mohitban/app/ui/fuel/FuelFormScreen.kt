@@ -331,7 +331,7 @@ fun FuelFormScreen(
                             Text(v.title, style = MaterialTheme.typography.titleSmall)
                             Text(v.type.title, style = MaterialTheme.typography.labelSmall, color = MColors.Muted)
                         }
-                        PlateView(v.plate, height = 28.dp)
+                        PlateView(v.plate, height = if (v.type == VehicleType.CAR) 28.dp else 32.dp)
                     }
                 }
                 OutlinePill(

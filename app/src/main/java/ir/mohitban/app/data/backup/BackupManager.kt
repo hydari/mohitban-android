@@ -129,6 +129,8 @@ class BackupManager(
         put("lastBackupAt", lastBackupAt ?: JSONObject.NULL)
         put("defaultVehicleId", defaultVehicleId ?: JSONObject.NULL)
         put("reportedSeasonKey", reportedSeasonKey ?: JSONObject.NULL)
+        put("shiftWork", shiftWork ?: JSONObject.NULL); put("shiftRest", shiftRest ?: JSONObject.NULL)
+        put("shiftStartJdn", shiftStartJdn ?: JSONObject.NULL); put("shiftOverrides", shiftOverrides ?: JSONObject.NULL)
     }
 
     private fun JSONObject.toSettings() = SettingsEntity(
@@ -136,6 +138,10 @@ class BackupManager(
         cngRate = optLong("cng", 6_568), lastBackupAt = if (isNull("lastBackupAt")) null else optLong("lastBackupAt"),
         defaultVehicleId = if (!has("defaultVehicleId") || isNull("defaultVehicleId")) null else optLong("defaultVehicleId"),
         reportedSeasonKey = if (!has("reportedSeasonKey") || isNull("reportedSeasonKey")) null else optInt("reportedSeasonKey"),
+        shiftWork = if (!has("shiftWork") || isNull("shiftWork")) null else optInt("shiftWork"),
+        shiftRest = if (!has("shiftRest") || isNull("shiftRest")) null else optInt("shiftRest"),
+        shiftStartJdn = if (!has("shiftStartJdn") || isNull("shiftStartJdn")) null else optInt("shiftStartJdn"),
+        shiftOverrides = if (!has("shiftOverrides") || isNull("shiftOverrides")) null else optString("shiftOverrides"),
     )
 
     private fun FuelEntryEntity.toJson() = JSONObject().apply {

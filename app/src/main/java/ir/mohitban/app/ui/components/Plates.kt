@@ -89,16 +89,6 @@ private fun FlagStrip(width: Dp, small: Boolean) {
     }
 }
 
-@Suppress("DEPRECATION")
-private fun TextStyle.tight(size: TextUnit) = copy(
-    lineHeight = size,
-    platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false),
-    lineHeightStyle = androidx.compose.ui.text.style.LineHeightStyle(
-        alignment = androidx.compose.ui.text.style.LineHeightStyle.Alignment.Center,
-        trim = androidx.compose.ui.text.style.LineHeightStyle.Trim.Both,
-    ),
-)
-
 private fun plateStyle(size: TextUnit) = TextStyle(
     color = Color.White,
     fontWeight = FontWeight.Black,
@@ -164,14 +154,10 @@ fun RedMotoPlate(plate: Plate.Motorcycle, height: Dp = 70.dp, modifier: Modifier
             Column(
                 Modifier.padding(horizontal = height * 0.2f).widthIn(min = height * 1.1f),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
             ) {
-                // tight line boxes so the two rows fill the plate without being clipped or squeezed
-                val topSize = (height * 0.34f).sp()
-                val bottomSize = (height * 0.38f).sp()
-                Text(plate.top.fa(), style = plateStyle(topSize).tight(topSize).copy(letterSpacing = (height * 0.03f).sp()))
-                Box(Modifier.padding(vertical = height * 0.035f).fillMaxWidth().height(height * 0.03f).background(Color.White))
-                Text(plate.bottom.fa(), style = plateStyle(bottomSize).tight(bottomSize).copy(letterSpacing = (height * 0.04f).sp()))
+                Text(plate.top.fa(), style = plateStyle((height * 0.3f).sp()).copy(letterSpacing = (height * 0.03f).sp()))
+                Box(Modifier.fillMaxWidth().height(height * 0.03f).background(Color.White))
+                Text(plate.bottom.fa(), style = plateStyle((height * 0.33f).sp()).copy(letterSpacing = (height * 0.04f).sp()))
             }
         }
     }
@@ -182,7 +168,7 @@ fun RedMotoPlate(plate: Plate.Motorcycle, height: Dp = 70.dp, modifier: Modifier
 fun PlateView(plate: Plate, height: Dp = 46.dp, modifier: Modifier = Modifier) {
     when (plate) {
         is Plate.Car -> RedCarPlate(plate, height, modifier)
-        is Plate.Motorcycle -> RedMotoPlate(plate, height * 1.6f, modifier)
+        is Plate.Motorcycle -> RedMotoPlate(plate, height * 1.5f, modifier)
     }
 }
 

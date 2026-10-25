@@ -114,6 +114,15 @@ import androidx.compose.ui.unit.sp
 import ir.mohitban.app.ui.components.Developer
 import ir.mohitban.app.ui.components.DeveloperDialog
 import ir.mohitban.app.ui.components.glossSweep
+import ir.mohitban.app.domain.model.ShiftStatus
+import ir.mohitban.app.ui.shift.ShiftColors
+import ir.mohitban.app.ui.shift.ShiftText
+import androidx.compose.material.icons.outlined.EventRepeat
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.animation.core.animateFloat
 
 data class DashboardState(
     val profile: RangerProfile? = null,
@@ -123,6 +132,7 @@ data class DashboardState(
     val due: ReportReminder.Due? = null,
     val lastBackupAt: Long? = null,
     val reportedKey: Int? = null,
+    val shift: ir.mohitban.app.domain.model.ShiftPattern? = null,
 )
 
 class DashboardViewModel(profiles: ProfileRepository, fuel: FuelRepository, settings: SettingsRepository) : ViewModel() {
@@ -134,7 +144,8 @@ class DashboardViewModel(profiles: ProfileRepository, fuel: FuelRepository, sett
         fuel.observeSeason(today.year, today.season),
         settings.reminder,
         settings.lastBackupAt,
-    ) { pvd, e, reminder, backup ->
+        settings.shift,
+    ) { pvd, e, reminder, backup, shift ->
         val (p, vs, defaultId) = pvd
         DashboardState(
             profile = p,
@@ -144,6 +155,7 @@ class DashboardViewModel(profiles: ProfileRepository, fuel: FuelRepository, sett
             due = ReportReminder.due(today, reminder.reportedSeasonKey),
             lastBackupAt = backup,
             reportedKey = reminder.reportedSeasonKey,
+            shift = shift,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardState())
 }
@@ -157,6 +169,7 @@ fun DashboardScreen(
     onProfile: () -> Unit,
     onSettings: () -> Unit,
     onAlerts: () -> Unit,
+    onShift: () -> Unit,
     onTab: (MainTab) -> Unit,
 ) {
     val vm = appViewModel { c, _ -> DashboardViewModel(c.profileRepository, c.fuelRepository, c.settingsRepository) }
@@ -184,6 +197,7 @@ fun DashboardScreen(
     val photo by rememberStoredImage(profile?.photoPath, 300)
     val alerts = Alerts.build(vm.today, profile?.fullName.orEmpty(), state.reportedKey, state.lastBackupAt)
     val urgentCount = alerts.count { it.urgent }
+    val shiftStatus = state.shift?.status(vm.today.jdn)
 
     val blurred = ImageBitmap.imageResource(R.drawable.bg_forest_blur)
     var rootSize by remember { mutableStateOf(IntSize.Zero) }
@@ -221,7 +235,10 @@ fun DashboardScreen(
 
                 // ---------- personal card (liquid glass): photo | name, rank · station | bell ----------
                 GlassCard(Modifier.fillMaxWidth().padding(top = 14.dp), dark = true) {
-                    GlassRing(70.dp, Modifier.padding(start = 12.dp, top = 12.dp, bottom = 12.dp), onClick = onProfile) {
+                    GlassRing(
+                        70.dp, Modifier.padding(start = 12.dp, top = 12.dp, bottom = 12.dp), onClick = onProfile,
+                        rim = shiftStatus?.let { if (it is ShiftStatus.OnDuty) ShiftColors.On else ShiftColors.Off },
+                    ) {
                         Box(
                             Modifier.fillMaxSize().clip(CircleShape)
                                 .background(Brush.linearGradient(listOf(Color(0xFFD9CFB4), Color(0xFFA68A5F)))),
@@ -268,10 +285,49 @@ fun DashboardScreen(
                             }
                         }
                     }
-                    SkeuoBell(
-                        ringing = urgentCount > 0, count = urgentCount, onClick = onAlerts,
-                        size = 46.dp, plain = true, modifier = Modifier.padding(end = 10.dp),
+                    MinimalBell(ringing = urgentCount > 0, count = urgentCount, onClick = onAlerts, modifier = Modifier.padding(end = 8.dp))
+                }
+
+                // ---------- today's shift ----------
+                val onDuty = shiftStatus is ShiftStatus.OnDuty
+                GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp), dark = true, onClick = onShift) {
+                    CircleIcon(
+                        when {
+                            shiftStatus == null -> Icons.Outlined.EventRepeat
+                            onDuty -> Icons.Outlined.Shield
+                            else -> Icons.Outlined.Bedtime
+                        },
+                        if (shiftStatus == null || onDuty) ShiftColors.On else ShiftColors.Off, Color.White,
+                        size = 42.dp, iconSize = 21.dp, modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 10.dp),
                     )
+                    Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                        Text(
+                            if (shiftStatus == null) "شیفت کاری" else ShiftText.title(shiftStatus),
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = if (onDuty) Color(0xFF7CF0A6) else Color.White,
+                        )
+                        Text(
+                            if (shiftStatus == null) "الگوی شیفت خود را ثبت کنید" else ShiftText.detail(shiftStatus),
+                            style = MaterialTheme.typography.labelSmall, color = Color(0xCCFFFFFF), modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
+                    if (shiftStatus != null) {
+                        // status pill: green and lit when on duty, grey and "off" when resting
+                        Box(
+                            Modifier
+                                .padding(end = 14.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (onDuty) ShiftColors.On else Color(0x40FFFFFF))
+                                .border(1.dp, if (onDuty) Color(0x99FFFFFF) else Color(0x33FFFFFF), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                        ) {
+                            Text(
+                                if (onDuty) "شیفت" else "استراحت",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                color = if (onDuty) Color.White else Color(0xB3FFFFFF),
+                            )
+                        }
+                    }
                 }
 
                 // ---------- main action ----------
@@ -431,5 +487,47 @@ private fun OrgPlate(text: String, size: androidx.compose.ui.unit.TextUnit) {
             text, color = MColors.Green, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.labelSmall.copy(fontSize = size, fontWeight = FontWeight.Bold),
         )
+    }
+}
+
+/** A simple white outline bell that swings when something needs attention; red dot shows the count. */
+@Composable
+private fun MinimalBell(ringing: Boolean, count: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "bell")
+    val swing by t.animateFloat(
+        initialValue = 0f, targetValue = 0f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            androidx.compose.animation.core.keyframes {
+                durationMillis = 2600
+                0f at 0
+                -18f at 120
+                14f at 260
+                -10f at 400
+                6f at 540
+                0f at 680
+                0f at 2600
+            },
+        ),
+        label = "swing",
+    )
+    Box(modifier.size(44.dp).clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+        Icon(
+            Icons.Outlined.NotificationsNone, "اعلان‌ها", tint = Color.White,
+            modifier = Modifier
+                .size(27.dp)
+                .graphicsLayer {
+                    rotationZ = if (ringing) swing else 0f
+                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0.1f)
+                },
+        )
+        if (count > 0) {
+            Box(
+                Modifier.align(Alignment.TopEnd).padding(top = 7.dp, end = 7.dp).size(15.dp).clip(CircleShape)
+                    .background(Color(0xFFE5483B)).border(1.dp, Color.White, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(count.fa(), color = Color.White, style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold, lineHeight = 10.sp))
+            }
+        }
     }
 }

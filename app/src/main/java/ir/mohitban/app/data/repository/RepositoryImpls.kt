@@ -94,6 +94,24 @@ class SettingsRepositoryImpl(private val db: AppDatabase) : SettingsRepository {
     override suspend fun getReminder(): ReminderState = current().let { ReminderState(it.reportedSeasonKey, it.lastReminderJdn) }
     override suspend fun markSeasonReported(key: Int) = dao.upsert(current().copy(reportedSeasonKey = key))
     override suspend fun markReminderShown(jdn: Int) = dao.upsert(current().copy(lastReminderJdn = jdn))
+
+    override val shift: Flow<ir.mohitban.app.domain.model.ShiftPattern?> = dao.observe().map { s ->
+        val w = s?.shiftWork; val r = s?.shiftRest; val start = s?.shiftStartJdn
+        if (s == null || w == null || r == null || start == null) null
+        else ir.mohitban.app.domain.model.ShiftPattern(w, r, start, ir.mohitban.app.domain.model.ShiftPattern.decodeOverrides(s.shiftOverrides))
+    }
+
+    override suspend fun saveShift(pattern: ir.mohitban.app.domain.model.ShiftPattern?) {
+        // keep manual changes of roughly the last year and everything ahead
+        val today = ir.mohitban.app.core.jalali.JalaliDate.today().jdn
+        val kept = pattern?.copy(overrides = pattern.overrides.filterKeys { it >= today - 400 })
+        dao.upsert(
+            current().copy(
+                shiftWork = kept?.work, shiftRest = kept?.rest, shiftStartJdn = kept?.startJdn,
+                shiftOverrides = kept?.encodeOverrides(),
+            ),
+        )
+    }
 }
 
 class FuelRepositoryImpl(

@@ -39,6 +39,8 @@ interface SettingsRepository {
     suspend fun getReminder(): ReminderState
     suspend fun markSeasonReported(key: Int)
     suspend fun markReminderShown(jdn: Int)
+    val shift: Flow<ir.mohitban.app.domain.model.ShiftPattern?>
+    suspend fun saveShift(pattern: ir.mohitban.app.domain.model.ShiftPattern?)
 }
 
 interface FuelRepository {

@@ -50,6 +50,12 @@ data class SettingsEntity(
     val reportedSeasonKey: Int? = null,
     /** JDN of the day the last reminder notification was shown (one per day). */
     val lastReminderJdn: Int? = null,
+    /** Shift pattern (null = not set up yet). */
+    val shiftWork: Int? = null,
+    val shiftRest: Int? = null,
+    val shiftStartJdn: Int? = null,
+    /** Manual changes: "jdn:1,jdn:0". */
+    val shiftOverrides: String? = null,
 )
 
 @Entity(tableName = "fuel_entry", indices = [Index("dateJdn")])
