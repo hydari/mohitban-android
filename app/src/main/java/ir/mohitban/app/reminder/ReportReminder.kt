@@ -72,9 +72,10 @@ object ReportReminder {
 
     fun schedule(context: Context) {
         createChannel(context)
-        val request = PeriodicWorkRequestBuilder<ReminderWorker>(12, TimeUnit.HOURS).build()
+        // every 4 hours so the shift reminder lands during the day; UPDATE replaces the older 12 h job
+        val request = PeriodicWorkRequestBuilder<ReminderWorker>(4, TimeUnit.HOURS).build()
         runCatching {
-            WorkManager.getInstance(context).enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.KEEP, request)
+            WorkManager.getInstance(context).enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.UPDATE, request)
         }
     }
 
@@ -90,6 +91,7 @@ object ReportReminder {
 
     /** Shows today's reminder once. Called by the worker and when the app opens. */
     suspend fun check(context: Context) {
+        runCatching { ShiftReminder.check(context) }
         val c = context.container
         val today = JalaliDate.today()
         val state = c.settingsRepository.getReminder()

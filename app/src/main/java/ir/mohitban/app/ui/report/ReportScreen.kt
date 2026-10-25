@@ -254,7 +254,7 @@ fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?) {
                     Spacer(Modifier.height(16.dp))
                     SignatureField(sig, "امضای محیط‌بان", Modifier.fillMaxWidth())
                     Spacer(Modifier.height(18.dp))
-                    PillButton("مشاهده گزارش A4", icon = Icons.Outlined.Visibility, loading = busy, onClick = {
+                    PillButton("مشاهده گزارش فصلی", icon = Icons.Outlined.Visibility, loading = busy, onClick = {
                         build { f -> scope.launch { preview = withContext(Dispatchers.IO) { context.container.quarterReport.renderPages(f) } } }
                     })
                     Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -285,8 +285,14 @@ fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?) {
             Box(Modifier.fillMaxSize().background(Color(0xF0101410))) {
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Spacer(Modifier.height(40.dp))
+                    Text(
+                        "برای بزرگ‌نمایی با دو انگشت باز کنید یا دو بار ضربه بزنید",
+                        style = MaterialTheme.typography.labelSmall, color = Color(0xCCFFFFFF),
+                        modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
                     pages.forEach { bmp ->
-                        Image(bmp.asImageBitmap(), null, contentScale = ContentScale.FillWidth, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)))
+                        val img = remember(bmp) { bmp.asImageBitmap() }
+                        ir.mohitban.app.ui.components.ZoomableImage(img, Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)))
                     }
                 }
                 Box(

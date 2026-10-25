@@ -124,6 +124,8 @@ import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.layout.navigationBarsPadding
+import ir.mohitban.app.ui.alerts.AlertSeen
+import androidx.compose.material.icons.filled.Notifications
 
 data class DashboardState(
     val profile: RangerProfile? = null,
@@ -196,8 +198,11 @@ fun DashboardScreen(
 
     val profile = state.profile
     val photo by rememberStoredImage(profile?.photoPath, 300)
-    val alerts = Alerts.build(vm.today, profile?.fullName.orEmpty(), state.reportedKey, state.lastBackupAt)
+    val alerts = Alerts.build(vm.today, profile?.fullName.orEmpty(), state.reportedKey, state.lastBackupAt, state.shift)
     val urgentCount = alerts.count { it.urgent }
+    val seenKey by AlertSeen.flow(context).collectAsStateWithLifecycle()
+    // yellow + swinging until the alerts page has been opened for these alerts
+    val unseen = urgentCount > 0 && seenKey != Alerts.key(alerts)
     val shiftStatus = state.shift?.status(vm.today.jdn)
 
     val blurred = ImageBitmap.imageResource(R.drawable.bg_forest_blur)
@@ -286,7 +291,7 @@ fun DashboardScreen(
                             }
                         }
                     }
-                    MinimalBell(ringing = urgentCount > 0, count = urgentCount, onClick = onAlerts, modifier = Modifier.padding(end = 8.dp))
+                    MinimalBell(ringing = unseen, count = if (unseen) urgentCount else 0, onClick = onAlerts, modifier = Modifier.padding(end = 8.dp))
                 }
 
                 // ---------- today's shift ----------
@@ -529,21 +534,22 @@ private fun MinimalBell(ringing: Boolean, count: Int, onClick: () -> Unit, modif
         initialValue = 0f, targetValue = 0f,
         animationSpec = androidx.compose.animation.core.infiniteRepeatable(
             androidx.compose.animation.core.keyframes {
-                durationMillis = 2600
+                durationMillis = 3200
                 0f at 0
                 -18f at 120
                 14f at 260
                 -10f at 400
                 6f at 540
                 0f at 680
-                0f at 2600
+                0f at 3200
             },
         ),
         label = "swing",
     )
     Box(modifier.size(44.dp).clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Icon(
-            Icons.Outlined.NotificationsNone, "اعلان‌ها", tint = Color.White,
+            if (ringing) Icons.Filled.Notifications else Icons.Outlined.NotificationsNone, "اعلان‌ها",
+            tint = if (ringing) Color(0xFFFFC21A) else Color.White,
             modifier = Modifier
                 .size(27.dp)
                 .graphicsLayer {

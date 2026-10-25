@@ -13,6 +13,8 @@ import ir.mohitban.app.ui.theme.MohitbanTheme
 class MainActivity : ComponentActivity() {
     /** Increases every time a reminder notification asks to open the reports screen. */
     private val openReportsRequest = mutableIntStateOf(0)
+    /** Increases every time the shift reminder asks to open the shift screen. */
+    private val openShiftRequest = mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -20,7 +22,7 @@ class MainActivity : ComponentActivity() {
         handle(intent)
         setContent {
             MohitbanTheme {
-                AppNavHost(openReportsRequest = openReportsRequest.intValue)
+                AppNavHost(openReportsRequest = openReportsRequest.intValue, openShiftRequest = openShiftRequest.intValue)
             }
         }
     }
@@ -31,9 +33,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handle(intent: Intent?) {
-        if (intent?.getStringExtra(ReportReminder.EXTRA_OPEN) == ReportReminder.OPEN_REPORTS) {
-            openReportsRequest.intValue += 1
-            intent.removeExtra(ReportReminder.EXTRA_OPEN)
+        when (intent?.getStringExtra(ReportReminder.EXTRA_OPEN)) {
+            ReportReminder.OPEN_REPORTS -> openReportsRequest.intValue += 1
+            ir.mohitban.app.reminder.ShiftReminder.OPEN_SHIFT -> openShiftRequest.intValue += 1
+            else -> return
         }
+        intent.removeExtra(ReportReminder.EXTRA_OPEN)
     }
 }

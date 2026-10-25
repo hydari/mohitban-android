@@ -34,7 +34,7 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
         private const val HEAD_H = 22f
         private const val CONT_TOP = 70f
         private const val CONTENT_BOTTOM = H - 52f
-        private const val FINAL_BLOCK = 200f
+        private const val FINAL_BLOCK = 270f
     }
 
     private val emblem: Bitmap? by lazy { BitmapFactory.decodeResource(context.resources, R.drawable.doe_emblem) }
@@ -67,7 +67,7 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
         }
         // does the totals row + final block fit after the last row?
         val lastTop = if (pages.size == 1) firstTableTop else CONT_TOP
-        val lastBottom = lastTop + HEAD_H + pages.last().count() * ROW_H + ROW_H
+        val lastBottom = lastTop + HEAD_H + pages.last().count() * ROW_H + ROW_H + 4f
         val extraPage = lastBottom + FINAL_BLOCK > CONTENT_BOTTOM
         // appendix: photos of the POS receipts (فیش‌های پرداختی), twelve per A4 page (4 × 3)
         val receipts = s.entries.mapIndexedNotNull { i, e -> if (e.receiptPath != null) (i + 1) to e else null }
@@ -231,7 +231,7 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
             (i + 1).fa(),
             e.date.format().fa(),
             e.odometer.rial(),
-            if (e.fuelType == FuelType.CNG) "گاز" else "بنزین",
+            if (e.fuelType == FuelType.CNG) "گاز CNG" else "بنزین",
             "${e.amount.amountText()} ${e.fuelType.unitShort}",
             e.unitPrice.rial(),
             e.total.rial(),
@@ -249,44 +249,74 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
         return top + ROW_H
     }
 
+    /** Grand total under the table: one label across the first columns, the sum under «مبلغ». */
     private fun totalsRow(c: Canvas, top: Float, s: QuarterSummary): Float {
         val w = widths()
-        c.drawRect(M, top, W - M, top + ROW_H + 2f, PdfKit.fill(PdfKit.GREEN_LIGHT))
-        val p = PdfKit.text(9f, true, PdfKit.GREEN)
-        val firstFour = w.take(4).sum()
-        PdfKit.line(c, "جمع کل", W - M - firstFour / 2, top + 14f, p, Align.CENTER)
-        var x = W - M - firstFour
-        PdfKit.fitLine(c, "${s.gasolineLiters.amountText()} لیتر / ${s.cngKg.amountText()} کیلو", x - w[4] / 2, top + 14f, PdfKit.text(7.5f, true, PdfKit.GREEN), w[4] - 4f, Align.CENTER)
-        x -= w[4]
-        PdfKit.line(c, "—", x - w[5] / 2, top + 14f, p, Align.CENTER)
-        x -= w[5]
-        PdfKit.fitLine(c, s.total.rial(), x - w[6] / 2, top + 14f, p, w[6] - 4f, Align.CENTER)
-        c.drawRect(M, top, W - M, top + ROW_H + 2f, PdfKit.stroke(0.8f, PdfKit.GREEN))
-        return top + ROW_H + 2f
+        val h = ROW_H + 4f
+        c.drawRect(M, top, W - M, top + h, PdfKit.fill(PdfKit.GREEN_LIGHT))
+        val labelW = w.take(6).sum()
+        val p = PdfKit.text(9.5f, true, PdfKit.GREEN)
+        PdfKit.line(c, "جمع کل (${s.count.fa()} مورد)", W - M - labelW / 2, top + 15.5f, p, Align.CENTER)
+        val xAmount = W - M - labelW
+        PdfKit.fitLine(c, s.total.rial(), xAmount - w[6] / 2, top + 15.5f, PdfKit.text(10f, true, PdfKit.GREEN), w[6] - 4f, Align.CENTER)
+        val line = PdfKit.stroke(0.8f, PdfKit.GREEN)
+        c.drawRect(M, top, W - M, top + h, line)
+        c.drawLine(xAmount, top, xAmount, top + h, line)
+        c.drawLine(xAmount - w[6], top, xAmount - w[6], top + h, line)
+        return top + h
     }
 
     private fun finalBlock(c: Canvas, top: Float, s: QuarterSummary, p: RangerProfile, sig: Bitmap?) {
-        val body = PdfKit.text(9.5f)
-        val bold = PdfKit.text(9.5f, true)
         var y = top
-        PdfKit.line(c, "جمع هزینه بنزین: ${s.gasolineTotal.rial()} ریال   |   جمع هزینه گاز: ${s.cngTotal.rial()} ریال", W - M, y + 10f, body)
-        y += 20f
-        val words = "جمع کل به حروف: ${PersianWords.of(s.total)} ریال"
-        y += PdfKit.paragraph(c, words, W - M, y, W - 2 * M, bold) + 16f
+        // ---- summary by fuel type ----
+        PdfKit.line(c, "خلاصه هزینه‌ها به تفکیک نوع سوخت", W - M, y + 10f, PdfKit.text(10f, true, PdfKit.GREEN))
+        y += 18f
+        val cols = listOf("نوع سوخت" to 0.28f, "تعداد دفعات" to 0.18f, "مقدار" to 0.24f, "مبلغ (ریال)" to 0.30f)
+        val tw = W - 2 * M
+        val ws = cols.map { it.second * tw }
+        val rh = 20f
+        val grid = PdfKit.stroke(0.6f, Color.rgb(170, 180, 166))
+        fun rowLines(t: Float, h: Float) {
+            c.drawRect(M, t, W - M, t + h, grid)
+            var x = W - M
+            for (i in 0 until ws.size - 1) { x -= ws[i]; c.drawLine(x, t, x, t + h, grid) }
+        }
+        fun cells(t: Float, values: List<String>, paint: android.graphics.Paint) {
+            var x = W - M
+            values.forEachIndexed { i, v ->
+                PdfKit.fitLine(c, v, x - ws[i] / 2, t + 14f, paint, ws[i] - 6f, Align.CENTER)
+                x -= ws[i]
+            }
+        }
+        c.drawRect(M, y, W - M, y + rh, PdfKit.fill(PdfKit.GREEN_LIGHT))
+        cells(y, cols.map { it.first }, PdfKit.text(9f, true, PdfKit.GREEN)); rowLines(y, rh); y += rh
+        val gas = s.entries.count { it.fuelType == FuelType.GASOLINE }
+        val cng = s.entries.count { it.fuelType == FuelType.CNG }
+        val body = PdfKit.text(9f)
+        cells(y, listOf("بنزین", gas.fa(), "${s.gasolineLiters.amountText()} لیتر", s.gasolineTotal.rial()), body); rowLines(y, rh); y += rh
+        c.drawRect(M, y, W - M, y + rh, PdfKit.fill(Color.rgb(248, 250, 247)))
+        cells(y, listOf("گاز CNG", cng.fa(), "${s.cngKg.amountText()} کیلوگرم", s.cngTotal.rial()), body); rowLines(y, rh); y += rh
+        c.drawRect(M, y, W - M, y + rh, PdfKit.fill(PdfKit.GREEN_LIGHT))
+        cells(y, listOf("جمع کل", s.count.fa(), "—", s.total.rial()), PdfKit.text(9.5f, true, PdfKit.GREEN))
+        c.drawRect(M, y, W - M, y + rh, PdfKit.stroke(0.8f, PdfKit.GREEN)); rowLines(y, rh); y += rh + 10f
 
-        val gap = 12f
-        val bw = (W - 2 * M - gap * 2) / 3
-        val bh = 118f
-        val titles = listOf("امضای محیط‌بان", "تأیید رئیس پاسگاه", "مهر و امضای رئیس اداره")
+        val words = "جمع کل به حروف: ${PersianWords.of(s.total)} ریال"
+        y += PdfKit.paragraph(c, words, W - M, y, W - 2 * M, PdfKit.text(9.5f, true)) + 14f
+
+        // ---- signatures: ranger and head of office ----
+        val gap = 16f
+        val bw = (W - 2 * M - gap) / 2
+        val bh = 104f
+        val titles = listOf("امضای محیط‌بان", "مهر و امضای رئیس اداره")
         var x = W - M
         titles.forEachIndexed { i, t ->
-            val r = RectF(x - bw, y, x, y + bh)
-            if (i == 2) c.drawRoundRect(r, 6f, 6f, PdfKit.dashed(0.9f, Color.rgb(140, 155, 138)))
-            else c.drawRoundRect(r, 6f, 6f, PdfKit.stroke(0.7f, Color.rgb(200, 209, 195)))
-            PdfKit.line(c, t, r.centerX(), r.top + 16f, PdfKit.text(9f, true), Align.CENTER)
+            val rr = RectF(x - bw, y, x, y + bh)
+            if (i == 1) c.drawRoundRect(rr, 6f, 6f, PdfKit.dashed(0.9f, Color.rgb(140, 155, 138)))
+            else c.drawRoundRect(rr, 6f, 6f, PdfKit.stroke(0.7f, Color.rgb(200, 209, 195)))
+            PdfKit.line(c, t, rr.centerX(), rr.top + 16f, PdfKit.text(9f, true), Align.CENTER)
             if (i == 0) {
-                sig?.let { PdfKit.bitmapFit(c, it, RectF(r.left + 14f, r.top + 24f, r.right - 14f, r.bottom - 26f)) }
-                PdfKit.line(c, p.fullName, r.centerX(), r.bottom - 10f, PdfKit.text(8.5f, false, PdfKit.MUTED), Align.CENTER)
+                sig?.let { PdfKit.bitmapFit(c, it, RectF(rr.left + 30f, rr.top + 22f, rr.right - 30f, rr.bottom - 24f)) }
+                PdfKit.line(c, p.fullName, rr.centerX(), rr.bottom - 10f, PdfKit.text(8.5f, false, PdfKit.MUTED), Align.CENTER)
             }
             x -= bw + gap
         }

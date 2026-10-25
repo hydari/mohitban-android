@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.EventRepeat
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material3.Icon
@@ -48,7 +49,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
-enum class AlertTarget { REPORTS, SETTINGS }
+enum class AlertTarget { REPORTS, SETTINGS, SHIFT }
 
 class AlertItem(
     val icon: ImageVector,
@@ -61,8 +62,18 @@ class AlertItem(
 
 /** Every reminder the app can show; the bell counts the urgent ones. */
 object Alerts {
-    fun build(today: JalaliDate, name: String, reportedSeasonKey: Int?, lastBackupAt: Long?): List<AlertItem> {
+    fun build(
+        today: JalaliDate, name: String, reportedSeasonKey: Int?, lastBackupAt: Long?,
+        shift: ir.mohitban.app.domain.model.ShiftPattern? = null,
+    ): List<AlertItem> {
         val list = mutableListOf<AlertItem>()
+        if (ir.mohitban.app.reminder.ShiftReminder.shiftTomorrow(shift, today)) {
+            list += AlertItem(
+                Icons.Outlined.EventRepeat, ir.mohitban.app.reminder.ShiftReminder.title(),
+                ir.mohitban.app.reminder.ShiftReminder.message(name, today),
+                Color(0xFF239B56), urgent = true, target = AlertTarget.SHIFT,
+            )
+        }
         val due = ReportReminder.due(today, reportedSeasonKey)
         if (due != null) {
             list += AlertItem(
@@ -88,22 +99,49 @@ object Alerts {
         }
         return list
     }
+
+    /** Identity of the urgent alerts, so the bell knows whether they were already looked at. */
+    fun key(list: List<AlertItem>): String = list.filter { it.urgent }.joinToString("|") { it.title + "~" + it.text }
+}
+
+/** Remembers which urgent alerts the ranger has opened (bell turns yellow and swings until then). */
+object AlertSeen {
+    private const val PREFS = "alerts"
+    private const val KEY = "seen"
+    private val state = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
+    fun flow(context: android.content.Context): kotlinx.coroutines.flow.StateFlow<String?> {
+        if (state.value == null) {
+            state.value = context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE).getString(KEY, "") ?: ""
+        }
+        return state
+    }
+
+    fun markSeen(context: android.content.Context, key: String) {
+        if (state.value == key) return
+        context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE).edit().putString(KEY, key).apply()
+        state.value = key
+    }
 }
 
 class AlertsViewModel(profiles: ProfileRepository, settings: SettingsRepository) : ViewModel() {
-    val alerts = combine(profiles.profile, settings.reminder, settings.lastBackupAt) { p, r, b ->
-        Alerts.build(JalaliDate.today(), p?.fullName.orEmpty(), r.reportedSeasonKey, b)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val alerts = combine(profiles.profile, settings.reminder, settings.lastBackupAt, settings.shift) { p, r, b, sh ->
+        Alerts.build(JalaliDate.today(), p?.fullName.orEmpty(), r.reportedSeasonKey, b, sh)
+    }.stateIn<List<AlertItem>?>(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 }
 
 @Composable
 fun AlertsScreen(onBack: () -> Unit, onOpen: (AlertTarget) -> Unit) {
     val vm = appViewModel(key = "alerts") { c, _ -> AlertsViewModel(c.profileRepository, c.settingsRepository) }
-    val alerts by vm.alerts.collectAsStateWithLifecycle()
+    val loaded by vm.alerts.collectAsStateWithLifecycle()
+    val alerts = loaded.orEmpty()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    // opening this page counts as having seen the current alerts
+    androidx.compose.runtime.LaunchedEffect(loaded) { loaded?.let { AlertSeen.markSeen(context, Alerts.key(it)) } }
     Column(Modifier.fillMaxSize().background(MColors.Bg)) {
         TopBar("اعلان‌ها و یادآوری‌ها", onBack = onBack)
-        if (alerts.isEmpty()) {
-            EmptyState(Icons.Outlined.NotificationsNone, "اعلانی وجود ندارد", "یادآوری‌های گزارش سه ماهه و پشتیبان‌گیری اینجا نمایش داده می‌شود.")
+        if (loaded != null && alerts.isEmpty()) {
+            EmptyState(Icons.Outlined.NotificationsNone, "اعلانی وجود ندارد", "یادآوری‌های گزارش سه ماهه، شیفت و پشتیبان‌گیری اینجا نمایش داده می‌شود.")
         }
         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             items(alerts) { a ->

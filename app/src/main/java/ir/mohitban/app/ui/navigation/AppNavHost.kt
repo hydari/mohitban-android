@@ -80,7 +80,7 @@ private fun NavHostController.openTab(tab: MainTab) {
 }
 
 @Composable
-fun AppNavHost(openReportsRequest: Int = 0) {
+fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0) {
     val nav = rememberNavController()
     val context = LocalContext.current
     var started by remember { mutableStateOf(false) }
@@ -88,6 +88,10 @@ fun AppNavHost(openReportsRequest: Int = 0) {
     // a tap on the quarterly-report reminder opens the reports tab
     LaunchedEffect(openReportsRequest, started) {
         if (openReportsRequest > 0 && started) nav.openTab(MainTab.REPORTS)
+    }
+    // a tap on the shift reminder opens the shift calendar
+    LaunchedEffect(openShiftRequest, started) {
+        if (openShiftRequest > 0 && started && nav.currentDestination?.route != Routes.SHIFT) nav.navigate(Routes.SHIFT)
     }
 
     NavHost(navController = nav, startDestination = Routes.START) {
@@ -184,7 +188,11 @@ fun AppNavHost(openReportsRequest: Int = 0) {
                 onBack = { nav.popBackStack() },
                 onOpen = { target ->
                     nav.popBackStack()
-                    nav.openTab(if (target == AlertTarget.REPORTS) MainTab.REPORTS else MainTab.SETTINGS)
+                    when (target) {
+                        AlertTarget.REPORTS -> nav.openTab(MainTab.REPORTS)
+                        AlertTarget.SETTINGS -> nav.openTab(MainTab.SETTINGS)
+                        AlertTarget.SHIFT -> nav.navigate(Routes.SHIFT)
+                    }
                 },
             )
         }
