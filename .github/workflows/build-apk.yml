@@ -41,7 +41,15 @@ jobs:
           MOHITBAN_KEY_PASSWORD: ${{ secrets.MOHITBAN_KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --stacktrace
+          set -o pipefail
+          ./gradlew assembleRelease 2>&1 | tee build.log
+
+      - name: Report build errors
+        if: failure()
+        run: |
+          grep -E "^e: |error:|What went wrong|> .*failed|Unresolved|Lint found" -A2 build.log | head -60 | while IFS= read -r line; do
+            [ -n "$line" ] && echo "::error::${line}"
+          done
 
       - name: Rename APK
         run: |
