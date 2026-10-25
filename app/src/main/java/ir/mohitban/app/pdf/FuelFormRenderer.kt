@@ -42,12 +42,6 @@ class FuelFormRenderer(private val context: Context, private val files: FileStor
         val p1 = doc.startPage(PdfDocument.PageInfo.Builder(W.toInt(), H.toInt(), 1).create())
         draw(p1.canvas, entry)
         doc.finishPage(p1)
-        val receipt = files.loadBitmap(entry.receiptPath, 1800)
-        if (receipt != null) {
-            val p2 = doc.startPage(PdfDocument.PageInfo.Builder(W.toInt(), H.toInt(), 2).create())
-            drawReceiptPage(p2.canvas, entry, receipt)
-            doc.finishPage(p2)
-        }
         val out = File(files.cacheDir, "fuel-form-${entry.date.format().replace('/', '-')}-${entry.id}.pdf")
         FileOutputStream(out).use { doc.writeTo(it) }
         doc.close()
@@ -127,12 +121,12 @@ class FuelFormRenderer(private val context: Context, private val files: FileStor
             val valW = 92f
             val total = labW + 4f + valW
             val right = W / 2 + total / 2
-            row(c, 110f, listOf(Seg.Label("شهرستان"), Seg.Value(s.city, fixed = valW)), right = right, left = right - total)
+            row(c, 106f, listOf(Seg.Label("شهرستان"), Seg.Value(s.city, fixed = valW)), right = right, left = right - total)
         }
 
         // ---------- vehicle number with the red plate ----------
         run {
-            val y = 141f
+            val y = 145f
             val lab = PdfKit.text(9.5f, true)
             PdfKit.line(c, "شماره خودرو :", W - M, y, lab, Align.RIGHT)
             val labW = lab.measureText("شماره خودرو :") + 6f
@@ -147,7 +141,9 @@ class FuelFormRenderer(private val context: Context, private val files: FileStor
             tmp.recycle()
             val cx = (areaLeft + areaRight) / 2
             val cy = if (s.plate is ir.mohitban.app.domain.model.Plate.Car) y - 9f else y - 10f
-            c.drawRect(cx - pw / 2 - 3f, cy - plateH, cx + pw / 2 + 3f, y + 4f, PdfKit.fill(Color.WHITE))
+            val ph = if (s.plate is ir.mohitban.app.domain.model.Plate.Car) plateH else plateH * 1.45f
+            // white gap behind the plate only (never reaches the city row above)
+            c.drawRect(cx - pw / 2 - 3f, cy - ph / 2 - 1.5f, cx + pw / 2 + 3f, y + 4f, PdfKit.fill(Color.WHITE))
             PdfKit.plate(c, s.plate, cx + pw / 2, cy, plateH)
         }
 
@@ -210,8 +206,8 @@ class FuelFormRenderer(private val context: Context, private val files: FileStor
         }
 
         // ---------- stamp box & POS slip box ----------
-        val top = 330f
-        val bottom = 400f
+        val top = 328f
+        val bottom = 404f
         val boxGap = 8f
         val boxW = (W - 2 * M - boxGap) / 2
         val stampBox = RectF(W - M - boxW, top, W - M, bottom)
@@ -220,31 +216,24 @@ class FuelFormRenderer(private val context: Context, private val files: FileStor
         c.drawRoundRect(stampBox, 6f, 6f, dash)
         c.drawRoundRect(slipBox, 6f, 6f, dash)
         PdfKit.paragraph(c, "مهر و امضاء فروشنده شرکت نفت", stampBox.right - 4f, top + 5f, boxW - 8f, PdfKit.text(8.2f, true), Align.CENTER)
-        PdfKit.line(c, "محل الصاق رسید پوز", slipBox.centerX(), top + 14f, PdfKit.text(8f, false, PdfKit.MUTED), Align.CENTER)
-        // staple mark
-        val sx = slipBox.centerX()
-        val st = PdfKit.stroke(1.4f, PdfKit.MUTED)
-        c.drawLine(sx - 11f, top + 33f, sx + 11f, top + 33f, st)
-        c.drawLine(sx - 11f, top + 33f, sx - 11f, top + 37f, st)
-        c.drawLine(sx + 11f, top + 33f, sx + 11f, top + 37f, st)
-        PdfKit.line(c, "منگنه", sx, top + 48f, PdfKit.text(7f, false, PdfKit.MUTED), Align.CENTER)
-        if (e.receiptPath != null) {
-            PdfKit.line(c, "تصویر رسید در صفحه ۲", sx, top + 60f, PdfKit.text(6.5f, false, PdfKit.GREEN), Align.CENTER)
+        val receipt = files.loadBitmap(e.receiptPath, 1400)
+        if (receipt != null) {
+            // the POS slip itself, placed inside its box on the same page
+            val inner = RectF(slipBox.left + 3f, slipBox.top + 3f, slipBox.right - 3f, slipBox.bottom - 3f)
+            PdfKit.bitmapFit(c, receipt, inner)
+        } else {
+            PdfKit.line(c, "محل الصاق رسید پوز", slipBox.centerX(), top + 14f, PdfKit.text(8f, false, PdfKit.MUTED), Align.CENTER)
+            val sx = slipBox.centerX()
+            val st = PdfKit.stroke(1.4f, PdfKit.MUTED)
+            c.drawLine(sx - 11f, top + 33f, sx + 11f, top + 33f, st)
+            c.drawLine(sx - 11f, top + 33f, sx - 11f, top + 37f, st)
+            c.drawLine(sx + 11f, top + 33f, sx + 11f, top + 37f, st)
+            PdfKit.line(c, "منگنه", sx, top + 48f, PdfKit.text(7f, false, PdfKit.MUTED), Align.CENTER)
         }
 
         // ---------- footer ----------
-        val foot = if (e.id > 0) "شماره ثبت ${e.id.fa()} | تهیه‌شده با اپلیکیشن محیط‌یار" else "تهیه‌شده با اپلیکیشن محیط‌یار"
+        val app = "تهیه‌شده با اپلیکیشن محیط‌یار نسخه ${ir.mohitban.app.BuildConfigCompat.versionName(context).fa()}"
+        val foot = if (e.id > 0) "شماره ثبت ${e.id.fa()} | $app" else app
         PdfKit.line(c, foot, W / 2, 413f, PdfKit.text(5.8f, false, Color.rgb(140, 150, 142)), Align.CENTER)
-    }
-
-    private fun drawReceiptPage(c: Canvas, e: FuelEntry, receipt: Bitmap) {
-        PdfKit.line(c, "پیوست فرم هزینه سوخت | رسید کارتخوان", W / 2, 24f, PdfKit.text(9f, true), Align.CENTER)
-        PdfKit.line(
-            c, "${e.date.formatLong().fa()} | ${e.fuelType.short} | ${e.total.rial()} ریال",
-            W / 2, 37f, PdfKit.text(7.5f, false, PdfKit.MUTED), Align.CENTER,
-        )
-        val box = RectF(M, 46f, W - M, H - M)
-        PdfKit.bitmapFit(c, receipt, box)
-        c.drawRect(box, PdfKit.stroke(0.5f, Color.rgb(210, 214, 210)))
     }
 }

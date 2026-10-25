@@ -77,6 +77,6 @@ jobs:
           done
           gh release create v1.0 out/Mohityar.apk \
             --repo "${{ github.repository }}" \
-            --title "محیط‌یار نسخه ۱.۰" \
+            --title "محیط‌یار نسخه ۱.۰.۰" \
             --notes "فایل Mohityar.apk را دانلود و روی گوشی نصب کنید. (ساخت شماره ${{ github.run_number }})" \
             --latest

@@ -61,7 +61,7 @@ data class VehicleForm(
     val odometer: String = "",
     val photoPath: String? = null,
 ) {
-    val plate: Plate get() = if (type == VehicleType.CAR) carPlate else motoPlate
+    val plate: Plate get() = if (type == VehicleType.CAR) carPlate.copy(letter = "الف") else motoPlate
 
     fun plateError(): String? = PlateRules.validate(plate)
 
@@ -119,7 +119,7 @@ object Suggestions {
     val carKinds = listOf("وانت دو کابین", "وانت تک کابین", "شاسی‌بلند", "سواری")
     val motoKinds = listOf("موتورسیکلت تریل", "موتورسیکلت معمولی")
     val carModels = listOf("تویوتا هایلوکس", "نیسان پیکاپ", "پاترول", "کاپرا", "ایسوزو دی‌مکس", "پژو پارس")
-    val motoModels = listOf("هوندا ۱۲۵", "یاماها", "تریل ۲۰۰", "باجاج پالس")
+    val motoModels = listOf("نامی ۱۲۵", "نامی ۱۵۰", "نامی ۲۰۰", "هوندا ۱۲۵", "یاماها", "تریل ۲۰۰", "باجاج پالسار")
 
     fun years(current: Int): List<String> = (current downTo current - 30).map { it.toString() }
 }

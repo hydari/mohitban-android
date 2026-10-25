@@ -52,7 +52,8 @@ class FuelFormViewModel(
     var odometer by mutableStateOf("")
     var fuelType by mutableStateOf(FuelType.GASOLINE)
         private set
-    var gasolineRateIndex by mutableStateOf(0)
+    /** 100,000 Rial (the third rate) is selected by default. */
+    var gasolineRateIndex by mutableStateOf(2)
     var amount by mutableStateOf("")
     var receiptPath by mutableStateOf<String?>(null)
         private set

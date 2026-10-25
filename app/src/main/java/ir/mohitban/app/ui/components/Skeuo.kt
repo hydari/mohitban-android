@@ -15,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -55,38 +56,67 @@ fun ShimmerLogo(size: Dp = 60.dp, modifier: Modifier = Modifier) {
         animationSpec = infiniteRepeatable(tween(2600, delayMillis = 900, easing = LinearEasing)),
         label = "sweep",
     )
+    GlassRing(size, modifier) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .clip(CircleShape)
+                .background(Brush.radialGradient(listOf(Color.White, Color(0xFFF3F7F4)))),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                painterResource(R.drawable.doe_emblem), "سازمان حفاظت محیط زیست",
+                modifier = Modifier
+                    .padding(size * 0.07f)
+                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                    .drawWithContent {
+                        drawContent()
+                        val w = this.size.width
+                        val x = sweep * w
+                        drawRect(
+                            Brush.linearGradient(
+                                0f to Color.Transparent,
+                                0.45f to Color.White.copy(alpha = 0.0f),
+                                0.5f to Color.White.copy(alpha = 0.85f),
+                                0.55f to Color.White.copy(alpha = 0.0f),
+                                1f to Color.Transparent,
+                                start = Offset(x - w * 0.6f, 0f),
+                                end = Offset(x + w * 0.6f, this.size.height),
+                            ),
+                            blendMode = BlendMode.SrcAtop,
+                        )
+                    },
+            )
+        }
+    }
+}
+
+/**
+ * Thin liquid-glass ring: translucent frosted rim with a specular highlight on top and a soft
+ * shadow; [content] fills the inner disc.
+ */
+@Composable
+fun GlassRing(size: Dp, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, content: @Composable () -> Unit) {
     Box(
         modifier
             .size(size)
-            .shadow(12.dp, CircleShape, ambientColor = Color.Black, spotColor = Color(0x66000000))
+            .shadow(14.dp, CircleShape, ambientColor = Color.Black, spotColor = Color(0x80000000))
             .clip(CircleShape)
-            .background(Brush.radialGradient(listOf(Color.White, Color(0xFFF1F6F2))))
-            .border(1.5.dp, Brush.linearGradient(listOf(Color.White, Color(0xFFBFD9C6), Color.White)), CircleShape),
+            .background(Brush.linearGradient(listOf(Color(0x8CFFFFFF), Color(0x29FFFFFF), Color(0x52FFFFFF)), start = Offset.Zero, end = Offset.Infinite))
+            .border(1.dp, Brush.verticalGradient(listOf(Color(0xF2FFFFFF), Color(0x33FFFFFF))), CircleShape)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(3.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Image(
-            painterResource(R.drawable.doe_emblem), "سازمان حفاظت محیط زیست",
-            modifier = Modifier
-                .padding(size * 0.14f)
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                .drawWithContent {
-                    drawContent()
-                    val w = this.size.width
-                    val x = sweep * w
-                    drawRect(
-                        Brush.linearGradient(
-                            0f to Color.Transparent,
-                            0.45f to Color.White.copy(alpha = 0.0f),
-                            0.5f to Color.White.copy(alpha = 0.85f),
-                            0.55f to Color.White.copy(alpha = 0.0f),
-                            1f to Color.Transparent,
-                            start = Offset(x - w * 0.6f, 0f),
-                            end = Offset(x + w * 0.6f, this.size.height),
-                        ),
-                        blendMode = BlendMode.SrcAtop,
-                    )
-                },
-        )
+        content()
+        // specular highlight across the upper part of the ring
+        Canvas(Modifier.fillMaxSize()) {
+            drawArc(
+                Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.75f), Color.Transparent), endY = this.size.height * 0.5f),
+                startAngle = 200f, sweepAngle = 140f, useCenter = false,
+                style = Stroke(width = 2.dp.toPx()),
+            )
+        }
     }
 }
 
@@ -117,19 +147,17 @@ fun SkeuoBell(ringing: Boolean, count: Int, onClick: () -> Unit, modifier: Modif
         label = "swing",
     )
     Box(modifier.size(size)) {
-        Box(
-            Modifier
-                .size(size)
-                .shadow(10.dp, CircleShape, ambientColor = Color.Black, spotColor = Color(0x80000000))
-                .clip(CircleShape)
-                .background(Brush.linearGradient(listOf(Color(0xFFFFFFFF), Color(0xFFE3E8E4), Color(0xFFC9D1CB)), start = Offset.Zero, end = Offset.Infinite))
-                .border(1.dp, Brush.verticalGradient(listOf(Color.White, Color(0xFF9AA59D))), CircleShape)
-                .clickable(onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) {
+        GlassRing(size, onClick = onClick) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .background(Brush.linearGradient(listOf(Color(0xFFFFFFFF), Color(0xFFE6ECE7), Color(0xFFCAD3CC)), start = Offset.Zero, end = Offset.Infinite)),
+                contentAlignment = Alignment.Center,
+            ) {
             Canvas(
                 Modifier
-                    .size(size * 0.62f)
+                    .size(size * 0.66f)
                     .graphicsLayer {
                         rotationZ = if (ringing) swing else 0f
                         transformOrigin = TransformOrigin(0.5f, 0.08f)
@@ -174,6 +202,7 @@ fun SkeuoBell(ringing: Boolean, count: Int, onClick: () -> Unit, modifier: Modif
                     close()
                 }
                 drawPath(shine, Color.White.copy(alpha = 0.7f))
+            }
             }
         }
         if (count > 0) {

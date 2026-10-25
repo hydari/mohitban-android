@@ -87,8 +87,8 @@ fun PersonalSection(form: ProfileForm, errors: Map<String, String>, onChange: (P
         }
         Text("عکس پروفایل (اختیاری)", style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 6.dp))
     }
-    MField(form.fullName, { onChange(form.copy(fullName = it)) }, label = "نام و نام خانوادگی", leadingIcon = Icons.Outlined.Person, placeholder = "علی رضایی", error = errors["fullName"])
-    MField(form.fatherName, { onChange(form.copy(fatherName = it)) }, label = "نام پدر", leadingIcon = Icons.Outlined.Person, placeholder = "حسن", error = errors["fatherName"])
+    MField(form.fullName, { onChange(form.copy(fullName = it)) }, label = "نام و نام خانوادگی", leadingIcon = Icons.Outlined.Person, placeholder = "محمدرضا حیدری", error = errors["fullName"])
+    MField(form.fatherName, { onChange(form.copy(fatherName = it)) }, label = "نام پدر", leadingIcon = Icons.Outlined.Person, placeholder = "سعید", error = errors["fatherName"])
     // national ID is checked live: as soon as 10 digits are typed an invalid code shows an error
     val idCheck = ir.mohitban.app.core.text.Validators.nationalId(form.nationalId)
     val idLiveError = if (form.nationalId.length == 10) idCheck else null

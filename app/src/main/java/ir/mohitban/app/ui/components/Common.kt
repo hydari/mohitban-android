@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -226,6 +227,10 @@ fun GlassCard(
     )
 }
 
+/**
+ * Skeuomorphic round icon: a raised disc with a light-to-dark gradient of [background], a glossy
+ * highlight on top, a darker rim and a soft drop shadow; the glyph has a subtle embossed shadow.
+ */
 @Composable
 fun CircleIcon(
     icon: ImageVector,
@@ -236,15 +241,46 @@ fun CircleIcon(
     modifier: Modifier = Modifier,
     border: Color? = null,
 ) {
+    val transparent = background.alpha < 0.5f
     Box(
         modifier = modifier
             .size(size)
+            .then(if (!transparent) Modifier.shadow(5.dp, CircleShape, ambientColor = Color.Black, spotColor = Color(0x59000000)) else Modifier)
             .clip(CircleShape)
-            .background(background)
-            .then(if (border != null) Modifier.border(1.5.dp, border, CircleShape) else Modifier),
+            .background(
+                Brush.verticalGradient(
+                    listOf(lerpColor(background, Color.White, 0.35f), background, lerpColor(background, Color.Black, 0.18f)),
+                ),
+            )
+            .drawBehind {
+                // glossy cap
+                drawOval(
+                    Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.55f), Color.White.copy(alpha = 0f)), endY = this.size.height * 0.55f),
+                    topLeft = Offset(this.size.width * 0.14f, this.size.height * 0.04f),
+                    size = androidx.compose.ui.geometry.Size(this.size.width * 0.72f, this.size.height * 0.48f),
+                )
+            }
+            .border(
+                1.dp,
+                border?.let { Brush.verticalGradient(listOf(it, it)) }
+                    ?: Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.8f), lerpColor(background, Color.Black, 0.3f).copy(alpha = 0.5f))),
+                CircleShape,
+            ),
         contentAlignment = Alignment.Center,
-    ) { Icon(icon, null, tint = tint, modifier = Modifier.size(iconSize)) }
+    ) {
+        // embossed glyph: a soft dark copy under the icon
+        Icon(icon, null, tint = Color.Black.copy(alpha = 0.18f), modifier = Modifier.size(iconSize).offset(y = 1.dp))
+        Icon(icon, null, tint = tint, modifier = Modifier.size(iconSize))
+    }
 }
+
+/** Linear blend between two colours. */
+fun lerpColor(a: Color, b: Color, t: Float): Color = Color(
+    red = a.red + (b.red - a.red) * t,
+    green = a.green + (b.green - a.green) * t,
+    blue = a.blue + (b.blue - a.blue) * t,
+    alpha = a.alpha,
+)
 
 @Composable
 fun SectionTitle(text: String, modifier: Modifier = Modifier, color: Color = MColors.Green) {

@@ -161,9 +161,10 @@ fun FuelFormScreen(
                             Icon(Icons.Outlined.ExpandMore, null, tint = MColors.Muted, modifier = Modifier.size(20.dp))
                         }
                         val sub = listOfNotNull(vehicle?.kind?.takeIf { it.isNotBlank() }, vehicle?.year?.takeIf { it.isNotBlank() }?.let { "مدل ${it.fa()}" })
-                        Text(sub.joinToString(" | "), style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
-                        vehicle?.let { PlateView(it.plate, height = if (it.type == VehicleType.CAR) 34.dp else 30.dp) }
+                        if (sub.isNotEmpty()) Text(sub.joinToString(" | "), style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 2.dp))
                     }
+                    // the plate sits on the left side of the card
+                    vehicle?.let { Box(Modifier.padding(start = 8.dp, end = 4.dp)) { PlateView(it.plate, height = if (it.type == VehicleType.CAR) 36.dp else 30.dp) } }
                 }
             }
 
@@ -177,18 +178,20 @@ fun FuelFormScreen(
                     label = "تاریخ سوخت‌گیری", leadingIcon = Icons.Outlined.CalendarMonth,
                     onClick = { datePicker = true }, modifier = Modifier.weight(1.15f),
                 )
-                MField(
-                    value = vm.odometer, onValueChange = { vm.odometer = it }, numeric = NumericMode.Grouped, maxLength = 7,
-                    label = "کیلومتر فعلی", leadingIcon = Icons.Outlined.Speed, placeholder = "۰",
-                    error = vm.errors["odometer"], modifier = Modifier.weight(1f),
-                )
-            }
-            vm.lastOdometer?.let {
-                Text(
-                    "آخرین کیلومتر ثبت‌شده: ${it.rial()}",
-                    style = MaterialTheme.typography.labelSmall, color = MColors.Muted,
-                    modifier = Modifier.padding(start = 6.dp, top = 4.dp),
-                )
+                Column(Modifier.weight(1f)) {
+                    MField(
+                        value = vm.odometer, onValueChange = { vm.odometer = it }, numeric = NumericMode.Grouped, maxLength = 7,
+                        label = "کیلومتر فعلی", leadingIcon = Icons.Outlined.Speed, placeholder = "۰",
+                        error = vm.errors["odometer"],
+                    )
+                    vm.lastOdometer?.let {
+                        Text(
+                            "آخرین ثبت‌شده: ${it.rial()}",
+                            style = MaterialTheme.typography.labelSmall, color = MColors.Muted,
+                            modifier = Modifier.padding(start = 6.dp, top = 4.dp),
+                        )
+                    }
+                }
             }
 
             // ---------- fuel type ----------
@@ -389,20 +392,22 @@ fun FuelFormScreen(
             title = { Text("فرم هزینه سوخت ثبت شد", style = MaterialTheme.typography.titleMedium) },
             text = { Text("فرم رسمی را می‌توانید به صورت PDF یا تصویر برای اداره ارسال کنید.", style = MaterialTheme.typography.bodyMedium, color = MColors.Muted) },
             confirmButton = {
-                Column(horizontalAlignment = Alignment.End) {
-                    ShareRow(Icons.Outlined.PictureAsPdf, "ارسال PDF") {
-                        scope.launch {
-                            val f = withContext(Dispatchers.IO) { container.fuelForm.createPdf(saved) }
-                            Share.file(context, f, "application/pdf")
-                        }
+                Column(Modifier.fillMaxWidth()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinePill("ارسال PDF", {
+                            scope.launch {
+                                val f = withContext(Dispatchers.IO) { container.fuelForm.createPdf(saved) }
+                                Share.file(context, f, "application/pdf")
+                            }
+                        }, Modifier.weight(1f), Icons.Outlined.PictureAsPdf)
+                        OutlinePill("ارسال تصویر", {
+                            scope.launch {
+                                val f = withContext(Dispatchers.IO) { container.fuelForm.createPng(saved) }
+                                Share.file(context, f, "image/png")
+                            }
+                        }, Modifier.weight(1f), Icons.Outlined.ImageIcon)
                     }
-                    ShareRow(Icons.Outlined.ImageIcon, "ارسال تصویر فرم") {
-                        scope.launch {
-                            val f = withContext(Dispatchers.IO) { container.fuelForm.createPng(saved) }
-                            Share.file(context, f, "image/png")
-                        }
-                    }
-                    TextButton(onClick = onDone) { Text("بازگشت", color = MColors.Muted) }
+                    GreenButton("بازگشت", onClick = onDone, modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(50.dp))
                 }
             },
         )

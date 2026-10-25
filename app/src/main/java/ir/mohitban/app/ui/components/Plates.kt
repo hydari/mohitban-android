@@ -222,7 +222,6 @@ fun CarPlateInput(plate: Plate.Car, onChange: (Plate.Car) -> Unit, modifier: Mod
     val r1 = remember { FocusRequester() }
     val r2 = remember { FocusRequester() }
     val r3 = remember { FocusRequester() }
-    var letterOpen by remember { mutableStateOf(false) }
     val h = 64.dp
     Box(modifier) {
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
@@ -241,28 +240,9 @@ fun CarPlateInput(plate: Plate.Car, onChange: (Plate.Car) -> Unit, modifier: Mod
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                PlateDigitBox(plate.first, { onChange(plate.copy(first = it)) }, 2, (h * 0.44f).sp(), 34.dp, r1, r2)
-                Box {
-                    Row(
-                        Modifier
-                            .clip(RoundedCornerShape(7.dp))
-                            .border(1.5.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(7.dp))
-                            .clickable { letterOpen = true }
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(plate.letter, style = plateStyle((h * 0.32f).sp()))
-                        Icon(Icons.Outlined.ExpandMore, "حرف پلاک", tint = Color.White, modifier = Modifier.size(16.dp))
-                    }
-                    DropdownMenu(expanded = letterOpen, onDismissRequest = { letterOpen = false }, modifier = Modifier.background(Color.White)) {
-                        Plate.LETTERS.forEach { l ->
-                            DropdownMenuItem(
-                                text = { Text(l, style = MaterialTheme.typography.titleMedium) },
-                                onClick = { onChange(plate.copy(letter = l)); letterOpen = false; r2.requestFocus() },
-                            )
-                        }
-                    }
-                }
+                PlateDigitBox(plate.first, { onChange(plate.copy(first = it, letter = "الف")) }, 2, (h * 0.44f).sp(), 34.dp, r1, r2)
+                // government red plates always carry the letter «الف»
+                Text("الف", style = plateStyle((h * 0.34f).sp()))
                 PlateDigitBox(plate.middle, { onChange(plate.copy(middle = it)) }, 3, (h * 0.44f).sp(), 50.dp, r2, r3)
             }
             Box(Modifier.width(3.dp).fillMaxHeight().background(Color.White))

@@ -65,7 +65,7 @@ object PlateRules {
         is Plate.Car -> when {
             !digits(plate.first) || plate.first.length != 2 -> "دو رقم سمت چپ پلاک را کامل وارد کنید"
             plate.first.startsWith("0") -> "دو رقم سمت چپ نمی‌تواند با صفر شروع شود"
-            plate.letter !in Plate.LETTERS -> "حرف پلاک را انتخاب کنید"
+            plate.letter != "الف" -> "حرف پلاک قرمز دولتی باید «الف» باشد"
             !digits(plate.middle) || plate.middle.length != 3 -> "سه رقم وسط پلاک را کامل وارد کنید"
             plate.middle.startsWith("0") -> "سه رقم وسط نمی‌تواند با صفر شروع شود"
             !digits(plate.iranCode) || plate.iranCode.length != 2 -> "کد دو رقمی ایران را وارد کنید"

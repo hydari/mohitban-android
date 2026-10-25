@@ -41,8 +41,8 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
 
     // right-to-left columns: title, width
     private val columns = listOf(
-        "ردیف" to 30f, "تاریخ" to 62f, "کیلومتر" to 60f, "نوع سوخت" to 50f,
-        "مقدار" to 58f, "فی (ریال)" to 58f, "مبلغ (ریال)" to 72f, "راننده" to 0f,
+        "ردیف" to 24f, "تاریخ" to 54f, "کیلومتر" to 52f, "نوع سوخت" to 38f,
+        "مقدار" to 52f, "فی (ریال)" to 52f, "مبلغ (ریال)" to 64f, "وسیله / پلاک" to 0f, "راننده" to 82f,
     )
 
     private fun widths(): List<Float> {
@@ -153,7 +153,7 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
         val small = PdfKit.text(8.5f, false, PdfKit.MUTED)
         PdfKit.line(c, "شماره: ................", M, 44f, small, Align.LEFT)
         PdfKit.line(c, "تاریخ تهیه: ${JalaliDate.today().format().fa()}", M, 58f, small, Align.LEFT)
-        PdfKit.line(c, if (attachmentPages > 0) "پیوست: دارد (${attachmentPages.fa()} برگ فیش)" else "پیوست: ندارد", M, 72f, small, Align.LEFT)
+        PdfKit.line(c, if (attachmentPages > 0) "پیوست: دارد" else "پیوست: ندارد", M, 72f, small, Align.LEFT)
         c.drawLine(M, 96f, W - M, 96f, PdfKit.stroke(1.4f, PdfKit.GREEN))
 
         // ---- info box ----
@@ -235,12 +235,14 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
             "${e.amount.amountText()} ${e.fuelType.unitShort}",
             e.unitPrice.rial(),
             e.total.rial(),
+            listOf(e.snapshot.vehicleModel.trim(), e.snapshot.plate.displayText().fa()).filter { it.isNotEmpty() }.joinToString(" | "),
             e.snapshot.driverName,
         )
         val p = PdfKit.text(8.5f)
+        val small = PdfKit.text(7.5f)
         var x = W - M
         cells.forEachIndexed { k, t ->
-            PdfKit.fitLine(c, t, x - w[k] / 2, top + 13f, p, w[k] - 5f, Align.CENTER)
+            PdfKit.fitLine(c, t, x - w[k] / 2, top + 13f, if (k == 7) small else p, w[k] - 5f, Align.CENTER)
             x -= w[k]
         }
         grid(c, top, top + ROW_H)
@@ -293,8 +295,8 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
     private fun receiptsPage(c: Canvas, s: QuarterSummary, items: List<Pair<Int, ir.mohitban.app.domain.model.FuelEntry>>) {
         PdfKit.line(c, "پیوست: فیش‌های پرداختی (رسید کارتخوان) | ${s.season.title} ${s.year.fa()}", W - M, 40f, PdfKit.text(10.5f, true, PdfKit.GREEN))
         c.drawLine(M, 48f, W - M, 48f, PdfKit.stroke(1f, PdfKit.GREEN))
-        val cols = 4
-        val rows = 3
+        val cols = 3
+        val rows = 4
         val gap = 7f
         val top0 = 56f
         val cellW = (W - 2 * M - gap * (cols - 1)) / cols
@@ -323,6 +325,6 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
 
     private fun footer(c: Canvas, page: Int, total: Int) {
         c.drawLine(M, H - 34f, W - M, H - 34f, PdfKit.stroke(0.5f, Color.rgb(213, 220, 209)))
-        PdfKit.line(c, "صفحه ${page.fa()} از ${total.fa()}  |  تهیه‌شده با اپلیکیشن محیط‌یار", W / 2, H - 22f, PdfKit.text(7.5f, false, Color.rgb(122, 134, 118)), Align.CENTER)
+        PdfKit.line(c, "صفحه ${page.fa()} از ${total.fa()}  |  تهیه‌شده با اپلیکیشن محیط‌یار نسخه ${ir.mohitban.app.BuildConfigCompat.versionName(context).fa()}", W / 2, H - 22f, PdfKit.text(7.5f, false, Color.rgb(122, 134, 118)), Align.CENTER)
     }
 }

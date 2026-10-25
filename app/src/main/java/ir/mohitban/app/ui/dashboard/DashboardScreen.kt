@@ -29,9 +29,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Assessment
-import androidx.compose.material.icons.outlined.Backup
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.DirectionsCar
-import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.LocalGasStation
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.NotificationsActive
@@ -88,6 +87,7 @@ import ir.mohitban.app.domain.repository.FuelRepository
 import ir.mohitban.app.domain.repository.ProfileRepository
 import ir.mohitban.app.domain.repository.SettingsRepository
 import ir.mohitban.app.reminder.ReportReminder
+import ir.mohitban.app.ui.alerts.Alerts
 import ir.mohitban.app.ui.common.appViewModel
 import ir.mohitban.app.ui.components.BottomBar
 import ir.mohitban.app.ui.components.CircleIcon
@@ -105,7 +105,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.util.Calendar
 
 data class DashboardState(
     val profile: RangerProfile? = null,
@@ -114,6 +113,7 @@ data class DashboardState(
     val seasonEntries: List<FuelEntry> = emptyList(),
     val due: ReportReminder.Due? = null,
     val lastBackupAt: Long? = null,
+    val reportedKey: Int? = null,
 )
 
 class DashboardViewModel(profiles: ProfileRepository, fuel: FuelRepository, settings: SettingsRepository) : ViewModel() {
@@ -134,12 +134,10 @@ class DashboardViewModel(profiles: ProfileRepository, fuel: FuelRepository, sett
             seasonEntries = e,
             due = ReportReminder.due(today, reminder.reportedSeasonKey),
             lastBackupAt = backup,
+            reportedKey = reminder.reportedSeasonKey,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardState())
 }
-
-/** One line in the alerts section. */
-private class Alert(val icon: ImageVector, val title: String, val text: String, val color: Color, val urgent: Boolean, val onClick: () -> Unit)
 
 @Composable
 fun DashboardScreen(
@@ -149,6 +147,7 @@ fun DashboardScreen(
     onVehicle: () -> Unit,
     onProfile: () -> Unit,
     onSettings: () -> Unit,
+    onAlerts: () -> Unit,
     onTab: (MainTab) -> Unit,
 ) {
     val vm = appViewModel { c, _ -> DashboardViewModel(c.profileRepository, c.fuelRepository, c.settingsRepository) }
@@ -174,7 +173,7 @@ fun DashboardScreen(
 
     val profile = state.profile
     val photo by rememberStoredImage(profile?.photoPath, 300)
-    val alerts = buildAlerts(state, vm, onReport, onSettings)
+    val alerts = Alerts.build(vm.today, profile?.fullName.orEmpty(), state.reportedKey, state.lastBackupAt)
     val urgentCount = alerts.count { it.urgent }
 
     val blurred = ImageBitmap.imageResource(R.drawable.bg_forest_blur)
@@ -199,32 +198,13 @@ fun DashboardScreen(
                     .verticalScroll(scroll)
                     .padding(horizontal = 18.dp),
             ) {
-                // ---------- welcome + skeuomorphic bell ----------
-                Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            "${greeting()}، ${firstName(profile?.fullName)} عزیز",
-                            style = MaterialTheme.typography.titleMedium, color = Color.White,
-                        )
-                        Text(
-                            "به محیط‌یار خوش آمدید | ${vm.today.formatLong().fa()}",
-                            style = MaterialTheme.typography.labelSmall, color = Color(0xD9FFFFFF), modifier = Modifier.padding(top = 2.dp),
-                        )
-                    }
-                    SkeuoBell(
-                        ringing = urgentCount > 0, count = urgentCount,
-                        onClick = { scope.launch { scroll.animateScrollTo(alertsY.toInt()) } },
-                    )
-                }
-
-                // ---------- profile header: photo (right), name, rank | station, DoE logo (left) ----------
-                Row(Modifier.fillMaxWidth().padding(top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                // ---------- header: photo, name, rank ✔ | 📍 station, bell + DoE logo ----------
+                Row(Modifier.fillMaxWidth().padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         Modifier
-                            .size(74.dp)
+                            .size(72.dp)
                             .shadow(12.dp, CircleShape)
                             .clip(CircleShape)
-                            .border(3.dp, Brush.linearGradient(listOf(Color(0xFFB7F5C9), Color(0xFF3FA866))), CircleShape)
                             .background(Brush.linearGradient(listOf(Color(0xFFD9CFB4), Color(0xFFA68A5F))))
                             .clickable(onClick = onProfile),
                         contentAlignment = Alignment.Center,
@@ -241,22 +221,25 @@ fun DashboardScreen(
                             profile?.fullName ?: "", style = MaterialTheme.typography.headlineSmall, color = Color.White,
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
-                        Text(
-                            listOfNotNull(
-                                profile?.rank?.takeIf { it.isNotBlank() },
-                                profile?.station?.takeIf { it.isNotBlank() }?.let { "پاسگاه محیط‌بانی $it" },
-                            ).joinToString(" | "),
-                            style = MaterialTheme.typography.bodySmall, color = Color(0xE6FFFFFF),
-                            modifier = Modifier.padding(top = 3.dp), maxLines = 2,
-                        )
-                        profile?.protectedArea?.takeIf { it.isNotBlank() }?.let {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
-                                Icon(Icons.Outlined.LocationOn, null, tint = MColors.Leaf, modifier = Modifier.size(14.dp))
-                                Text(" منطقه حفاظت‌شده $it", style = MaterialTheme.typography.labelSmall, color = Color(0xCCFFFFFF))
+                        profile?.rank?.takeIf { it.isNotBlank() }?.let { rank ->
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 3.dp)) {
+                                Text(rank, style = MaterialTheme.typography.bodySmall, color = Color(0xF2FFFFFF))
+                                VerifiedBadge(Modifier.padding(start = 5.dp))
+                            }
+                        }
+                        profile?.station?.takeIf { it.isNotBlank() }?.let { st ->
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 3.dp)) {
+                                Icon(Icons.Outlined.LocationOn, null, tint = Color(0xFFFF8A7A), modifier = Modifier.size(16.dp))
+                                Text(
+                                    " پاسگاه محیط‌بانی $st", style = MaterialTheme.typography.bodySmall, color = Color(0xE6FFFFFF),
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                )
                             }
                         }
                     }
-                    ShimmerLogo(size = 62.dp)
+                    SkeuoBell(ringing = urgentCount > 0, count = urgentCount, onClick = onAlerts, size = 52.dp)
+                    Spacer(Modifier.size(10.dp))
+                    ShimmerLogo(size = 66.dp)
                 }
 
                 // ---------- main action ----------
@@ -312,40 +295,27 @@ fun DashboardScreen(
                     QuickTile(Icons.Outlined.Settings, "تنظیمات", "نرخ‌ها و پشتیبان", Modifier.weight(1f), onSettings)
                 }
 
-                // ---------- alerts section ----------
-                Column(Modifier.padding(top = 18.dp).onGloballyPositioned { alertsY = it.positionInParent().y }) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)) {
-                        Icon(Icons.Outlined.NotificationsActive, null, tint = Color(0xFFFFD36B), modifier = Modifier.size(20.dp))
-                        Text(" اعلان‌ها و یادآوری‌ها", style = MaterialTheme.typography.titleSmall, color = Color.White)
+                // ---------- alerts entry (details in their own page) ----------
+                GlassCard(Modifier.fillMaxWidth().padding(top = 14.dp), dark = true, onClick = onAlerts) {
+                    CircleIcon(
+                        Icons.Outlined.NotificationsActive, Color(0xFFD99A1E), Color.White, size = 42.dp, iconSize = 21.dp,
+                        modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 10.dp),
+                    )
+                    Text(
+                        "اعلان‌ها و یادآوری‌ها", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = Color.White,
+                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+                    )
+                    if (alerts.isNotEmpty()) {
+                        Box(
+                            Modifier.size(24.dp).clip(CircleShape)
+                                .background(if (urgentCount > 0) Color(0xFFE5483B) else Color(0x40FFFFFF)),
+                            contentAlignment = Alignment.Center,
+                        ) { Text(alerts.size.fa(), style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = Color.White) }
                     }
-                    GlassCard(Modifier.fillMaxWidth(), dark = true) {
-                        Column(Modifier.weight(1f).padding(vertical = 6.dp)) {
-                            alerts.forEachIndexed { i, a ->
-                                Row(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .clickable(onClick = a.onClick)
-                                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Box(
-                                        Modifier.size(40.dp).clip(CircleShape).background(a.color.copy(alpha = 0.22f))
-                                            .border(1.dp, a.color.copy(alpha = 0.6f), CircleShape),
-                                        contentAlignment = Alignment.Center,
-                                    ) { Icon(a.icon, null, tint = a.color, modifier = Modifier.size(21.dp)) }
-                                    Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
-                                        Text(a.title, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = Color.White)
-                                        Text(a.text, style = MaterialTheme.typography.labelSmall, color = Color(0xD9FFFFFF), modifier = Modifier.padding(top = 2.dp))
-                                    }
-                                    Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = Color(0xCCFFFFFF), modifier = Modifier.size(18.dp))
-                                }
-                                if (i < alerts.lastIndex) {
-                                    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(1.dp).background(Color(0x26FFFFFF)))
-                                }
-                            }
-                        }
-                    }
+                    Icon(
+                        Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = Color.White,
+                        modifier = Modifier.padding(start = 8.dp, end = 14.dp).size(20.dp),
+                    )
                 }
 
                 // ---------- season summary ----------
@@ -378,46 +348,6 @@ fun DashboardScreen(
     }
 }
 
-/** Reminders shown in the alerts section (the bell counts the urgent ones). */
-private fun buildAlerts(state: DashboardState, vm: DashboardViewModel, onReport: () -> Unit, onSettings: () -> Unit): List<Alert> {
-    val list = mutableListOf<Alert>()
-    val name = state.profile?.fullName.orEmpty()
-    state.due?.let { d ->
-        list += Alert(
-            Icons.Outlined.NotificationsActive, ReportReminder.title(d), ReportReminder.message(name, d),
-            if (d.overdue) Color(0xFFFF8A80) else Color(0xFFFFD36B), urgent = true, onClick = onReport,
-        )
-    }
-    if (state.due == null) {
-        val range = vm.season.jdnRange(vm.year)
-        val left = range.last - vm.today.jdn
-        val end = JalaliDate.fromJdn(range.last)
-        list += Alert(
-            Icons.Outlined.Event, "مهلت گزارش ${vm.season.title} ${vm.year.fa()}",
-            "تا ${end.day.fa()} ${Jalali.MONTH_NAMES[end.month - 1]} | ${left.fa()} روز مانده است",
-            Color(0xFF9BF0B6), urgent = false, onClick = onReport,
-        )
-    }
-    val backup = state.lastBackupAt
-    if (backup == null || System.currentTimeMillis() - backup > 14L * 24 * 3600 * 1000) {
-        list += Alert(
-            Icons.Outlined.Backup, "پشتیبان‌گیری",
-            if (backup == null) "هنوز از اطلاعات پشتیبان نگرفته‌اید" else "بیش از دو هفته از آخرین پشتیبان گذشته است",
-            Color(0xFF8FD3FF), urgent = false, onClick = onSettings,
-        )
-    }
-    return list
-}
-
-private fun greeting(): String = when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
-    in 4..11 -> "صبح بخیر"
-    in 12..16 -> "ظهر بخیر"
-    in 17..19 -> "عصر بخیر"
-    else -> "شب بخیر"
-}
-
-private fun firstName(full: String?): String = full?.trim()?.split(" ")?.firstOrNull().orEmpty()
-
 private fun initials(name: String?): String {
     if (name.isNullOrBlank()) return ""
     return name.trim().split(" ", "‌").filter { it.isNotBlank() }.take(2).joinToString(" ") { it.first().toString() }
@@ -445,4 +375,17 @@ private fun QuickTile(icon: ImageVector, title: String, subtitle: String, modifi
 /** Runs the reminder check right after the permission was granted. */
 private fun scopeLaunchCheck(context: Context) {
     kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch { ReportReminder.check(context.applicationContext) }
+}
+
+/** Small green "verified" seal with a white check. */
+@Composable
+private fun VerifiedBadge(modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .size(16.dp)
+            .shadow(2.dp, CircleShape)
+            .clip(CircleShape)
+            .background(Brush.verticalGradient(listOf(Color(0xFF4CD07D), Color(0xFF1E8C47)))),
+        contentAlignment = Alignment.Center,
+    ) { Icon(Icons.Outlined.Check, "تأیید شده", tint = Color.White, modifier = Modifier.size(11.dp)) }
 }

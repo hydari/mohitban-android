@@ -27,6 +27,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import ir.mohitban.app.R
 import ir.mohitban.app.container
+import ir.mohitban.app.ui.alerts.AlertTarget
+import ir.mohitban.app.ui.alerts.AlertsScreen
 import ir.mohitban.app.ui.components.MainTab
 import ir.mohitban.app.ui.dashboard.DashboardScreen
 import ir.mohitban.app.ui.fuel.FuelFormScreen
@@ -50,6 +52,7 @@ object Routes {
     const val CROP = "crop?path={path}"
     const val EDIT_PROFILE = "edit_profile"
     const val VEHICLES = "vehicles"
+    const val ALERTS = "alerts"
     const val VEHICLE = "vehicle/{id}"
 
     fun fuel(id: Long = 0L) = "fuel?entryId=$id"
@@ -114,6 +117,7 @@ fun AppNavHost(openReportsRequest: Int = 0) {
                 onVehicle = { nav.navigate(Routes.VEHICLES) },
                 onProfile = { nav.navigate(Routes.EDIT_PROFILE) },
                 onSettings = { nav.openTab(MainTab.SETTINGS) },
+                onAlerts = { nav.navigate(Routes.ALERTS) },
                 onTab = { nav.openTab(it) },
             )
         }
@@ -172,6 +176,15 @@ fun AppNavHost(openReportsRequest: Int = 0) {
         }
         composable(Routes.EDIT_PROFILE) {
             ProfileEditScreen(onBack = { nav.popBackStack() })
+        }
+        composable(Routes.ALERTS) {
+            AlertsScreen(
+                onBack = { nav.popBackStack() },
+                onOpen = { target ->
+                    nav.popBackStack()
+                    nav.openTab(if (target == AlertTarget.REPORTS) MainTab.REPORTS else MainTab.SETTINGS)
+                },
+            )
         }
         composable(Routes.VEHICLES) {
             VehiclesScreen(onBack = { nav.popBackStack() }, onEdit = { nav.navigate(Routes.vehicle(it)) })
