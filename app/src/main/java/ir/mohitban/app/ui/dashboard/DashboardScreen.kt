@@ -123,6 +123,7 @@ import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.foundation.layout.navigationBarsPadding
 
 data class DashboardState(
     val profile: RangerProfile? = null,
@@ -433,6 +434,37 @@ fun DashboardScreen(
                 Spacer(Modifier.height(124.dp))
             }
             BottomBar(MainTab.HOME, onTab, Modifier.align(Alignment.BottomCenter))
+            // the dashboard is the root screen: back twice within 2 s to leave the app
+            var lastBack by remember { mutableStateOf(0L) }
+            var exitHint by remember { mutableStateOf(false) }
+            androidx.activity.compose.BackHandler {
+                val now = android.os.SystemClock.elapsedRealtime()
+                if (exitHint && now - lastBack < 2000) context.findActivity()?.finish()
+                else { lastBack = now; exitHint = true }
+            }
+            LaunchedEffect(lastBack) {
+                if (exitHint) { kotlinx.coroutines.delay(2000); exitHint = false }
+            }
+            if (exitHint) {
+                Row(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(bottom = 104.dp, start = 24.dp, end = 24.dp)
+                        .shadow(10.dp, RoundedCornerShape(Corners.R))
+                        .clip(RoundedCornerShape(Corners.R))
+                        .background(Color(0xF21A2620))
+                        .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(Corners.R))
+                        .padding(horizontal = 14.dp, vertical = 11.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Outlined.NotificationsNone, null, tint = Color(0xFFFFC857), modifier = Modifier.size(20.dp))
+                    Text(
+                        "  برای خروج از برنامه، دوبار دکمه بازگشت را بزنید",
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = Color.White,
+                    )
+                }
+            }
         }
     }
 }
@@ -480,7 +512,6 @@ private fun OrgPlate(text: String, size: androidx.compose.ui.unit.TextUnit) {
             .clip(RoundedCornerShape(10.dp))
             .background(Brush.verticalGradient(listOf(Color.White, Color(0xFFEFF6F1))))
             .border(1.dp, Color(0xFFCFE3D5), RoundedCornerShape(10.dp))
-            .glossSweep()
             .padding(horizontal = 9.dp, vertical = 3.dp),
     ) {
         Text(
@@ -530,4 +561,10 @@ private fun MinimalBell(ringing: Boolean, count: Int, onClick: () -> Unit, modif
             }
         }
     }
+}
+
+private tailrec fun Context.findActivity(): android.app.Activity? = when (this) {
+    is android.app.Activity -> this
+    is android.content.ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

@@ -104,7 +104,7 @@ fun PersonalSection(form: ProfileForm, errors: Map<String, String>, onChange: (P
         form.mobile, { onChange(form.copy(mobile = it)) }, label = "شماره همراه", leadingIcon = Icons.Outlined.PhoneAndroid,
         numeric = NumericMode.Digits, maxLength = 11, placeholder = "۰۹۱۲۳۴۵۶۷۸۹", error = errors["mobile"] ?: mobileLiveError,
     )
-    ComboField(form.rank, { onChange(form.copy(rank = it)) }, Suggestions.ranks, label = "درجه / سمت", leadingIcon = Icons.Outlined.Park, placeholder = "محیط‌بان", error = errors["rank"])
+    ComboField(form.rank, { onChange(form.copy(rank = it)) }, Suggestions.ranks, label = "درجه / سمت", leadingIcon = Icons.Outlined.Park, placeholder = "انتخاب سمت", error = errors["rank"], readOnly = true)
 }
 
 @Composable
@@ -113,7 +113,11 @@ fun LocationSection(form: ProfileForm, errors: Map<String, String>, onChange: (P
         form.province, { p -> onChange(form.copy(province = p, city = if (form.city in Suggestions.citiesOf(p)) form.city else "")) }, Suggestions.provinces,
         label = "اداره کل استان", leadingIcon = Icons.Outlined.LocationOn, error = errors["province"], readOnly = true,
     )
-    ComboField(form.city, { onChange(form.copy(city = it)) }, Suggestions.citiesOf(form.province), label = "شهرستان", leadingIcon = Icons.Outlined.LocationOn, placeholder = "میانه", error = errors["city"])
+    ComboField(
+        form.city, { onChange(form.copy(city = it)) }, Suggestions.citiesOf(form.province), label = "شهرستان",
+        leadingIcon = Icons.Outlined.LocationOn, placeholder = if (form.province.isBlank()) "ابتدا استان را انتخاب کنید" else "انتخاب شهرستان",
+        error = errors["city"], readOnly = true,
+    )
     MField(form.protectedArea, { onChange(form.copy(protectedArea = it)) }, label = "منطقه حفاظت‌شده", leadingIcon = Icons.Outlined.Park, placeholder = "کاغذکنان", error = errors["protectedArea"])
     MField(form.station, { onChange(form.copy(station = it)) }, label = "پاسگاه محیط‌بانی", leadingIcon = Icons.Outlined.Home, placeholder = "آقکند", error = errors["station"], imeAction = androidx.compose.ui.text.input.ImeAction.Done)
 }
