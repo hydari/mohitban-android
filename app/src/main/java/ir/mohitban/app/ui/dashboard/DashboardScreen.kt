@@ -206,10 +206,21 @@ fun DashboardScreen(
                     .verticalScroll(scroll)
                     .padding(horizontal = 18.dp),
             ) {
-                // ---------- header card (liquid glass): photo | name, rank ✔ · 📍 station | DoE logo ----------
+                // ---------- header card (liquid glass): DoE logo + organisation plates on top, then photo | name ----------
                 GlassCard(Modifier.fillMaxWidth().padding(top = 14.dp), dark = true, radius = 28.dp) {
-                  Column(Modifier.weight(1f)) {
-                  Row(verticalAlignment = Alignment.CenterVertically) {
+                  Column(Modifier.weight(1f).padding(top = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    ShimmerLogo(size = 64.dp)
+                    // organisation plates under the logo: white, green text, same glossy sweep
+                    val province = profile?.province.orEmpty().trim().removePrefix("استان").trim()
+                    Column(
+                        Modifier.padding(top = 8.dp, start = 12.dp, end = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        OrgPlate("سازمان حفاظت محیط زیست", 9.5.sp)
+                        if (province.isNotEmpty()) OrgPlate("اداره کل حفاظت محیط زیست استان $province", 8.5.sp)
+                    }
+                  Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     GlassRing(70.dp, Modifier.padding(start = 12.dp, top = 12.dp, bottom = 12.dp), onClick = onProfile) {
                         Box(
                             Modifier.fillMaxSize().clip(CircleShape)
@@ -229,9 +240,9 @@ fun DashboardScreen(
                             profile?.fullName ?: "",
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.Black,
-                                shadow = Shadow(Color(0x99000000), Offset(0f, 2f), 6f),
+                                shadow = Shadow(Color(0xCC000000), Offset(0f, 3f), 8f),
                             ),
-                            color = Color(0xFF62E592),
+                            color = Color.White,
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                         val rank = profile?.rank?.takeIf { it.isNotBlank() }
@@ -257,18 +268,7 @@ fun DashboardScreen(
                             }
                         }
                     }
-                    ShimmerLogo(size = 64.dp, modifier = Modifier.padding(end = 12.dp))
                   }
-                    // organisation plates under the logo: white, green text, same glossy sweep
-                    val province = profile?.province.orEmpty().trim().removePrefix("استان").trim()
-                    Column(
-                        Modifier.align(Alignment.End).padding(end = 12.dp, bottom = 12.dp, start = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(5.dp),
-                    ) {
-                        OrgPlate("سازمان حفاظت محیط زیست", 11.sp)
-                        if (province.isNotEmpty()) OrgPlate("اداره کل حفاظت محیط زیست استان $province", 10.sp)
-                    }
                   }
                 }
 
@@ -423,10 +423,10 @@ private fun OrgPlate(text: String, size: androidx.compose.ui.unit.TextUnit) {
             .background(Brush.verticalGradient(listOf(Color.White, Color(0xFFEFF6F1))))
             .border(1.dp, Color(0xFFCFE3D5), RoundedCornerShape(10.dp))
             .glossSweep()
-            .padding(horizontal = 10.dp, vertical = 4.dp),
+            .padding(horizontal = 9.dp, vertical = 3.dp),
     ) {
         Text(
-            text, color = MColors.Green, textAlign = TextAlign.Center,
+            text, color = MColors.Green, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.labelSmall.copy(fontSize = size, fontWeight = FontWeight.Bold),
         )
     }
