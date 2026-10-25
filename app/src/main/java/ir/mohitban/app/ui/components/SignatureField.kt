@@ -111,7 +111,7 @@ fun SignatureField(
                 Image(img, title, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 22.dp))
             } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Outlined.Draw, null, tint = MColors.Hint, modifier = Modifier.size(22.dp))
+                    CircleIcon(Icons.Outlined.Draw, Color(0xFF7D8C84), Color.White, size = 34.dp, iconSize = 18.dp)
                     Text("برای امضا لمس کنید", style = MaterialTheme.typography.labelSmall, color = MColors.Hint, modifier = Modifier.padding(top = 4.dp))
                 }
             }

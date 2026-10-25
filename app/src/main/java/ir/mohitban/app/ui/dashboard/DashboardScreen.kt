@@ -93,6 +93,8 @@ import ir.mohitban.app.ui.components.BottomBar
 import ir.mohitban.app.ui.components.CircleIcon
 import ir.mohitban.app.ui.components.GlassBackdrop
 import ir.mohitban.app.ui.components.GlassCard
+import androidx.compose.foundation.layout.width
+import ir.mohitban.app.ui.components.GlassRing
 import ir.mohitban.app.ui.components.LocalGlassBackdrop
 import ir.mohitban.app.ui.components.MainTab
 import ir.mohitban.app.ui.components.PlateView
@@ -198,62 +200,56 @@ fun DashboardScreen(
                     .verticalScroll(scroll)
                     .padding(horizontal = 18.dp),
             ) {
-                // ---------- header: photo, name, rank ✔ | 📍 station, bell + DoE logo ----------
-                Row(Modifier.fillMaxWidth().padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier
-                            .size(72.dp)
-                            .shadow(12.dp, CircleShape)
-                            .clip(CircleShape)
-                            .background(Brush.linearGradient(listOf(Color(0xFFD9CFB4), Color(0xFFA68A5F))))
-                            .clickable(onClick = onProfile),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        val p = photo
-                        if (p != null) {
-                            Image(p, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
-                        } else {
-                            Text(initials(profile?.fullName), style = MaterialTheme.typography.titleLarge, color = Color(0xFF4B3517))
+                // ---------- header card (liquid glass): photo | name, rank ✔ · 📍 station | DoE logo ----------
+                GlassCard(Modifier.fillMaxWidth().padding(top = 14.dp), dark = true, radius = 28.dp) {
+                    GlassRing(70.dp, Modifier.padding(start = 12.dp, top = 12.dp, bottom = 12.dp), onClick = onProfile) {
+                        Box(
+                            Modifier.fillMaxSize().clip(CircleShape)
+                                .background(Brush.linearGradient(listOf(Color(0xFFD9CFB4), Color(0xFFA68A5F)))),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            val p = photo
+                            if (p != null) {
+                                Image(p, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
+                            } else {
+                                Text(initials(profile?.fullName), style = MaterialTheme.typography.titleLarge, color = Color(0xFF4B3517))
+                            }
                         }
                     }
-                    Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                    Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
                         Text(
-                            profile?.fullName ?: "", style = MaterialTheme.typography.headlineSmall, color = Color.White,
+                            profile?.fullName ?: "", style = MaterialTheme.typography.titleLarge, color = Color.White,
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
-                        profile?.rank?.takeIf { it.isNotBlank() }?.let { rank ->
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 3.dp)) {
-                                Text(rank, style = MaterialTheme.typography.bodySmall, color = Color(0xF2FFFFFF))
-                                VerifiedBadge(Modifier.padding(start = 5.dp))
-                            }
-                        }
-                        profile?.station?.takeIf { it.isNotBlank() }?.let { st ->
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 3.dp)) {
-                                Icon(Icons.Outlined.LocationOn, null, tint = Color(0xFFFF8A7A), modifier = Modifier.size(16.dp))
-                                Text(
-                                    " پاسگاه محیط‌بانی $st", style = MaterialTheme.typography.bodySmall, color = Color(0xE6FFFFFF),
-                                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                )
+                        val rank = profile?.rank?.takeIf { it.isNotBlank() }
+                        val station = profile?.station?.takeIf { it.isNotBlank() }
+                        if (rank != null || station != null) {
+                            // rank and station on one line, each icon on its right side
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 5.dp)) {
+                                if (rank != null) {
+                                    VerifiedBadge()
+                                    Text(
+                                        " $rank", style = MaterialTheme.typography.bodySmall, color = Color(0xF2FFFFFF),
+                                        maxLines = 1,
+                                    )
+                                }
+                                if (rank != null && station != null) Spacer(Modifier.width(10.dp))
+                                if (station != null) {
+                                    CircleIcon(Icons.Outlined.LocationOn, Color(0xFFE5483B), Color.White, size = 17.dp, iconSize = 11.dp)
+                                    Text(
+                                        " پاسگاه $station", style = MaterialTheme.typography.bodySmall, color = Color(0xE6FFFFFF),
+                                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
+                                    )
+                                }
                             }
                         }
                     }
-                    SkeuoBell(ringing = urgentCount > 0, count = urgentCount, onClick = onAlerts, size = 52.dp)
-                    Spacer(Modifier.size(10.dp))
-                    ShimmerLogo(size = 66.dp)
+                    ShimmerLogo(size = 64.dp, modifier = Modifier.padding(end = 12.dp))
                 }
 
                 // ---------- main action ----------
                 GlassCard(Modifier.fillMaxWidth().padding(top = 22.dp), radius = 28.dp, onClick = onFuel) {
-                    Box(
-                        Modifier
-                            .padding(14.dp)
-                            .size(70.dp)
-                            .shadow(14.dp, CircleShape, spotColor = MColors.Green)
-                            .clip(CircleShape)
-                            .background(Brush.linearGradient(listOf(Color(0xFF45C173), MColors.GreenBright, Color(0xFF16592F))))
-                            .border(1.5.dp, Brush.verticalGradient(listOf(Color(0xCCFFFFFF), Color(0x1AFFFFFF))), CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) { Icon(Icons.Outlined.LocalGasStation, null, tint = Color.White, modifier = Modifier.size(34.dp)) }
+                    CircleIcon(Icons.Outlined.LocalGasStation, Color(0xFF239B56), Color.White, size = 70.dp, iconSize = 34.dp, modifier = Modifier.padding(14.dp))
                     Column(Modifier.weight(1f).padding(vertical = 14.dp)) {
                         Text("ثبت هزینه سوخت", style = MaterialTheme.typography.titleLarge, color = MColors.Ink)
                         Text("بنزین یا گاز، رسید و امضا", style = MaterialTheme.typography.bodySmall, color = Color(0xFF3E4A44), modifier = Modifier.padding(top = 4.dp))
@@ -270,7 +266,7 @@ fun DashboardScreen(
                     GlassCard(Modifier.fillMaxWidth().padding(top = 14.dp), dark = true, onClick = onVehicle) {
                         CircleIcon(
                             if (v.type == VehicleType.MOTORCYCLE) Icons.Outlined.TwoWheeler else Icons.Outlined.DirectionsCar,
-                            Color(0x33FFFFFF), Color.White, size = 40.dp, iconSize = 21.dp, modifier = Modifier.padding(start = 14.dp),
+                            Color(0xFF2F7FC1), Color.White, size = 40.dp, iconSize = 21.dp, modifier = Modifier.padding(start = 14.dp),
                         )
                         Column(Modifier.weight(1f).padding(horizontal = 10.dp, vertical = 12.dp)) {
                             Text(v.title, style = MaterialTheme.typography.titleSmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -287,12 +283,12 @@ fun DashboardScreen(
 
                 // ---------- quick tiles ----------
                 Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    QuickTile(Icons.AutoMirrored.Outlined.FormatListBulleted, "سوابق سوخت", "${state.seasonEntries.size.fa()} ثبت در ${vm.season.title}", Modifier.weight(1f), onRecords)
-                    QuickTile(Icons.Outlined.Assessment, "گزارش فصلی", "${vm.season.title} ${vm.year.fa()}", Modifier.weight(1f), onReport)
+                    QuickTile(Icons.AutoMirrored.Outlined.FormatListBulleted, "سوابق سوخت", "${state.seasonEntries.size.fa()} ثبت در ${vm.season.title}", Modifier.weight(1f), onRecords, Color(0xFF2F7FC1))
+                    QuickTile(Icons.Outlined.Assessment, "گزارش فصلی", "${vm.season.title} ${vm.year.fa()}", Modifier.weight(1f), onReport, Color(0xFFE08A1E))
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    QuickTile(Icons.Outlined.DirectionsCar, "وسایل نقلیه", "${state.vehicleCount.fa()} وسیله | پلاک‌ها", Modifier.weight(1f), onVehicle)
-                    QuickTile(Icons.Outlined.Settings, "تنظیمات", "نرخ‌ها و پشتیبان", Modifier.weight(1f), onSettings)
+                    QuickTile(Icons.Outlined.DirectionsCar, "وسایل نقلیه", "${state.vehicleCount.fa()} وسیله | پلاک‌ها", Modifier.weight(1f), onVehicle, Color(0xFF1F9A8A))
+                    QuickTile(Icons.Outlined.Settings, "تنظیمات", "نرخ‌ها و پشتیبان", Modifier.weight(1f), onSettings, Color(0xFF5F6F7A))
                 }
 
                 // ---------- alerts entry (details in their own page) ----------
@@ -354,17 +350,9 @@ private fun initials(name: String?): String {
 }
 
 @Composable
-private fun QuickTile(icon: ImageVector, title: String, subtitle: String, modifier: Modifier, onClick: () -> Unit) {
+private fun QuickTile(icon: ImageVector, title: String, subtitle: String, modifier: Modifier, onClick: () -> Unit, color: Color) {
     GlassCard(modifier.height(86.dp), dark = true, radius = 22.dp, onClick = onClick) {
-        Box(
-            Modifier
-                .padding(start = 12.dp)
-                .size(44.dp)
-                .shadow(6.dp, CircleShape)
-                .clip(CircleShape)
-                .background(Brush.verticalGradient(listOf(Color.White, Color(0xFFE6F2E9)))),
-            contentAlignment = Alignment.Center,
-        ) { Icon(icon, null, tint = MColors.Green, modifier = Modifier.size(22.dp)) }
+        CircleIcon(icon, color, Color.White, size = 44.dp, iconSize = 22.dp, modifier = Modifier.padding(start = 12.dp))
         Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
             Text(title, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(subtitle, style = MaterialTheme.typography.labelSmall, color = Color(0xCCFFFFFF), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 3.dp))

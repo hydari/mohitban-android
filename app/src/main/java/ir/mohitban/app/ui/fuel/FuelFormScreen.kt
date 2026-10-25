@@ -282,11 +282,9 @@ fun FuelFormScreen(
                         Text("لبه‌ها خودکار تشخیص داده می‌شود", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = MColors.Green)
                     }
                 }
-                Box(
-                    Modifier.size(54.dp).clip(CircleShape).background(MColors.GreenLight)
-                        .border(1.5.dp, Color(0xFFCFE3D5), CircleShape).clickable { receiptPicker.openSheet() },
-                    contentAlignment = Alignment.Center,
-                ) { Icon(Icons.Outlined.PhotoCamera, "عکس رسید", tint = MColors.Green, modifier = Modifier.size(26.dp)) }
+                Box(Modifier.clip(CircleShape).clickable { receiptPicker.openSheet() }) {
+                    CircleIcon(Icons.Outlined.PhotoCamera, MColors.Green, Color.White, size = 54.dp, iconSize = 26.dp)
+                }
             }
             FieldMessage(vm.errors["receipt"], null)
 

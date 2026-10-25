@@ -198,7 +198,7 @@ fun SettingsScreen(
 
                 SectionTitle("درباره")
                 AppCard(Modifier.fillMaxWidth()) {
-                    SettingRow(Icons.Outlined.Info, "محیط‌یار — نسخه ${ir.mohitban.app.BuildConfigCompat.versionName(LocalContext.current).fa()}", "طراح و برنامه‌نویس: مهندس محمدرضا حیدری | کاملاً آفلاین", null)
+                    SettingRow(Icons.Outlined.Info, "محیط‌یار — نسخه ${ir.mohitban.app.BuildConfigCompat.versionName(LocalContext.current).fa()}", "طراح و برنامه‌نویس: مهندس محمدرضا حیدری", null)
                 }
                 Spacer(Modifier.height(120.dp))
             }

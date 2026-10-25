@@ -165,7 +165,7 @@ fun MField(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            if (leadingIcon != null) Icon(leadingIcon, null, tint = MColors.Green, modifier = Modifier.size(21.dp))
+            if (leadingIcon != null) CircleIcon(leadingIcon, MColors.Green, Color.White, size = 30.dp, iconSize = 17.dp)
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                 val textStyle = MaterialTheme.typography.bodyLarge.copy(
                     fontWeight = FontWeight.Bold,

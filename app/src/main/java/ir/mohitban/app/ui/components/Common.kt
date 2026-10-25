@@ -55,6 +55,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -241,6 +242,13 @@ fun CircleIcon(
     modifier: Modifier = Modifier,
     border: Color? = null,
 ) {
+    // light disc + coloured glyph → turn into a glossy coloured button with a white glyph
+    var background = background
+    var tint = tint
+    if (background.alpha >= 0.5f && background.luminance() > 0.72f && tint.luminance() < 0.45f) {
+        background = tint
+        tint = Color.White
+    }
     val transparent = background.alpha < 0.5f
     Box(
         modifier = modifier
@@ -330,18 +338,18 @@ fun TopBar(
                     .clip(CircleShape)
                     .clickable(onClick = onBack),
                 contentAlignment = Alignment.Center,
-            ) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "بازگشت", tint = MColors.Ink) }
+            ) { CircleIcon(Icons.AutoMirrored.Outlined.ArrowBack, MColors.Green, Color.White, size = 36.dp, iconSize = 19.dp) }
         }
         Text(title, style = MaterialTheme.typography.titleLarge, color = MColors.Ink, modifier = Modifier.align(Alignment.Center))
         if (action != null) Box(Modifier.align(Alignment.CenterEnd)) { action() }
     }
 }
 
-enum class MainTab(val title: String, val icon: ImageVector) {
-    HOME("خانه", Icons.Outlined.Home),
-    RECORDS("سوابق", Icons.AutoMirrored.Outlined.FormatListBulleted),
-    REPORTS("گزارش‌ها", Icons.Outlined.Assessment),
-    SETTINGS("تنظیمات", Icons.Outlined.Settings),
+enum class MainTab(val title: String, val icon: ImageVector, val color: Color) {
+    HOME("خانه", Icons.Outlined.Home, Color(0xFF239B56)),
+    RECORDS("سوابق", Icons.AutoMirrored.Outlined.FormatListBulleted, Color(0xFF2F7FC1)),
+    REPORTS("گزارش‌ها", Icons.Outlined.Assessment, Color(0xFFE08A1E)),
+    SETTINGS("تنظیمات", Icons.Outlined.Settings, Color(0xFF5F6F7A)),
 }
 
 /** Floating glass navigation bar (blurred photo behind it on the dashboard, frosted green elsewhere). */
@@ -349,6 +357,7 @@ enum class MainTab(val title: String, val icon: ImageVector) {
 fun BottomBar(current: MainTab, onSelect: (MainTab) -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(28.dp)
     val backdrop = LocalGlassBackdrop.current
+    val glass = backdrop != null
     var position by remember { mutableStateOf(Offset.Zero) }
     Row(
         modifier = modifier
@@ -356,21 +365,27 @@ fun BottomBar(current: MainTab, onSelect: (MainTab) -> Unit, modifier: Modifier 
             .padding(horizontal = 14.dp, vertical = 10.dp)
             .fillMaxWidth()
             .height(72.dp)
-            .shadow(20.dp, shape, ambientColor = Color.Black, spotColor = Color(0x80000000))
+            .shadow(if (glass) 20.dp else 10.dp, shape, ambientColor = Color.Black, spotColor = if (glass) Color(0x80000000) else Color(0x40143C1E))
             .clip(shape)
             .onGloballyPositioned { position = it.positionInRoot() }
             .drawBehind {
-                drawBackdrop(backdrop, position)
-                drawRect(
-                    if (backdrop != null) Brush.verticalGradient(listOf(Color(0x8C0E2A18), Color(0xB30A1F12)))
-                    else Brush.verticalGradient(listOf(Color(0xE61C4A2C), Color(0xF20E2417))),
-                )
-                drawRect(
-                    Brush.verticalGradient(0f to Color.White.copy(alpha = 0.20f), 0.5f to Color.Transparent),
-                    size = this.size.copy(height = this.size.height * 0.5f),
-                )
+                if (glass) {
+                    drawBackdrop(backdrop, position)
+                    drawRect(Brush.verticalGradient(listOf(Color(0x8C0E2A18), Color(0xB30A1F12))))
+                    drawRect(
+                        Brush.verticalGradient(0f to Color.White.copy(alpha = 0.20f), 0.5f to Color.Transparent),
+                        size = this.size.copy(height = this.size.height * 0.5f),
+                    )
+                } else {
+                    drawRect(Color.White)
+                }
             }
-            .border(1.dp, Brush.verticalGradient(listOf(Color(0x99FFFFFF), Color(0x1AFFFFFF))), shape)
+            .border(
+                if (glass) 1.dp else 1.5.dp,
+                if (glass) Brush.verticalGradient(listOf(Color(0x99FFFFFF), Color(0x1AFFFFFF)))
+                else Brush.verticalGradient(listOf(MColors.Green2, MColors.Green)),
+                shape,
+            )
             .padding(horizontal = 6.dp),
         horizontalArrangement = Arrangement.SpaceAround,
         verticalAlignment = Alignment.CenterVertically,
@@ -382,21 +397,25 @@ fun BottomBar(current: MainTab, onSelect: (MainTab) -> Unit, modifier: Modifier 
                     .weight(1f)
                     .clip(RoundedCornerShape(20.dp))
                     .then(
-                        if (on) Modifier
+                        if (on && glass) Modifier
                             .background(Brush.verticalGradient(listOf(Color(0x47FFFFFF), Color(0x1AFFFFFF))))
                             .border(1.dp, Color(0x40FFFFFF), RoundedCornerShape(20.dp))
+                        else if (on) Modifier.background(MColors.GreenLight)
                         else Modifier,
                     )
                     .clickable { onSelect(tab) }
-                    .padding(vertical = 7.dp),
+                    .padding(vertical = 5.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(3.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                Icon(tab.icon, tab.title, tint = if (on) Color(0xFF9BF0B6) else Color(0xCCFFFFFF), modifier = Modifier.size(23.dp))
+                CircleIcon(
+                    tab.icon, if (on) tab.color else lerpColor(tab.color, Color(0xFF9AA5A0), 0.55f), Color.White,
+                    size = if (on) 34.dp else 30.dp, iconSize = if (on) 19.dp else 17.dp,
+                )
                 Text(
                     tab.title,
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = if (on) FontWeight.Bold else FontWeight.Normal),
-                    color = if (on) Color.White else Color(0xBFFFFFFF),
+                    color = if (glass) (if (on) Color.White else Color(0xBFFFFFFF)) else (if (on) MColors.Green else MColors.Muted),
                 )
             }
         }
