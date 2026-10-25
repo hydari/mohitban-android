@@ -1,0 +1,53 @@
+name: ساخت APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Restore signing key
+        env:
+          MOHITBAN_KEY_PASSWORD: ${{ secrets.MOHITBAN_KEY_PASSWORD }}
+        run: |
+          if [ -n "$MOHITBAN_KEY_PASSWORD" ]; then
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in signing/mohitban.jks.enc -out signing/mohitban.jks -pass env:MOHITBAN_KEY_PASSWORD
+            echo "keystore sha256: $(sha256sum signing/mohitban.jks | cut -c1-16)"
+          else
+            echo "::warning::Secret MOHITBAN_KEY_PASSWORD is missing - the APK is signed with a temporary debug key."
+          fi
+
+      - name: Build release APK
+        env:
+          MOHITBAN_KEY_PASSWORD: ${{ secrets.MOHITBAN_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --stacktrace
+
+      - name: Rename APK
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/release/*.apk out/Mohitban-${{ github.run_number }}.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mohitban-APK-${{ github.run_number }}
+          path: out/*.apk
+          retention-days: 30

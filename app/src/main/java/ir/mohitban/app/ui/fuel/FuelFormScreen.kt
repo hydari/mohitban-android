@@ -1,0 +1,437 @@
+package ir.mohitban.app.ui.fuel
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.DirectionsCar
+import androidx.compose.material.icons.outlined.Image as ImageIcon
+import androidx.compose.material.icons.outlined.LocalFireDepartment
+import androidx.compose.material.icons.outlined.Payments
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.PictureAsPdf
+import androidx.compose.material.icons.outlined.Receipt
+import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material.icons.outlined.WaterDrop
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import ir.mohitban.app.container
+import ir.mohitban.app.core.text.fa
+import ir.mohitban.app.core.text.rial
+import ir.mohitban.app.domain.model.FuelType
+import ir.mohitban.app.domain.model.VehicleType
+import ir.mohitban.app.ui.common.Share
+import ir.mohitban.app.ui.common.appViewModel
+import ir.mohitban.app.ui.components.AppCard
+import ir.mohitban.app.ui.components.TagBadge
+import ir.mohitban.app.ui.components.CircleIcon
+import ir.mohitban.app.ui.components.FieldLabel
+import ir.mohitban.app.ui.components.FieldMessage
+import ir.mohitban.app.ui.components.JalaliDatePickerDialog
+import ir.mohitban.app.ui.components.MField
+import ir.mohitban.app.ui.components.NumericMode
+import ir.mohitban.app.ui.components.PillButton
+import ir.mohitban.app.ui.components.PlateView
+import ir.mohitban.app.ui.components.SignaturePad
+import ir.mohitban.app.ui.components.TopBar
+import ir.mohitban.app.ui.components.rememberImagePicker
+import ir.mohitban.app.ui.components.rememberSignatureState
+import ir.mohitban.app.ui.components.rememberStoredImage
+import ir.mohitban.app.ui.theme.MColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+
+@Composable
+fun FuelFormScreen(
+    entryId: Long,
+    croppedReceipt: String?,
+    onReceiptConsumed: () -> Unit,
+    onCropReceipt: (File) -> Unit,
+    onBack: () -> Unit,
+    onDone: () -> Unit,
+) {
+    val vm = appViewModel(key = "fuel_$entryId") { c, _ ->
+        FuelFormViewModel(entryId, c.profileRepository, c.settingsRepository, c.fuelRepository, c.files)
+    }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val driverSig = rememberSignatureState()
+    val passengerSig = rememberSignatureState()
+    var datePicker by remember { mutableStateOf(false) }
+
+    LaunchedEffect(croppedReceipt) {
+        if (croppedReceipt != null) {
+            vm.onReceipt(croppedReceipt)
+            onReceiptConsumed()
+        }
+    }
+    // show saved signatures while editing
+    val oldDriver by rememberStoredImage(vm.existingDriverSignature, 600)
+    val oldPassenger by rememberStoredImage(vm.existingPassengerSignature, 600)
+    LaunchedEffect(oldDriver) { if (oldDriver != null && !driverSig.hasNewDrawing) driverSig.existing = oldDriver }
+    LaunchedEffect(oldPassenger) { if (oldPassenger != null && !passengerSig.hasNewDrawing) passengerSig.existing = oldPassenger }
+
+    val receiptPicker = rememberImagePicker("receipt", onImported = { vm.onReceipt(it) }, rawCameraFile = onCropReceipt)
+    val vehiclePicker = rememberImagePicker("vehicle", onImported = { vm.onVehiclePhoto(it) })
+
+    Column(Modifier.fillMaxSize().background(Color.White)) {
+        TopBar(if (vm.isEdit) "ویرایش هزینه سوخت" else "ثبت هزینه سوخت", onBack = onBack)
+        if (!vm.loaded) return@Column
+        Column(
+            Modifier
+                .weight(1f)
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 18.dp),
+        ) {
+            // ---------- date + odometer ----------
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                MField(
+                    value = vm.date.format(), onValueChange = {}, numeric = NumericMode.Digits,
+                    label = "تاریخ سوخت‌گیری", leadingIcon = Icons.Outlined.CalendarMonth,
+                    onClick = { datePicker = true }, modifier = Modifier.weight(1.15f),
+                )
+                MField(
+                    value = vm.odometer, onValueChange = { vm.odometer = it }, numeric = NumericMode.Grouped, maxLength = 7,
+                    label = "کیلومتر فعلی", leadingIcon = Icons.Outlined.Speed, placeholder = "۰",
+                    error = vm.errors["odometer"], modifier = Modifier.weight(1f),
+                )
+            }
+            vm.lastOdometer?.let {
+                Text(
+                    "آخرین کیلومتر ثبت‌شده: ${it.rial()}",
+                    style = MaterialTheme.typography.labelSmall, color = MColors.Muted,
+                    modifier = Modifier.padding(start = 6.dp, top = 4.dp),
+                )
+            }
+
+            // ---------- vehicle ----------
+            FieldLabel("خودرو", Icons.Outlined.DirectionsCar)
+            val vehicle = vm.vehicle
+            val vPhoto by rememberStoredImage(vehicle?.photoPath, 700)
+            AppCard(Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f).padding(start = 4.dp)) {
+                        Text(vehicle?.model ?: "", style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        val sub = listOfNotNull(vehicle?.kind?.takeIf { it.isNotBlank() }, vehicle?.year?.takeIf { it.isNotBlank() }?.let { "مدل ${it.fa()}" })
+                        Text(sub.joinToString(" | "), style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
+                        vehicle?.let { PlateView(it.plate, height = if (it.type == VehicleType.CAR) 34.dp else 30.dp) }
+                    }
+                    Box(
+                        Modifier
+                            .size(width = 128.dp, height = 96.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MColors.GreenTint)
+                            .border(1.5.dp, Color(0xFFBFD3C5), RoundedCornerShape(14.dp))
+                            .clickable { vehiclePicker.openSheet() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        val p = vPhoto
+                        if (p != null) {
+                            Image(p, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                            CircleIcon(
+                                Icons.Outlined.PhotoCamera, MColors.Green, Color.White, size = 30.dp, iconSize = 16.dp,
+                                modifier = Modifier.align(Alignment.BottomStart).padding(6.dp),
+                            )
+                        } else {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircleIcon(Icons.Outlined.PhotoCamera, MColors.Green, Color.White, size = 40.dp, iconSize = 20.dp)
+                                Text("افزودن عکس خودرو", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Green, modifier = Modifier.padding(top = 6.dp))
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ---------- fuel type ----------
+            FieldLabel("نوع سوخت")
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FuelTypeCard(
+                    FuelType.CNG, Icons.Outlined.LocalFireDepartment, "${vm.rates.cng.rial()} ریال/کیلو",
+                    vm.fuelType == FuelType.CNG, MColors.Green2, Color.White, Modifier.weight(1f),
+                ) { vm.onFuelType(FuelType.CNG) }
+                FuelTypeCard(
+                    FuelType.GASOLINE, Icons.Outlined.WaterDrop, "${vm.rates.gasoline.size.fa()} نرخ مصوب",
+                    vm.fuelType == FuelType.GASOLINE, MColors.AmberBg, MColors.Amber, Modifier.weight(1f),
+                ) { vm.onFuelType(FuelType.GASOLINE) }
+            }
+            if (vm.fuelType == FuelType.GASOLINE) {
+                FieldLabel("نرخ هر لیتر (ریال)")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    vm.rates.gasoline.forEachIndexed { i, r ->
+                        RateChip(r.rial(), vm.gasolineRateIndex == i, Modifier.weight(1f)) { vm.gasolineRateIndex = i }
+                    }
+                }
+            }
+            MField(
+                value = vm.amount, onValueChange = { vm.amount = it }, numeric = NumericMode.Decimal, maxLength = 7,
+                label = "مقدار سوخت (${vm.fuelType.unit})",
+                leadingIcon = if (vm.fuelType == FuelType.CNG) Icons.Outlined.LocalFireDepartment else Icons.Outlined.WaterDrop,
+                trailing = { Text(vm.fuelType.unit, style = MaterialTheme.typography.labelMedium, color = MColors.Muted) },
+                placeholder = "۰", error = vm.errors["amount"], highlight = vm.amount.isNotEmpty(), big = true,
+            )
+
+            // ---------- total ----------
+            AppCard(Modifier.fillMaxWidth().padding(top = 14.dp)) {
+                Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    CircleIcon(Icons.Outlined.Payments, MColors.GreenLight, MColors.Green, size = 46.dp, iconSize = 24.dp)
+                    Text("مبلغ کل", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 12.dp).weight(1f))
+                    Column(horizontalAlignment = Alignment.End) {
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text(vm.total.rial(), style = MaterialTheme.typography.headlineSmall.copy(fontSize = 24.sp), color = MColors.Green)
+                            Spacer(Modifier.width(4.dp))
+                            Text("ریال", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = MColors.Green, modifier = Modifier.padding(bottom = 4.dp))
+                        }
+                        Text(
+                            "${vm.amount.ifBlank { "0" }.fa().replace('.', '٫')} × ${vm.unitPrice.rial()}",
+                            style = MaterialTheme.typography.labelSmall, color = MColors.Muted,
+                        )
+                    }
+                }
+            }
+
+            // ---------- receipt ----------
+            FieldLabel("عکس رسید", Icons.Outlined.Receipt) {
+                if (vm.receiptRequired) TagBadge("الزامی برای بنزین", MColors.ErrorBg, MColors.Error)
+                else TagBadge("برای گاز اختیاری", MColors.Bg, MColors.Muted)
+            }
+            val receipt by rememberStoredImage(vm.receiptPath, 500)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .size(width = 120.dp, height = 88.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFFE4E3DE))
+                        .clickable { receiptPicker.openSheet() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    val r = receipt
+                    if (r != null) {
+                        Image(r, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                        CircleIcon(Icons.Outlined.Check, MColors.Green2, Color.White, size = 24.dp, iconSize = 14.dp,
+                            modifier = Modifier.align(Alignment.TopEnd).padding(6.dp), border = Color.White)
+                    } else {
+                        Icon(Icons.Outlined.Receipt, null, tint = Color(0xFF9AA29C), modifier = Modifier.size(34.dp))
+                    }
+                }
+                Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                    if (vm.receiptPath != null) {
+                        Text("رسید کارتخوان ثبت شد", style = MaterialTheme.typography.bodySmall, color = MColors.Muted)
+                        Text(
+                            "حذف رسید", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = MColors.Error,
+                            modifier = Modifier.padding(top = 4.dp).clickable { vm.removeReceipt() },
+                        )
+                    } else {
+                        Text("از رسید کارتخوان عکس بگیرید", style = MaterialTheme.typography.bodySmall, color = MColors.Muted)
+                        Text("لبه‌ها خودکار تشخیص داده می‌شود", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = MColors.Green)
+                    }
+                }
+                Box(
+                    Modifier.size(54.dp).clip(CircleShape).background(MColors.GreenLight)
+                        .border(1.5.dp, Color(0xFFCFE3D5), CircleShape).clickable { receiptPicker.openSheet() },
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Outlined.PhotoCamera, "عکس رسید", tint = MColors.Green, modifier = Modifier.size(26.dp)) }
+            }
+            FieldMessage(vm.errors["receipt"], null)
+
+            // ---------- signatures ----------
+            FieldLabel("امضای دیجیتال")
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SignaturePad(driverSig, "راننده", Modifier.weight(1f), required = true, error = vm.errors["driver"])
+                SignaturePad(passengerSig, "سرنشین (اختیاری)", Modifier.weight(1f))
+            }
+
+            Spacer(Modifier.height(20.dp))
+            PillButton(
+                if (vm.isEdit) "ذخیره تغییرات" else "ثبت و ذخیره فرم",
+                onClick = { vm.requestSave(driverEmpty = driverSig.isEmpty) },
+                icon = Icons.AutoMirrored.Outlined.Send,
+            )
+            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.navigationBarsPadding())
+        }
+    }
+
+    if (datePicker) {
+        JalaliDatePickerDialog(vm.date, onDismiss = { datePicker = false }, onConfirm = { vm.date = it; datePicker = false })
+    }
+
+    if (vm.showConfirm) {
+        AlertDialog(
+            onDismissRequest = { if (!vm.saving) vm.showConfirm = false },
+            containerColor = Color.White,
+            title = { Text("بررسی و تأیید نهایی", style = MaterialTheme.typography.titleMedium) },
+            text = {
+                Column {
+                    vm.summaryLines().forEachIndexed { i, (k, v) ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 7.dp)) {
+                            Text(k, style = MaterialTheme.typography.bodyMedium, color = MColors.Muted, modifier = Modifier.weight(1f))
+                            Text(
+                                v,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                color = if (i == 5) MColors.Green else MColors.Ink,
+                            )
+                        }
+                        if (i < 5) HorizontalDivider(color = MColors.Line)
+                    }
+                    Text(
+                        "پس از ثبت، فرم رسمی (PDF و تصویر) ساخته می‌شود.",
+                        style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 10.dp),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !vm.saving,
+                    onClick = {
+                        scope.launch {
+                            val d = withContext(Dispatchers.Default) { if (driverSig.hasNewDrawing) driverSig.toBitmap() else null }
+                            val p = withContext(Dispatchers.Default) { if (passengerSig.hasNewDrawing) passengerSig.toBitmap() else null }
+                            vm.save(d, p, passengerCleared = passengerSig.isEmpty)
+                        }
+                    },
+                ) { Text(if (vm.saving) "در حال ثبت…" else "ثبت نهایی", color = MColors.Green, style = MaterialTheme.typography.labelLarge) }
+            },
+            dismissButton = { TextButton(onClick = { vm.showConfirm = false }) { Text("ویرایش", color = MColors.Muted) } },
+        )
+    }
+
+    vm.savedEntry?.let { saved ->
+        val container = context.container
+        AlertDialog(
+            onDismissRequest = onDone,
+            containerColor = Color.White,
+            icon = { CircleIcon(Icons.Outlined.Check, MColors.GreenLight, MColors.Green, size = 56.dp, iconSize = 30.dp) },
+            title = { Text("فرم هزینه سوخت ثبت شد", style = MaterialTheme.typography.titleMedium) },
+            text = { Text("فرم رسمی را می‌توانید به صورت PDF یا تصویر برای اداره ارسال کنید.", style = MaterialTheme.typography.bodyMedium, color = MColors.Muted) },
+            confirmButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    ShareRow(Icons.Outlined.PictureAsPdf, "ارسال PDF") {
+                        scope.launch {
+                            val f = withContext(Dispatchers.IO) { container.fuelForm.createPdf(saved) }
+                            Share.file(context, f, "application/pdf")
+                        }
+                    }
+                    ShareRow(Icons.Outlined.ImageIcon, "ارسال تصویر فرم") {
+                        scope.launch {
+                            val f = withContext(Dispatchers.IO) { container.fuelForm.createPng(saved) }
+                            Share.file(context, f, "image/png")
+                        }
+                    }
+                    TextButton(onClick = onDone) { Text("بازگشت", color = MColors.Muted) }
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun ShareRow(icon: ImageVector, text: String, onClick: () -> Unit) {
+    TextButton(onClick = onClick) {
+        Icon(icon, null, tint = MColors.Green, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(text, color = MColors.Green, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+@Composable
+private fun FuelTypeCard(
+    type: FuelType,
+    icon: ImageVector,
+    subtitle: String,
+    selected: Boolean,
+    iconBg: Color,
+    iconTint: Color,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(16.dp)
+    Box(
+        modifier
+            .clip(shape)
+            .background(if (selected) MColors.GreenTint else Color.White)
+            .border(if (selected) 2.dp else 1.5.dp, if (selected) MColors.Green2 else MColors.Line, shape)
+            .clickable(onClick = onClick)
+            .padding(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CircleIcon(icon, if (selected) MColors.Green2 else iconBg, if (selected) Color.White else iconTint, size = 42.dp)
+            Column(Modifier.padding(start = 10.dp)) {
+                Text(type.title, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        Box(
+            Modifier
+                .align(Alignment.TopEnd)
+                .size(18.dp)
+                .clip(CircleShape)
+                .background(if (selected) MColors.Green2 else Color.White)
+                .border(1.5.dp, if (selected) MColors.Green2 else Color(0xFFC5CCC7), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) { if (selected) Icon(Icons.Outlined.Check, null, tint = Color.White, modifier = Modifier.size(12.dp)) }
+    }
+}
+
+@Composable
+private fun RateChip(text: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(14.dp)
+    Column(
+        modifier
+            .height(54.dp)
+            .clip(shape)
+            .background(if (selected) MColors.Green else Color.White)
+            .border(1.5.dp, if (selected) MColors.Green else MColors.Line, shape)
+            .clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(text, style = MaterialTheme.typography.titleSmall, color = if (selected) Color.White else MColors.Ink)
+        Text("ریال", style = MaterialTheme.typography.labelSmall, color = if (selected) Color(0xFFCFE3C7) else MColors.Muted)
+    }
+}
