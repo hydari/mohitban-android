@@ -1,6 +1,7 @@
 package ir.mohitban.app.ui.components
 
 import android.graphics.Bitmap
+import ir.mohitban.app.ui.theme.Corners
 import android.graphics.Canvas as ACanvas
 import android.graphics.Paint as APaint
 import android.graphics.Path as APath
@@ -131,7 +132,7 @@ fun SignaturePad(
     error: String? = null,
     hint: String = "اینجا امضا کنید",
 ) {
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(Corners.R)
     val borderColor = if (error != null) MColors.Error else Color(0xFFC9D1CB)
     Column(modifier) {
         Box(
@@ -215,7 +216,7 @@ fun SignaturePad(
 /** Large drawing surface used in the full-screen signature dialog. */
 @Composable
 fun BigSignatureCanvas(state: SignatureState, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(18.dp)
+    val shape = RoundedCornerShape(Corners.R)
     Box(
         modifier
             .clip(shape)

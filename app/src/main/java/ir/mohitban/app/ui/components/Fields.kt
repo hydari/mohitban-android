@@ -1,6 +1,7 @@
 package ir.mohitban.app.ui.components
 
 import androidx.compose.foundation.background
+import ir.mohitban.app.ui.theme.Corners
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -144,7 +145,7 @@ fun MField(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(Corners.R)
     val borderColor = when {
         error != null -> MColors.Error
         focused || highlight -> MColors.Green2
@@ -283,7 +284,12 @@ fun ComboField(
             onDismissRequest = { open = false },
             modifier = Modifier.background(Color.White),
         ) {
-            options.forEach { opt ->
+            // while typing, narrow the list to matching options (all of them once a value is chosen)
+            val typed = value.trim()
+            val shown = if (!readOnly && typed.isNotEmpty() && options.none { it == typed }) {
+                options.filter { it.contains(typed) }.ifEmpty { options }
+            } else options
+            shown.forEach { opt ->
                 DropdownMenuItem(
                     text = { Text(if (numeric != NumericMode.None) opt.fa() else opt, style = MaterialTheme.typography.bodyLarge) },
                     onClick = { onValueChange(opt); open = false },

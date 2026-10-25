@@ -1,6 +1,7 @@
 package ir.mohitban.app.ui.records
 
 import android.graphics.BitmapFactory
+import ir.mohitban.app.ui.theme.Corners
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -287,7 +288,7 @@ private fun EntryCard(e: FuelEntry, onOpen: () -> Unit, onPdf: () -> Unit, onIma
 @Composable
 private fun Chip(icon: ImageVector?, text: String) {
     Row(
-        Modifier.clip(RoundedCornerShape(20.dp)).background(MColors.Bg).padding(horizontal = 9.dp, vertical = 4.dp),
+        Modifier.clip(RoundedCornerShape(Corners.R)).background(MColors.Bg).padding(horizontal = 9.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) Icon(icon, null, tint = MColors.Muted, modifier = Modifier.size(13.dp).padding(end = 2.dp))
@@ -328,7 +329,7 @@ private fun FormPreviewDialog(e: FuelEntry, onDismiss: () -> Unit) {
             Modifier
                 .fillMaxWidth(0.96f)
                 .fillMaxHeight(0.88f)
-                .clip(RoundedCornerShape(24.dp))
+                .clip(RoundedCornerShape(Corners.R))
                 .background(Color(0xF7101410))
                 .padding(16.dp),
         ) {

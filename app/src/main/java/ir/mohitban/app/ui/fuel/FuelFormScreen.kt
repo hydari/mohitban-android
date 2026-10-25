@@ -1,6 +1,7 @@
 package ir.mohitban.app.ui.fuel
 
 import androidx.compose.foundation.Image
+import ir.mohitban.app.ui.theme.Corners
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -164,7 +165,7 @@ fun FuelFormScreen(
                         if (sub.isNotEmpty()) Text(sub.joinToString(" | "), style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 2.dp))
                     }
                     // the plate sits on the left side of the card
-                    vehicle?.let { Box(Modifier.padding(start = 8.dp, end = 4.dp)) { PlateView(it.plate, height = if (it.type == VehicleType.CAR) 36.dp else 30.dp) } }
+                    vehicle?.let { Box(Modifier.padding(start = 8.dp, end = 4.dp)) { PlateView(it.plate, height = 36.dp) } }
                 }
             }
 
@@ -256,7 +257,7 @@ fun FuelFormScreen(
                 Box(
                     Modifier
                         .size(width = 120.dp, height = 88.dp)
-                        .clip(RoundedCornerShape(14.dp))
+                        .clip(RoundedCornerShape(Corners.R))
                         .background(Color(0xFFE4E3DE))
                         .clickable { receiptPicker.openSheet() },
                     contentAlignment = Alignment.Center,
@@ -316,7 +317,7 @@ fun FuelFormScreen(
                         Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
-                            .clip(RoundedCornerShape(14.dp))
+                            .clip(RoundedCornerShape(Corners.R))
                             .background(if (selected) MColors.GreenTint else MColors.Bg)
                             .clickable { vm.selectVehicle(v.id); vehicleSheet = false }
                             .padding(12.dp),
@@ -432,7 +433,7 @@ private fun FuelTypeCard(
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(Corners.R)
     Box(
         modifier
             .clip(shape)
@@ -462,7 +463,7 @@ private fun FuelTypeCard(
 
 @Composable
 private fun RateChip(text: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(Corners.R)
     Column(
         modifier
             .height(54.dp)

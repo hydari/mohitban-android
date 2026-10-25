@@ -1,6 +1,7 @@
 package ir.mohitban.app.ui.components
 
 import androidx.compose.foundation.background
+import ir.mohitban.app.ui.theme.Corners
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -61,7 +62,7 @@ fun JalaliDatePickerDialog(
     Dialog(onDismissRequest = onDismiss) {
         Column(
             Modifier
-                .clip(RoundedCornerShape(24.dp))
+                .clip(RoundedCornerShape(Corners.R))
                 .background(Color.White)
                 .padding(16.dp),
         ) {

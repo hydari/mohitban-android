@@ -21,6 +21,8 @@ android {
         versionCode = run
         versionName = "1.0.0"
         vectorDrawables { useSupportLibrary = true }
+        // only Persian and English UI strings from libraries (smaller APK, nothing visible changes)
+        resourceConfigurations += listOf("fa", "en")
     }
 
     // A fixed release key so every new APK installs as an update over the previous one.
@@ -45,7 +47,10 @@ android {
             if (hasReleaseKey) signingConfig = signingConfigs.getByName("mohitban")
         }
         release {
-            isMinifyEnabled = false
+            // R8 removes unused library code/resources (mostly the large icon set); the app's own
+            // classes are kept as-is in proguard-rules.pro so behaviour does not change
+            isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = if (hasReleaseKey) signingConfigs.getByName("mohitban") else signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }

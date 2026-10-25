@@ -1,6 +1,7 @@
 package ir.mohitban.app.ui.dashboard
 
 import android.Manifest
+import ir.mohitban.app.ui.theme.Corners
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -206,21 +207,20 @@ fun DashboardScreen(
                     .verticalScroll(scroll)
                     .padding(horizontal = 18.dp),
             ) {
-                // ---------- header card (liquid glass): DoE logo + organisation plates on top, then photo | name ----------
-                GlassCard(Modifier.fillMaxWidth().padding(top = 14.dp), dark = true, radius = 28.dp) {
-                  Column(Modifier.weight(1f).padding(top = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    ShimmerLogo(size = 64.dp)
-                    // organisation plates under the logo: white, green text, same glossy sweep
-                    val province = profile?.province.orEmpty().trim().removePrefix("استان").trim()
-                    Column(
-                        Modifier.padding(top = 8.dp, start = 12.dp, end = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        OrgPlate("سازمان حفاظت محیط زیست", 9.5.sp)
-                        if (province.isNotEmpty()) OrgPlate("اداره کل حفاظت محیط زیست استان $province", 8.5.sp)
-                    }
-                  Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                // ---------- organisation: DoE logo + name plates, no background ----------
+                val province = profile?.province.orEmpty().trim().removePrefix("استان").trim()
+                Column(
+                    Modifier.fillMaxWidth().padding(top = 14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    ShimmerLogo(size = 66.dp, modifier = Modifier.padding(bottom = 4.dp))
+                    OrgPlate("سازمان حفاظت محیط زیست", 9.5.sp)
+                    if (province.isNotEmpty()) OrgPlate("اداره کل حفاظت محیط زیست استان $province", 8.5.sp)
+                }
+
+                // ---------- personal card (liquid glass): photo | name, rank · station | bell ----------
+                GlassCard(Modifier.fillMaxWidth().padding(top = 14.dp), dark = true) {
                     GlassRing(70.dp, Modifier.padding(start = 12.dp, top = 12.dp, bottom = 12.dp), onClick = onProfile) {
                         Box(
                             Modifier.fillMaxSize().clip(CircleShape)
@@ -268,12 +268,14 @@ fun DashboardScreen(
                             }
                         }
                     }
-                  }
-                  }
+                    SkeuoBell(
+                        ringing = urgentCount > 0, count = urgentCount, onClick = onAlerts,
+                        size = 46.dp, plain = true, modifier = Modifier.padding(end = 10.dp),
+                    )
                 }
 
                 // ---------- main action ----------
-                GlassCard(Modifier.fillMaxWidth().padding(top = 22.dp), radius = 28.dp, onClick = onFuel) {
+                GlassCard(Modifier.fillMaxWidth().padding(top = 22.dp), radius = Corners.R, onClick = onFuel) {
                     CircleIcon(Icons.Outlined.LocalGasStation, Color(0xFF239B56), Color.White, size = 70.dp, iconSize = 34.dp, modifier = Modifier.padding(14.dp))
                     Column(Modifier.weight(1f).padding(vertical = 14.dp)) {
                         Text("ثبت هزینه سوخت", style = MaterialTheme.typography.titleLarge, color = MColors.Ink)
@@ -358,7 +360,7 @@ fun DashboardScreen(
                 // ---------- credit ----------
                 var showDev by remember { mutableStateOf(false) }
                 Column(
-                    Modifier.fillMaxWidth().padding(top = 24.dp).clip(RoundedCornerShape(14.dp)).clickable { showDev = true }.padding(vertical = 6.dp),
+                    Modifier.fillMaxWidth().padding(top = 24.dp).clip(RoundedCornerShape(Corners.R)).clickable { showDev = true }.padding(vertical = 6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
@@ -386,7 +388,7 @@ private fun initials(name: String?): String {
 
 @Composable
 private fun QuickTile(icon: ImageVector, title: String, subtitle: String, modifier: Modifier, onClick: () -> Unit, color: Color) {
-    GlassCard(modifier.height(86.dp), dark = true, radius = 22.dp, onClick = onClick) {
+    GlassCard(modifier.height(86.dp), dark = true, radius = Corners.R, onClick = onClick) {
         CircleIcon(icon, color, Color.White, size = 44.dp, iconSize = 22.dp, modifier = Modifier.padding(start = 12.dp))
         Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
             Text(title, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)

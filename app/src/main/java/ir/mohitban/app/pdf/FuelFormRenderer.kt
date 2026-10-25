@@ -110,7 +110,7 @@ class FuelFormRenderer(private val context: Context, private val files: FileStor
         // ---------- header ----------
         emblem?.let { PdfKit.bitmapFit(c, it, RectF(W / 2 - 18f, 10f, W / 2 + 18f, 46f)) }
         PdfKit.line(c, "ریاست جمهوری", W / 2, 59f, PdfKit.text(9.5f, true), Align.CENTER)
-        PdfKit.fitLine(c, "اداره کل حفاظت محیط زیست ${s.province}", W / 2, 72f, PdfKit.text(9.2f, true), W - 2 * M, Align.CENTER)
+        PdfKit.fitLine(c, "اداره کل حفاظت محیط زیست استان ${s.province.trim().removePrefix("استان").trim()}", W / 2, 72f, PdfKit.text(9.2f, true), W - 2 * M, Align.CENTER)
         c.drawLine(62f, 80f, W - 62f, 80f, PdfKit.stroke(1.3f, PdfKit.GREEN))
         PdfKit.line(c, "فرم هزینه سوخت خودرو", W / 2, 91f, PdfKit.text(7.5f, false, PdfKit.GREEN), Align.CENTER)
 

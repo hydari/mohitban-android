@@ -1,6 +1,7 @@
 package ir.mohitban.app.ui.components
 
 import android.content.Context
+import ir.mohitban.app.ui.theme.Corners
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
@@ -58,8 +59,8 @@ fun DeveloperDialog(onDismiss: () -> Unit) {
         Column(
             Modifier
                 .widthIn(max = 380.dp)
-                .shadow(24.dp, RoundedCornerShape(28.dp))
-                .clip(RoundedCornerShape(28.dp))
+                .shadow(24.dp, RoundedCornerShape(Corners.R))
+                .clip(RoundedCornerShape(Corners.R))
                 .background(Color.White)
                 .padding(22.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -85,7 +86,7 @@ private fun ContactRow(icon: ImageVector, color: Color, label: String, value: St
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(Corners.R))
             .background(MColors.Bg)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 12.dp, vertical = 10.dp),

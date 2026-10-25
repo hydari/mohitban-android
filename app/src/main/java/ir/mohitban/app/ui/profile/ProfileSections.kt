@@ -1,6 +1,7 @@
 package ir.mohitban.app.ui.profile
 
 import androidx.compose.foundation.Image
+import ir.mohitban.app.ui.theme.Corners
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -109,17 +110,17 @@ fun PersonalSection(form: ProfileForm, errors: Map<String, String>, onChange: (P
 @Composable
 fun LocationSection(form: ProfileForm, errors: Map<String, String>, onChange: (ProfileForm) -> Unit) {
     ComboField(
-        form.province, { onChange(form.copy(province = it)) }, Suggestions.provinces,
+        form.province, { p -> onChange(form.copy(province = p, city = if (form.city in Suggestions.citiesOf(p)) form.city else "")) }, Suggestions.provinces,
         label = "اداره کل استان", leadingIcon = Icons.Outlined.LocationOn, error = errors["province"], readOnly = true,
     )
-    MField(form.city, { onChange(form.copy(city = it)) }, label = "شهرستان", leadingIcon = Icons.Outlined.LocationOn, placeholder = "میانه", error = errors["city"])
+    ComboField(form.city, { onChange(form.copy(city = it)) }, Suggestions.citiesOf(form.province), label = "شهرستان", leadingIcon = Icons.Outlined.LocationOn, placeholder = "میانه", error = errors["city"])
     MField(form.protectedArea, { onChange(form.copy(protectedArea = it)) }, label = "منطقه حفاظت‌شده", leadingIcon = Icons.Outlined.Park, placeholder = "کاغذکنان", error = errors["protectedArea"])
     MField(form.station, { onChange(form.copy(station = it)) }, label = "پاسگاه محیط‌بانی", leadingIcon = Icons.Outlined.Home, placeholder = "آقکند", error = errors["station"], imeAction = androidx.compose.ui.text.input.ImeAction.Done)
 }
 
 @Composable
 private fun TypeCard(title: String, icon: ImageVector, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(Corners.R)
     Row(
         modifier
             .height(58.dp)

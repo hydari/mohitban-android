@@ -148,7 +148,7 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
     private fun header(c: Canvas, s: QuarterSummary, p: RangerProfile, attachmentPages: Int) {
         emblem?.let { PdfKit.bitmapFit(c, it, RectF(W - M - 54f, 30f, W - M, 84f)) }
         PdfKit.line(c, "ریاست جمهوری", W / 2, 46f, PdfKit.text(11f, true), Align.CENTER)
-        PdfKit.line(c, "اداره کل حفاظت محیط زیست ${p.province}", W / 2, 63f, PdfKit.text(11f, true), Align.CENTER)
+        PdfKit.line(c, "اداره کل حفاظت محیط زیست استان ${p.province.trim().removePrefix("استان").trim()}", W / 2, 63f, PdfKit.text(11f, true), Align.CENTER)
         PdfKit.line(c, "گزارش فصلی هزینه سوخت | ${s.season.title} ${s.year.fa()} (${s.season.months})", W / 2, 84f, PdfKit.text(13f, true, PdfKit.GREEN), Align.CENTER)
         val small = PdfKit.text(8.5f, false, PdfKit.MUTED)
         PdfKit.line(c, "شماره: ................", M, 44f, small, Align.LEFT)

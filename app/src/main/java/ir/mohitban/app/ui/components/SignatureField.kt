@@ -1,6 +1,7 @@
 package ir.mohitban.app.ui.components
 
 import android.graphics.Bitmap
+import ir.mohitban.app.ui.theme.Corners
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -94,7 +95,7 @@ fun SignatureField(
             Modifier
                 .fillMaxWidth()
                 .height(height.dp)
-                .clip(RoundedCornerShape(14.dp))
+                .clip(RoundedCornerShape(Corners.R))
                 .background(Color(0xFFFBFCFB))
                 .drawBehind {
                     drawRoundRect(
@@ -132,7 +133,7 @@ fun SignatureField(
                 Modifier
                     .fillMaxWidth()
                     .fillMaxHeight(0.82f)
-                    .clip(RoundedCornerShape(26.dp))
+                    .clip(RoundedCornerShape(Corners.R))
                     .background(Color.White)
                     .padding(16.dp),
             ) {

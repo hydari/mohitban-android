@@ -1,6 +1,7 @@
 package ir.mohitban.app.ui.report
 
 import android.graphics.Bitmap
+import ir.mohitban.app.ui.theme.Corners
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -344,7 +345,7 @@ private fun ReceiptThumb(e: ir.mohitban.app.domain.model.FuelEntry, onClick: () 
     Column(
         Modifier
             .width(112.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(Corners.R))
             .background(Color.White)
             .clickable(onClick = onClick)
             .padding(6.dp),

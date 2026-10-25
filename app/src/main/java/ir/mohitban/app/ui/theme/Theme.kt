@@ -2,6 +2,7 @@
 
 package ir.mohitban.app.ui.theme
 
+import androidx.compose.ui.unit.dp
 import android.content.Context
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
@@ -131,6 +132,19 @@ fun MohitbanTheme(content: @Composable () -> Unit) {
     )
     // The whole application is right-to-left regardless of the phone's language.
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-        MaterialTheme(colorScheme = scheme, typography = typography(AppFonts.family()), content = content)
+        MaterialTheme(colorScheme = scheme, typography = typography(AppFonts.family()), shapes = Corners.materialShapes, content = content)
     }
+}
+
+/** One modest corner radius for cards, buttons, fields, dialogs and the bottom bar (formal look). */
+object Corners {
+    val R = 12.dp
+    val Shape = androidx.compose.foundation.shape.RoundedCornerShape(R)
+    val materialShapes = androidx.compose.material3.Shapes(
+        extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
+        small = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+        medium = Shape,
+        large = Shape,
+        extraLarge = Shape,
+    )
 }

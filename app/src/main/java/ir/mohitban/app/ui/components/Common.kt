@@ -1,6 +1,7 @@
 package ir.mohitban.app.ui.components
 
 import androidx.compose.foundation.Image
+import ir.mohitban.app.ui.theme.Corners
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -78,7 +79,7 @@ fun PillButton(
     enabled: Boolean = true,
     loading: Boolean = false,
 ) {
-    val shape = RoundedCornerShape(30.dp)
+    val shape = RoundedCornerShape(Corners.R)
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -108,7 +109,7 @@ fun PillButton(
 
 @Composable
 fun OutlinePill(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null, color: Color = MColors.Green) {
-    val shape = RoundedCornerShape(30.dp)
+    val shape = RoundedCornerShape(Corners.R)
     Row(
         modifier = modifier
             .height(52.dp)
@@ -133,7 +134,7 @@ fun OutlinePill(text: String, onClick: () -> Unit, modifier: Modifier = Modifier
 @Composable
 fun AppCard(
     modifier: Modifier = Modifier,
-    radius: Dp = 18.dp,
+    radius: Dp = Corners.R,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -182,7 +183,7 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawBackdrop(backdrop: Glas
 fun GlassCard(
     modifier: Modifier = Modifier,
     dark: Boolean = false,
-    radius: Dp = 24.dp,
+    radius: Dp = Corners.R,
     onClick: (() -> Unit)? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
@@ -355,7 +356,7 @@ enum class MainTab(val title: String, val icon: ImageVector, val color: Color) {
 /** Floating glass navigation bar (blurred photo behind it on the dashboard, frosted green elsewhere). */
 @Composable
 fun BottomBar(current: MainTab, onSelect: (MainTab) -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(28.dp)
+    val shape = RoundedCornerShape(Corners.R)
     val backdrop = LocalGlassBackdrop.current
     val glass = backdrop != null
     var position by remember { mutableStateOf(Offset.Zero) }
@@ -395,11 +396,11 @@ fun BottomBar(current: MainTab, onSelect: (MainTab) -> Unit, modifier: Modifier 
             Column(
                 Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(20.dp))
+                    .clip(RoundedCornerShape(9.dp))
                     .then(
                         if (on && glass) Modifier
                             .background(Brush.verticalGradient(listOf(Color(0x47FFFFFF), Color(0x1AFFFFFF))))
-                            .border(1.dp, Color(0x40FFFFFF), RoundedCornerShape(20.dp))
+                            .border(1.dp, Color(0x40FFFFFF), RoundedCornerShape(9.dp))
                         else if (on) Modifier.background(MColors.GreenLight)
                         else Modifier,
                     )

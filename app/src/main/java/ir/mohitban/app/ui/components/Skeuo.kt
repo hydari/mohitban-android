@@ -126,7 +126,7 @@ fun GlassRing(size: Dp, modifier: Modifier = Modifier, onClick: (() -> Unit)? = 
  * left and right every few seconds; [count] shows a red badge.
  */
 @Composable
-fun SkeuoBell(ringing: Boolean, count: Int, onClick: () -> Unit, modifier: Modifier = Modifier, size: Dp = 48.dp) {
+fun SkeuoBell(ringing: Boolean, count: Int, onClick: () -> Unit, modifier: Modifier = Modifier, size: Dp = 48.dp, plain: Boolean = false) {
     val t = rememberInfiniteTransition(label = "bell")
     val swing by t.animateFloat(
         initialValue = 0f, targetValue = 0f,
@@ -147,18 +147,9 @@ fun SkeuoBell(ringing: Boolean, count: Int, onClick: () -> Unit, modifier: Modif
         ),
         label = "swing",
     )
-    Box(modifier.size(size)) {
-        GlassRing(size, onClick = onClick) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .clip(CircleShape)
-                    .background(Brush.linearGradient(listOf(Color(0xFFFFFFFF), Color(0xFFE6ECE7), Color(0xFFCAD3CC)), start = Offset.Zero, end = Offset.Infinite)),
-                contentAlignment = Alignment.Center,
-            ) {
+    val bell: @Composable (Modifier) -> Unit = { m ->
             Canvas(
-                Modifier
-                    .size(size * 0.66f)
+                m
                     .graphicsLayer {
                         rotationZ = if (ringing) swing else 0f
                         transformOrigin = TransformOrigin(0.5f, 0.08f)
@@ -204,6 +195,22 @@ fun SkeuoBell(ringing: Boolean, count: Int, onClick: () -> Unit, modifier: Modif
                 }
                 drawPath(shine, Color.White.copy(alpha = 0.7f))
             }
+    }
+    Box(modifier.size(size)) {
+        if (plain) {
+            // just the brass bell, no disc or ring behind it
+            Box(Modifier.fillMaxSize().clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+                bell(Modifier.size(size * 0.86f))
+            }
+        } else {
+            GlassRing(size, onClick = onClick) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                        .background(Brush.linearGradient(listOf(Color(0xFFFFFFFF), Color(0xFFE6ECE7), Color(0xFFCAD3CC)), start = Offset.Zero, end = Offset.Infinite)),
+                    contentAlignment = Alignment.Center,
+                ) { bell(Modifier.size(size * 0.66f)) }
             }
         }
         if (count > 0) {

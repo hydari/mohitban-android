@@ -1,6 +1,7 @@
 package ir.mohitban.app.ui.fuel
 
 import android.graphics.Bitmap
+import ir.mohitban.app.ui.theme.Corners
 import android.graphics.PointF
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -97,7 +98,7 @@ fun ReceiptCropScreen(rawPath: String, onDone: (String) -> Unit, onCancel: () ->
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 Icons.AutoMirrored.Outlined.ArrowBack, "بازگشت", tint = Color.White,
-                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(20.dp)).clickable(onClick = onCancel).padding(8.dp),
+                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(Corners.R)).clickable(onClick = onCancel).padding(8.dp),
             )
             Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
                 Text(if (result == null) "برش رسید" else "پیش‌نمایش رسید", style = MaterialTheme.typography.titleMedium, color = Color.White)
@@ -246,7 +247,7 @@ fun ReceiptCropScreen(rawPath: String, onDone: (String) -> Unit, onCancel: () ->
 private fun ToolButton(icon: ImageVector, text: String, modifier: Modifier, onClick: () -> Unit) {
     Row(
         modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(Corners.R))
             .background(Color(0x1FFFFFFF))
             .clickable(onClick = onClick)
             .padding(vertical = 12.dp),

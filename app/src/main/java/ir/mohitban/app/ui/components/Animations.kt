@@ -1,6 +1,7 @@
 package ir.mohitban.app.ui.components
 
 import androidx.compose.animation.core.Animatable
+import ir.mohitban.app.ui.theme.Corners
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -88,7 +89,7 @@ fun SuccessDialog(message: String, onFinished: () -> Unit, durationMs: Long = 14
         Column(
             Modifier
                 .graphicsLayer { scaleX = appear.value; scaleY = appear.value }
-                .clip(RoundedCornerShape(26.dp))
+                .clip(RoundedCornerShape(Corners.R))
                 .background(Color.White)
                 .widthIn(min = 220.dp)
                 .padding(horizontal = 28.dp, vertical = 24.dp),
@@ -110,7 +111,7 @@ fun GreenButton(text: String, onClick: () -> Unit, enabled: Boolean = true, modi
         onClick = onClick,
         enabled = enabled,
         modifier = modifier,
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(Corners.R),
         colors = ButtonDefaults.buttonColors(
             containerColor = MColors.Green,
             contentColor = Color.White,
