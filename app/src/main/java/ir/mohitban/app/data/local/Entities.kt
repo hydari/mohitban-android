@@ -21,10 +21,10 @@ data class ProfileEntity(
     val station: String,
 )
 
-/** Single-row table (id = 1): the organisational vehicle registered on this phone. */
-@Entity(tableName = "vehicle")
+/** Every organisational vehicle (car or motorcycle) saved on this phone, with its red plate. */
+@Entity(tableName = "vehicles")
 data class VehicleEntity(
-    @PrimaryKey val id: Int = 1,
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val type: String,
     val kind: String,
     val model: String,
@@ -32,17 +32,24 @@ data class VehicleEntity(
     val plate: String,
     val odometer: Long,
     val photoPath: String?,
+    val createdAt: Long,
 )
 
-/** Single-row table (id = 1): fuel prices in Rial. */
+/** Single-row table (id = 1): fuel prices in Rial and app state. */
 @Entity(tableName = "settings")
 data class SettingsEntity(
     @PrimaryKey val id: Int = 1,
-    val gasolineRate1: Long = 10_000,
-    val gasolineRate2: Long = 15_000,
-    val gasolineRate3: Long = 30_000,
+    val gasolineRate1: Long = 15_000,
+    val gasolineRate2: Long = 30_000,
+    val gasolineRate3: Long = 100_000,
     val cngRate: Long = 6_568,
     val lastBackupAt: Long? = null,
+    /** Vehicle selected by default in the fuel form. */
+    val defaultVehicleId: Long? = null,
+    /** year * 10 + season index of the last quarterly report that was sent / saved / printed. */
+    val reportedSeasonKey: Int? = null,
+    /** JDN of the day the last reminder notification was shown (one per day). */
+    val lastReminderJdn: Int? = null,
 )
 
 @Entity(tableName = "fuel_entry", indices = [Index("dateJdn")])
@@ -66,4 +73,5 @@ data class FuelEntryEntity(
     @ColumnInfo(name = "snap_area") val snapArea: String,
     @ColumnInfo(name = "snap_station") val snapStation: String,
     val createdAt: Long,
+    val vehicleId: Long? = null,
 )

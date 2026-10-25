@@ -1,5 +1,11 @@
 package ir.mohitban.app.ui.dashboard
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,7 +34,9 @@ import androidx.compose.material.icons.outlined.Eco
 import androidx.compose.material.icons.outlined.LocalGasStation
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Menu
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.TwoWheeler
 import androidx.compose.material.icons.outlined.Park
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Shield
@@ -36,6 +44,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,7 +57,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -63,6 +75,9 @@ import ir.mohitban.app.domain.model.RangerProfile
 import ir.mohitban.app.domain.model.Vehicle
 import ir.mohitban.app.domain.repository.FuelRepository
 import ir.mohitban.app.domain.repository.ProfileRepository
+import ir.mohitban.app.domain.repository.SettingsRepository
+import ir.mohitban.app.domain.model.VehicleType
+import ir.mohitban.app.reminder.ReportReminder
 import ir.mohitban.app.ui.common.appViewModel
 import ir.mohitban.app.ui.components.BottomBar
 import ir.mohitban.app.ui.components.CircleIcon
@@ -75,21 +90,35 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 data class DashboardState(
     val profile: RangerProfile? = null,
     val vehicle: Vehicle? = null,
+    val vehicleCount: Int = 0,
     val seasonEntries: List<FuelEntry> = emptyList(),
+    val due: ReportReminder.Due? = null,
 )
 
-class DashboardViewModel(profiles: ProfileRepository, fuel: FuelRepository) : ViewModel() {
+class DashboardViewModel(profiles: ProfileRepository, fuel: FuelRepository, settings: SettingsRepository) : ViewModel() {
     private val today = JalaliDate.today()
     val season = today.season
     val year = today.year
     val state: StateFlow<DashboardState> = combine(
-        profiles.profile, profiles.vehicle, fuel.observeSeason(today.year, today.season),
-    ) { p, v, e -> DashboardState(p, v, e) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardState())
+        profiles.profile,
+        profiles.vehicles,
+        settings.defaultVehicleId,
+        fuel.observeSeason(today.year, today.season),
+        settings.reminder,
+    ) { p, vs, defaultId, e, reminder ->
+        DashboardState(
+            profile = p,
+            vehicle = vs.firstOrNull { it.id == defaultId } ?: vs.firstOrNull(),
+            vehicleCount = vs.size,
+            seasonEntries = e,
+            due = ReportReminder.due(today, reminder.reportedSeasonKey),
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardState())
 }
 
 @Composable
@@ -102,8 +131,22 @@ fun DashboardScreen(
     onSettings: () -> Unit,
     onTab: (MainTab) -> Unit,
 ) {
-    val vm = appViewModel { c, _ -> DashboardViewModel(c.profileRepository, c.fuelRepository) }
+    val vm = appViewModel { c, _ -> DashboardViewModel(c.profileRepository, c.fuelRepository, c.settingsRepository) }
     val state by vm.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    // Android 13+: ask once for permission to show the quarterly-report reminder on the lock screen
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) scopeLaunchCheck(context)
+    }
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            permission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            ReportReminder.check(context.applicationContext)
+        }
+    }
     val profile = state.profile
     val photo by rememberStoredImage(profile?.photoPath, 300)
 
@@ -129,8 +172,11 @@ fun DashboardScreen(
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Menu, "منو", tint = Color.White, modifier = Modifier.size(26.dp).clip(CircleShape).clickable(onClick = onSettings))
                 Spacer(Modifier.weight(1f))
-                Box {
+                Box(Modifier.clip(CircleShape).clickable(onClick = onReport).padding(4.dp)) {
                     Icon(Icons.Outlined.NotificationsNone, "اعلان‌ها", tint = Color.White, modifier = Modifier.size(25.dp))
+                    if (state.due != null) {
+                        Box(Modifier.align(Alignment.TopEnd).size(9.dp).clip(CircleShape).background(Color(0xFFF2B233)))
+                    }
                 }
             }
             // ---------- profile header ----------
@@ -168,6 +214,26 @@ fun DashboardScreen(
                     } else {
                         Text(initials(profile?.fullName), style = MaterialTheme.typography.titleLarge, color = Color(0xFF4B3517))
                     }
+                }
+            }
+            // ---------- quarterly report reminder ----------
+            state.due?.let { d ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(if (d.overdue) Color(0xF2B23A2E) else Color(0xF2C98A1B))
+                        .clickable(onClick = onReport)
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Outlined.NotificationsActive, null, tint = Color.White, modifier = Modifier.size(26.dp))
+                    Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                        Text(ReportReminder.title(d), style = MaterialTheme.typography.titleSmall, color = Color.White)
+                        Text(ReportReminder.message(profile?.fullName.orEmpty(), d), style = MaterialTheme.typography.labelSmall, color = Color(0xF2FFFFFF))
+                    }
+                    Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = Color.White)
                 }
             }
             // ---------- station ----------
@@ -210,8 +276,12 @@ fun DashboardScreen(
             // ---------- vehicle strip ----------
             state.vehicle?.let { v ->
                 GlassCard(Modifier.fillMaxWidth().padding(top = 14.dp), dark = true, onClick = onVehicle) {
-                    Column(Modifier.weight(1f).padding(start = 16.dp, top = 12.dp, bottom = 12.dp)) {
-                        Text(v.model, style = MaterialTheme.typography.titleSmall, color = Color.White)
+                    CircleIcon(
+                        if (v.type == VehicleType.MOTORCYCLE) Icons.Outlined.TwoWheeler else Icons.Outlined.DirectionsCar,
+                        Color(0x33FFFFFF), Color.White, size = 38.dp, iconSize = 20.dp, modifier = Modifier.padding(start = 12.dp),
+                    )
+                    Column(Modifier.weight(1f).padding(start = 10.dp, top = 12.dp, bottom = 12.dp)) {
+                        Text(v.title, style = MaterialTheme.typography.titleSmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
                             "آخرین کیلومتر: ${v.odometer.rial()}",
                             style = MaterialTheme.typography.labelSmall, color = Color(0xCCFFFFFF), modifier = Modifier.padding(top = 3.dp),
@@ -226,7 +296,7 @@ fun DashboardScreen(
                 QuickTile(Icons.Outlined.Assessment, "گزارش فصلی", "${vm.season.title} ${vm.year.fa()}", Modifier.weight(1f), onReport)
             }
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                QuickTile(Icons.Outlined.DirectionsCar, "اطلاعات خودرو", "مشخصات و پلاک", Modifier.weight(1f), onVehicle)
+                QuickTile(Icons.Outlined.DirectionsCar, "وسایل نقلیه", "${state.vehicleCount.fa()} وسیله | پلاک‌ها", Modifier.weight(1f), onVehicle)
                 QuickTile(Icons.Outlined.Settings, "تنظیمات", "نرخ‌ها و پشتیبان", Modifier.weight(1f), onSettings)
             }
             // ---------- season summary ----------
@@ -249,9 +319,12 @@ fun DashboardScreen(
                 }
             }
             // ---------- motto ----------
-            Column(Modifier.padding(top = 22.dp, start = 4.dp)) {
-                Motto(Icons.Outlined.Eco, "حفاظت از طبیعت،")
-                Motto(Icons.Outlined.Shield, "حفاظت از آینده ماست")
+            Column(Modifier.fillMaxWidth().padding(top = 26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    "طراح و برنامه‌نویس: مهندس محمدرضا حیدری",
+                    style = MaterialTheme.typography.bodySmall, color = Color(0xE6FFFFFF),
+                    textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
+                )
             }
             Spacer(Modifier.height(120.dp))
         }
@@ -282,4 +355,9 @@ private fun Motto(icon: ImageVector, text: String) {
         Spacer(Modifier.size(8.dp))
         Text(text, style = MaterialTheme.typography.bodyMedium, color = Color(0xF2FFFFFF))
     }
+}
+
+/** Runs the reminder check right after the permission was granted. */
+private fun scopeLaunchCheck(context: Context) {
+    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch { ReportReminder.check(context.applicationContext) }
 }

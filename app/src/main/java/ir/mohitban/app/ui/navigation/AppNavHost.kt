@@ -10,6 +10,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,7 +32,8 @@ import ir.mohitban.app.ui.dashboard.DashboardScreen
 import ir.mohitban.app.ui.fuel.FuelFormScreen
 import ir.mohitban.app.ui.fuel.ReceiptCropScreen
 import ir.mohitban.app.ui.onboarding.OnboardingScreen
-import ir.mohitban.app.ui.profile.EditSection
+import ir.mohitban.app.ui.profile.VehicleEditScreen
+import ir.mohitban.app.ui.profile.VehiclesScreen
 import ir.mohitban.app.ui.profile.ProfileEditScreen
 import ir.mohitban.app.ui.records.RecordsScreen
 import ir.mohitban.app.ui.report.ReportScreen
@@ -44,14 +48,17 @@ object Routes {
     const val SETTINGS = "settings"
     const val FUEL = "fuel?entryId={entryId}"
     const val CROP = "crop?path={path}"
-    const val EDIT = "edit/{section}"
+    const val EDIT_PROFILE = "edit_profile"
+    const val VEHICLES = "vehicles"
+    const val VEHICLE = "vehicle/{id}"
 
     fun fuel(id: Long = 0L) = "fuel?entryId=$id"
     fun crop(path: String) = "crop?path=${Uri.encode(path)}"
-    fun edit(section: EditSection) = "edit/${section.name}"
+    fun vehicle(id: Long) = "vehicle/$id"
 }
 
 private const val RECEIPT_KEY = "cropped_receipt"
+private const val VEHICLE_KEY = "new_vehicle"
 
 private fun NavHostController.openTab(tab: MainTab) {
     val route = when (tab) {
@@ -69,9 +76,15 @@ private fun NavHostController.openTab(tab: MainTab) {
 }
 
 @Composable
-fun AppNavHost() {
+fun AppNavHost(openReportsRequest: Int = 0) {
     val nav = rememberNavController()
     val context = LocalContext.current
+    var started by remember { mutableStateOf(false) }
+
+    // a tap on the quarterly-report reminder opens the reports tab
+    LaunchedEffect(openReportsRequest, started) {
+        if (openReportsRequest > 0 && started) nav.openTab(MainTab.REPORTS)
+    }
 
     NavHost(navController = nav, startDestination = Routes.START) {
         composable(Routes.START) {
@@ -84,11 +97,13 @@ fun AppNavHost() {
                 nav.navigate(if (registered) Routes.HOME else Routes.ONBOARDING) {
                     popUpTo(Routes.START) { inclusive = true }
                 }
+                started = registered
             }
         }
         composable(Routes.ONBOARDING) {
             OnboardingScreen(onFinished = {
                 nav.navigate(Routes.HOME) { popUpTo(Routes.ONBOARDING) { inclusive = true } }
+                started = true
             })
         }
         composable(Routes.HOME) {
@@ -96,8 +111,8 @@ fun AppNavHost() {
                 onFuel = { nav.navigate(Routes.fuel()) },
                 onRecords = { nav.openTab(MainTab.RECORDS) },
                 onReport = { nav.openTab(MainTab.REPORTS) },
-                onVehicle = { nav.navigate(Routes.edit(EditSection.VEHICLE)) },
-                onProfile = { nav.navigate(Routes.edit(EditSection.PROFILE)) },
+                onVehicle = { nav.navigate(Routes.VEHICLES) },
+                onProfile = { nav.navigate(Routes.EDIT_PROFILE) },
                 onSettings = { nav.openTab(MainTab.SETTINGS) },
                 onTab = { nav.openTab(it) },
             )
@@ -110,8 +125,8 @@ fun AppNavHost() {
         }
         composable(Routes.SETTINGS) {
             SettingsScreen(
-                onEditProfile = { nav.navigate(Routes.edit(EditSection.PROFILE)) },
-                onEditVehicle = { nav.navigate(Routes.edit(EditSection.VEHICLE)) },
+                onEditProfile = { nav.navigate(Routes.EDIT_PROFILE) },
+                onEditVehicle = { nav.navigate(Routes.VEHICLES) },
                 onTab = { nav.openTab(it) },
                 onBack = null,
                 onRestored = {
@@ -125,8 +140,12 @@ fun AppNavHost() {
         ) { entry ->
             val id = entry.arguments?.getLong("entryId") ?: 0L
             val cropped by entry.savedStateHandle.getStateFlow<String?>(RECEIPT_KEY, null).collectAsState()
+            val newVehicle by entry.savedStateHandle.getStateFlow<Long?>(VEHICLE_KEY, null).collectAsState()
             FuelFormScreen(
                 entryId = id,
+                newVehicleId = newVehicle,
+                onVehicleConsumed = { entry.savedStateHandle[VEHICLE_KEY] = null },
+                onAddVehicle = { nav.navigate(Routes.vehicle(0L)) },
                 croppedReceipt = cropped,
                 onReceiptConsumed = { entry.savedStateHandle[RECEIPT_KEY] = null },
                 onCropReceipt = { file -> nav.navigate(Routes.crop(file.absolutePath)) },
@@ -151,13 +170,25 @@ fun AppNavHost() {
                 onCancel = { nav.popBackStack() },
             )
         }
+        composable(Routes.EDIT_PROFILE) {
+            ProfileEditScreen(onBack = { nav.popBackStack() })
+        }
+        composable(Routes.VEHICLES) {
+            VehiclesScreen(onBack = { nav.popBackStack() }, onEdit = { nav.navigate(Routes.vehicle(it)) })
+        }
         composable(
-            Routes.EDIT,
-            arguments = listOf(navArgument("section") { type = NavType.StringType }),
+            Routes.VEHICLE,
+            arguments = listOf(navArgument("id") { type = NavType.LongType; defaultValue = 0L }),
         ) { entry ->
-            val section = runCatching { EditSection.valueOf(entry.arguments?.getString("section").orEmpty()) }
-                .getOrDefault(EditSection.PROFILE)
-            ProfileEditScreen(section, onBack = { nav.popBackStack() })
+            val id = entry.arguments?.getLong("id") ?: 0L
+            VehicleEditScreen(
+                vehicleId = id,
+                onBack = { nav.popBackStack() },
+                onSaved = { savedId ->
+                    nav.previousBackStackEntry?.savedStateHandle?.set(VEHICLE_KEY, savedId)
+                    nav.popBackStack()
+                },
+            )
         }
     }
 }

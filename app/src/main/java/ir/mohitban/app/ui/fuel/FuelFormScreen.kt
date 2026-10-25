@@ -23,7 +23,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.TwoWheeler
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.Image as ImageIcon
@@ -35,6 +38,8 @@ import androidx.compose.material.icons.outlined.Receipt
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -75,10 +80,11 @@ import ir.mohitban.app.ui.components.MField
 import ir.mohitban.app.ui.components.NumericMode
 import ir.mohitban.app.ui.components.PillButton
 import ir.mohitban.app.ui.components.PlateView
-import ir.mohitban.app.ui.components.SignaturePad
+import ir.mohitban.app.ui.components.SignatureField
+import ir.mohitban.app.ui.components.OutlinePill
 import ir.mohitban.app.ui.components.TopBar
 import ir.mohitban.app.ui.components.rememberImagePicker
-import ir.mohitban.app.ui.components.rememberSignatureState
+import ir.mohitban.app.ui.components.rememberSignatureFieldState
 import ir.mohitban.app.ui.components.rememberStoredImage
 import ir.mohitban.app.ui.theme.MColors
 import kotlinx.coroutines.Dispatchers
@@ -86,9 +92,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FuelFormScreen(
     entryId: Long,
+    newVehicleId: Long?,
+    onVehicleConsumed: () -> Unit,
+    onAddVehicle: () -> Unit,
     croppedReceipt: String?,
     onReceiptConsumed: () -> Unit,
     onCropReceipt: (File) -> Unit,
@@ -100,8 +110,9 @@ fun FuelFormScreen(
     }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val driverSig = rememberSignatureState()
-    val passengerSig = rememberSignatureState()
+    val driverSig = rememberSignatureFieldState()
+    val passengerSig = rememberSignatureFieldState()
+    var vehicleSheet by remember { mutableStateOf(false) }
     var datePicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(croppedReceipt) {
@@ -113,8 +124,14 @@ fun FuelFormScreen(
     // show saved signatures while editing
     val oldDriver by rememberStoredImage(vm.existingDriverSignature, 600)
     val oldPassenger by rememberStoredImage(vm.existingPassengerSignature, 600)
-    LaunchedEffect(oldDriver) { if (oldDriver != null && !driverSig.hasNewDrawing) driverSig.existing = oldDriver }
-    LaunchedEffect(oldPassenger) { if (oldPassenger != null && !passengerSig.hasNewDrawing) passengerSig.existing = oldPassenger }
+    LaunchedEffect(oldDriver) { if (oldDriver != null && !driverSig.changed) driverSig.existing = oldDriver }
+    LaunchedEffect(oldPassenger) { if (oldPassenger != null && !passengerSig.changed) passengerSig.existing = oldPassenger }
+    LaunchedEffect(newVehicleId) {
+        if (newVehicleId != null) {
+            vm.refreshVehicles(newVehicleId.takeIf { it > 0 })
+            onVehicleConsumed()
+        }
+    }
 
     val receiptPicker = rememberImagePicker("receipt", onImported = { vm.onReceipt(it) }, rawCameraFile = onCropReceipt)
     val vehiclePicker = rememberImagePicker("vehicle", onImported = { vm.onVehiclePhoto(it) })
@@ -151,13 +168,19 @@ fun FuelFormScreen(
             }
 
             // ---------- vehicle ----------
-            FieldLabel("خودرو", Icons.Outlined.DirectionsCar)
             val vehicle = vm.vehicle
+            val isMoto = vehicle?.type == VehicleType.MOTORCYCLE
+            FieldLabel(if (isMoto) "موتورسیکلت" else "خودرو", if (isMoto) Icons.Outlined.TwoWheeler else Icons.Outlined.DirectionsCar) {
+                if (vm.vehicles.size > 1) TagBadge("برای تغییر لمس کنید", MColors.GreenLight, MColors.Green)
+            }
             val vPhoto by rememberStoredImage(vehicle?.photoPath, 700)
-            AppCard(Modifier.fillMaxWidth()) {
+            AppCard(Modifier.fillMaxWidth(), onClick = { vehicleSheet = true }) {
                 Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f).padding(start = 4.dp)) {
-                        Text(vehicle?.model ?: "", style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(vehicle?.title ?: "انتخاب وسیله", style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                            Icon(Icons.Outlined.ExpandMore, null, tint = MColors.Muted, modifier = Modifier.size(20.dp))
+                        }
                         val sub = listOfNotNull(vehicle?.kind?.takeIf { it.isNotBlank() }, vehicle?.year?.takeIf { it.isNotBlank() }?.let { "مدل ${it.fa()}" })
                         Text(sub.joinToString(" | "), style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
                         vehicle?.let { PlateView(it.plate, height = if (it.type == VehicleType.CAR) 34.dp else 30.dp) }
@@ -191,14 +214,23 @@ fun FuelFormScreen(
             // ---------- fuel type ----------
             FieldLabel("نوع سوخت")
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FuelTypeCard(
-                    FuelType.CNG, Icons.Outlined.LocalFireDepartment, "${vm.rates.cng.rial()} ریال/کیلو",
-                    vm.fuelType == FuelType.CNG, MColors.Green2, Color.White, Modifier.weight(1f),
-                ) { vm.onFuelType(FuelType.CNG) }
+                if (vm.cngAllowed) {
+                    FuelTypeCard(
+                        FuelType.CNG, Icons.Outlined.LocalFireDepartment, "${vm.rates.cng.rial()} ریال/کیلو",
+                        vm.fuelType == FuelType.CNG, MColors.Green2, Color.White, Modifier.weight(1f),
+                    ) { vm.onFuelType(FuelType.CNG) }
+                }
                 FuelTypeCard(
                     FuelType.GASOLINE, Icons.Outlined.WaterDrop, "${vm.rates.gasoline.size.fa()} نرخ مصوب",
                     vm.fuelType == FuelType.GASOLINE, MColors.AmberBg, MColors.Amber, Modifier.weight(1f),
                 ) { vm.onFuelType(FuelType.GASOLINE) }
+            }
+            if (!vm.cngAllowed) {
+                Text(
+                    "برای موتورسیکلت فقط بنزین قابل ثبت است (گاز CNG ویژه خودرو است).",
+                    style = MaterialTheme.typography.labelSmall, color = MColors.Muted,
+                    modifier = Modifier.padding(start = 6.dp, top = 6.dp),
+                )
             }
             if (vm.fuelType == FuelType.GASOLINE) {
                 FieldLabel("نرخ هر لیتر (ریال)")
@@ -282,8 +314,8 @@ fun FuelFormScreen(
             // ---------- signatures ----------
             FieldLabel("امضای دیجیتال")
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                SignaturePad(driverSig, "راننده", Modifier.weight(1f), required = true, error = vm.errors["driver"])
-                SignaturePad(passengerSig, "سرنشین (اختیاری)", Modifier.weight(1f))
+                SignatureField(driverSig, "امضای راننده", Modifier.weight(1f), required = true, error = vm.errors["driver"])
+                SignatureField(passengerSig, "امضای سرنشین (اختیاری)", Modifier.weight(1f))
             }
 
             Spacer(Modifier.height(20.dp))
@@ -294,6 +326,41 @@ fun FuelFormScreen(
             )
             Spacer(Modifier.height(20.dp))
             Spacer(Modifier.navigationBarsPadding())
+        }
+    }
+
+    if (vehicleSheet) {
+        ModalBottomSheet(onDismissRequest = { vehicleSheet = false }, containerColor = Color.White) {
+            Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 16.dp)) {
+                Text("انتخاب خودرو یا موتورسیکلت", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 10.dp))
+                vm.vehicles.forEach { v ->
+                    val selected = v.id == vm.vehicle?.id
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(if (selected) MColors.GreenTint else MColors.Bg)
+                            .clickable { vm.selectVehicle(v.id); vehicleSheet = false }
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CircleIcon(
+                            if (v.type == VehicleType.CAR) Icons.Outlined.DirectionsCar else Icons.Outlined.TwoWheeler,
+                            if (selected) MColors.Green2 else Color.White, if (selected) Color.White else MColors.Green, size = 38.dp, iconSize = 19.dp,
+                        )
+                        Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                            Text(v.title, style = MaterialTheme.typography.titleSmall)
+                            Text(v.type.title, style = MaterialTheme.typography.labelSmall, color = MColors.Muted)
+                        }
+                        PlateView(v.plate, height = 28.dp)
+                    }
+                }
+                OutlinePill(
+                    "افزودن خودرو یا موتورسیکلت جدید", { vehicleSheet = false; onAddVehicle() },
+                    Modifier.fillMaxWidth().padding(top = 10.dp), Icons.Outlined.Add,
+                )
+            }
         }
     }
 
@@ -308,16 +375,17 @@ fun FuelFormScreen(
             title = { Text("بررسی و تأیید نهایی", style = MaterialTheme.typography.titleMedium) },
             text = {
                 Column {
-                    vm.summaryLines().forEachIndexed { i, (k, v) ->
+                    val lines = vm.summaryLines()
+                    lines.forEachIndexed { i, (k, v) ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 7.dp)) {
                             Text(k, style = MaterialTheme.typography.bodyMedium, color = MColors.Muted, modifier = Modifier.weight(1f))
                             Text(
                                 v,
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                color = if (i == 5) MColors.Green else MColors.Ink,
+                                color = if (i == lines.lastIndex) MColors.Green else MColors.Ink,
                             )
                         }
-                        if (i < 5) HorizontalDivider(color = MColors.Line)
+                        if (i < lines.lastIndex) HorizontalDivider(color = MColors.Line)
                     }
                     Text(
                         "پس از ثبت، فرم رسمی (PDF و تصویر) ساخته می‌شود.",
@@ -330,9 +398,7 @@ fun FuelFormScreen(
                     enabled = !vm.saving,
                     onClick = {
                         scope.launch {
-                            val d = withContext(Dispatchers.Default) { if (driverSig.hasNewDrawing) driverSig.toBitmap() else null }
-                            val p = withContext(Dispatchers.Default) { if (passengerSig.hasNewDrawing) passengerSig.toBitmap() else null }
-                            vm.save(d, p, passengerCleared = passengerSig.isEmpty)
+                            vm.save(driverSig.bitmap, passengerSig.bitmap, passengerCleared = passengerSig.isEmpty)
                         }
                     },
                 ) { Text(if (vm.saving) "در حال ثبت…" else "ثبت نهایی", color = MColors.Green, style = MaterialTheme.typography.labelLarge) }

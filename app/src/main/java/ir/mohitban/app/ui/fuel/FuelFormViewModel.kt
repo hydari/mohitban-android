@@ -18,6 +18,7 @@ import ir.mohitban.app.domain.model.FuelRates
 import ir.mohitban.app.domain.model.FuelType
 import ir.mohitban.app.domain.model.RangerProfile
 import ir.mohitban.app.domain.model.Vehicle
+import ir.mohitban.app.domain.model.VehicleType
 import ir.mohitban.app.domain.repository.FuelRepository
 import ir.mohitban.app.domain.repository.ProfileRepository
 import ir.mohitban.app.domain.repository.SettingsRepository
@@ -38,6 +39,8 @@ class FuelFormViewModel(
         private set
     var profile by mutableStateOf<RangerProfile?>(null)
         private set
+    var vehicles by mutableStateOf<List<Vehicle>>(emptyList())
+        private set
     var vehicle by mutableStateOf<Vehicle?>(null)
         private set
     var rates by mutableStateOf(FuelRates())
@@ -48,7 +51,8 @@ class FuelFormViewModel(
     var date by mutableStateOf(JalaliDate.today())
     var odometer by mutableStateOf("")
     var fuelType by mutableStateOf(FuelType.GASOLINE)
-    var gasolineRateIndex by mutableStateOf(2)
+        private set
+    var gasolineRateIndex by mutableStateOf(0)
     var amount by mutableStateOf("")
     var receiptPath by mutableStateOf<String?>(null)
         private set
@@ -72,12 +76,16 @@ class FuelFormViewModel(
 
     val isEdit: Boolean get() = entryId != 0L
 
+    /** CNG is only used by cars. */
+    val cngAllowed: Boolean get() = vehicle?.type != VehicleType.MOTORCYCLE
+
     init {
         viewModelScope.launch {
             profile = profiles.getProfile()
-            vehicle = profiles.getVehicle()
+            vehicles = profiles.getVehicles()
             rates = settings.getRates()
-            lastOdometer = fuel.lastOdometer() ?: vehicle?.odometer
+            val defaultId = settings.getDefaultVehicleId()
+            var selected = vehicles.firstOrNull { it.id == defaultId } ?: vehicles.firstOrNull()
             if (isEdit) {
                 fuel.get(entryId)?.let { e ->
                     original = e
@@ -92,9 +100,32 @@ class FuelFormViewModel(
                         val idx = rates.gasoline.indexOf(e.unitPrice)
                         gasolineRateIndex = if (idx >= 0) idx else -1
                     }
+                    e.vehicleId?.let { vid -> vehicles.firstOrNull { it.id == vid }?.let { selected = it } }
                 }
             }
+            applyVehicle(selected, keepFuelType = isEdit)
             loaded = true
+        }
+    }
+
+    private suspend fun applyVehicle(v: Vehicle?, keepFuelType: Boolean) {
+        vehicle = v
+        lastOdometer = v?.let { fuel.lastOdometer(it.id) ?: it.odometer }
+        if (v?.type == VehicleType.MOTORCYCLE) fuelType = FuelType.GASOLINE
+    }
+
+    fun selectVehicle(id: Long) {
+        val v = vehicles.firstOrNull { it.id == id } ?: return
+        viewModelScope.launch { applyVehicle(v, keepFuelType = true) }
+        errors = errors - "vehicle"
+    }
+
+    /** Reloads the list after a vehicle was added in the vehicles screen; selects [selectId] if given. */
+    fun refreshVehicles(selectId: Long?) {
+        viewModelScope.launch {
+            vehicles = profiles.getVehicles()
+            val v = vehicles.firstOrNull { it.id == (selectId ?: vehicle?.id) } ?: vehicles.firstOrNull()
+            applyVehicle(v, keepFuelType = true)
         }
     }
 
@@ -108,7 +139,7 @@ class FuelFormViewModel(
             FuelType.GASOLINE -> when {
                 gasolineRateIndex in rates.gasoline.indices -> rates.gasoline[gasolineRateIndex]
                 original?.fuelType == FuelType.GASOLINE -> original!!.unitPrice
-                else -> rates.gasoline.last()
+                else -> rates.gasoline.first()
             }
         }
 
@@ -118,6 +149,7 @@ class FuelFormViewModel(
     val receiptRequired: Boolean get() = fuelType == FuelType.GASOLINE
 
     fun onFuelType(t: FuelType) {
+        if (t == FuelType.CNG && !cngAllowed) return
         fuelType = t
         if (errors.isNotEmpty()) errors = errors - "receipt" - "amount"
     }
@@ -137,16 +169,19 @@ class FuelFormViewModel(
             val updated = v.copy(photoPath = path)
             profiles.saveVehicle(updated)
             vehicle = updated
+            vehicles = vehicles.map { if (it.id == updated.id) updated else it }
         }
     }
 
     /** First step of saving: validates and opens the summary dialog. */
     fun requestSave(driverEmpty: Boolean) {
         val e = buildMap {
+            if (vehicle == null) put("vehicle", "وسیله نقلیه را انتخاب کنید")
             val odo = odometer.digitsOnly().toLongOrNull()
             if (odo == null || odo <= 0) put("odometer", "کیلومتر فعلی را وارد کنید")
             if (amountValue <= 0.0) put("amount", "مقدار سوخت را وارد کنید")
             else if (amountValue > 2000) put("amount", "مقدار وارد شده بیش از حد مجاز است")
+            if (fuelType == FuelType.CNG && !cngAllowed) put("amount", "گاز CNG برای موتورسیکلت قابل ثبت نیست")
             if (receiptRequired && receiptPath == null) put("receipt", "برای بنزین، عکس رسید کارتخوان الزامی است")
             if (driverEmpty) put("driver", "امضای راننده الزامی است")
         }
@@ -156,6 +191,7 @@ class FuelFormViewModel(
 
     fun summaryLines(): List<Pair<String, String>> = listOf(
         "تاریخ" to date.formatLong().fa(),
+        "وسیله" to (vehicle?.let { "${it.title} | ${it.plate.displayText().fa()}" } ?: ""),
         "کیلومتر فعلی" to (odometer.digitsOnly().toLongOrNull() ?: 0L).rial(),
         "نوع سوخت" to fuelType.title,
         "مقدار" to "${amountValue.amountText()} ${fuelType.unit}",
@@ -186,6 +222,21 @@ class FuelFormViewModel(
                 return@launch
             }
             val base = original
+            val vehicleChanged = base != null && base.vehicleId != v.id
+            val snapshot = if (base != null && !vehicleChanged) {
+                base.snapshot
+            } else {
+                EntrySnapshot(
+                    driverName = base?.snapshot?.driverName ?: p.fullName,
+                    plate = v.plate,
+                    vehicleType = v.type,
+                    vehicleModel = v.title,
+                    province = base?.snapshot?.province ?: p.province,
+                    city = base?.snapshot?.city ?: p.city,
+                    protectedArea = base?.snapshot?.protectedArea ?: p.protectedArea,
+                    station = base?.snapshot?.station ?: p.station,
+                )
+            }
             val entry = FuelEntry(
                 id = base?.id ?: 0L,
                 date = date,
@@ -197,21 +248,12 @@ class FuelFormViewModel(
                 receiptPath = receiptPath,
                 driverSignaturePath = driverPath,
                 passengerSignaturePath = passengerPath,
-                snapshot = base?.snapshot?.copy(
-                    // keep the original driver, refresh nothing else so the printed form stays the same
-                ) ?: EntrySnapshot(
-                    driverName = p.fullName,
-                    plate = v.plate,
-                    vehicleType = v.type,
-                    vehicleModel = v.model,
-                    province = p.province,
-                    city = p.city,
-                    protectedArea = p.protectedArea,
-                    station = p.station,
-                ),
+                snapshot = snapshot,
                 createdAt = base?.createdAt ?: System.currentTimeMillis(),
+                vehicleId = v.id,
             )
             val id = fuel.save(entry)
+            settings.setDefaultVehicleId(v.id)
             committed = true
             showConfirm = false
             saving = false

@@ -108,9 +108,9 @@ fun LocationSection(form: ProfileForm, errors: Map<String, String>, onChange: (P
         form.province, { onChange(form.copy(province = it)) }, Suggestions.provinces,
         label = "اداره کل استان", leadingIcon = Icons.Outlined.LocationOn, error = errors["province"], readOnly = true,
     )
-    MField(form.city, { onChange(form.copy(city = it)) }, label = "شهرستان", leadingIcon = Icons.Outlined.LocationOn, placeholder = "کلیبر", error = errors["city"])
-    MField(form.protectedArea, { onChange(form.copy(protectedArea = it)) }, label = "منطقه حفاظت‌شده", leadingIcon = Icons.Outlined.Park, placeholder = "ارسباران", error = errors["protectedArea"])
-    MField(form.station, { onChange(form.copy(station = it)) }, label = "پاسگاه محیط‌بانی", leadingIcon = Icons.Outlined.Home, placeholder = "مکیدی", error = errors["station"], imeAction = androidx.compose.ui.text.input.ImeAction.Done)
+    MField(form.city, { onChange(form.copy(city = it)) }, label = "شهرستان", leadingIcon = Icons.Outlined.LocationOn, placeholder = "میانه", error = errors["city"])
+    MField(form.protectedArea, { onChange(form.copy(protectedArea = it)) }, label = "منطقه حفاظت‌شده", leadingIcon = Icons.Outlined.Park, placeholder = "کاغذکنان", error = errors["protectedArea"])
+    MField(form.station, { onChange(form.copy(station = it)) }, label = "پاسگاه محیط‌بانی", leadingIcon = Icons.Outlined.Home, placeholder = "آقکند", error = errors["station"], imeAction = androidx.compose.ui.text.input.ImeAction.Done)
 }
 
 @Composable
@@ -141,10 +141,10 @@ fun VehicleSection(form: VehicleForm, errors: Map<String, String>, onChange: (Ve
     FieldLabel("نوع وسیله", Icons.Outlined.DirectionsCar)
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         TypeCard("خودرو", Icons.Outlined.DirectionsCar, form.type == VehicleType.CAR, Modifier.weight(1f)) {
-            onChange(form.copy(type = VehicleType.CAR))
+            onChange(form.withType(VehicleType.CAR))
         }
         TypeCard("موتورسیکلت", Icons.Outlined.TwoWheeler, form.type == VehicleType.MOTORCYCLE, Modifier.weight(1f)) {
-            onChange(form.copy(type = VehicleType.MOTORCYCLE))
+            onChange(form.withType(VehicleType.MOTORCYCLE))
         }
     }
     Spacer(Modifier.height(14.dp))
@@ -178,12 +178,18 @@ fun VehicleSection(form: VehicleForm, errors: Map<String, String>, onChange: (Ve
 
     val kinds = if (form.type == VehicleType.CAR) Suggestions.carKinds else Suggestions.motoKinds
     val models = if (form.type == VehicleType.CAR) Suggestions.carModels else Suggestions.motoModels
-    ComboField(form.kind, { onChange(form.copy(kind = it)) }, kinds, label = "نوع خودرو", labelIcon = Icons.Outlined.DirectionsCar, placeholder = kinds.first(), error = errors["kind"])
-    ComboField(form.model, { onChange(form.copy(model = it)) }, models, label = "مدل", placeholder = models.first(), error = errors["model"])
+    val isCar = form.type == VehicleType.CAR
+    val noun = if (isCar) "خودرو" else "موتورسیکلت"
+    ComboField(
+        form.kind, { onChange(form.copy(kind = it)) }, kinds,
+        label = "نوع $noun", labelIcon = if (isCar) Icons.Outlined.DirectionsCar else Icons.Outlined.TwoWheeler,
+        placeholder = "نوع $noun را بنویسید", error = errors["kind"],
+    )
+    ComboField(form.model, { onChange(form.copy(model = it)) }, models, label = "مدل $noun", placeholder = "مدل $noun را بنویسید", error = errors["model"])
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         ComboField(
             form.year, { onChange(form.copy(year = it)) }, Suggestions.years(JalaliDate.today().year),
-            label = "سال ساخت", numeric = NumericMode.Digits, maxLength = 4, placeholder = "۱۳۹۸",
+            label = "سال ساخت", numeric = NumericMode.Digits, maxLength = 4, placeholder = "مثلاً ۱۳۹۸",
             error = errors["year"], modifier = Modifier.weight(1f),
         )
         MField(
@@ -191,7 +197,7 @@ fun VehicleSection(form: VehicleForm, errors: Map<String, String>, onChange: (Ve
             numeric = NumericMode.Grouped, maxLength = 7, placeholder = "۰", error = errors["odometer"], modifier = Modifier.weight(1f),
         )
     }
-    FieldLabel("عکس وسیله (اختیاری)")
+    FieldLabel("عکس $noun (اختیاری)")
     Row(
         Modifier
             .fillMaxWidth()
@@ -209,7 +215,7 @@ fun VehicleSection(form: VehicleForm, errors: Map<String, String>, onChange: (Ve
             Row(Modifier.weight(1f).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 CircleIcon(Icons.Outlined.PhotoCamera, MColors.Green, Color.White, size = 44.dp)
                 Column {
-                    Text("افزودن عکس وسیله", style = MaterialTheme.typography.titleSmall, color = MColors.Green)
+                    Text("افزودن عکس $noun", style = MaterialTheme.typography.titleSmall, color = MColors.Green)
                     Text("در کارت خودرو و فرم سوخت نمایش داده می‌شود", style = MaterialTheme.typography.labelSmall, color = MColors.Muted)
                 }
             }

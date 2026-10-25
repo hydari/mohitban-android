@@ -10,21 +10,35 @@ import kotlinx.coroutines.flow.Flow
 
 interface ProfileRepository {
     val profile: Flow<RangerProfile?>
-    val vehicle: Flow<Vehicle?>
+    val vehicles: Flow<List<Vehicle>>
     suspend fun getProfile(): RangerProfile?
-    suspend fun getVehicle(): Vehicle?
+    suspend fun getVehicles(): List<Vehicle>
+    suspend fun getVehicle(id: Long): Vehicle?
     suspend fun isRegistered(): Boolean
-    suspend fun save(profile: RangerProfile, vehicle: Vehicle)
+    /** First registration: profile + first vehicle (becomes the default). */
+    suspend fun register(profile: RangerProfile, vehicle: Vehicle)
     suspend fun saveProfile(profile: RangerProfile)
-    suspend fun saveVehicle(vehicle: Vehicle)
+    /** Inserts (id = 0) or updates a vehicle and returns its id. */
+    suspend fun saveVehicle(vehicle: Vehicle): Long
+    /** Deletes a vehicle; returns false when it is the last one. */
+    suspend fun deleteVehicle(id: Long): Boolean
 }
+
+data class ReminderState(val reportedSeasonKey: Int?, val lastReminderJdn: Int?)
 
 interface SettingsRepository {
     val rates: Flow<FuelRates>
     val lastBackupAt: Flow<Long?>
+    val defaultVehicleId: Flow<Long?>
+    val reminder: Flow<ReminderState>
     suspend fun getRates(): FuelRates
     suspend fun saveRates(rates: FuelRates)
     suspend fun markBackup(time: Long)
+    suspend fun getDefaultVehicleId(): Long?
+    suspend fun setDefaultVehicleId(id: Long?)
+    suspend fun getReminder(): ReminderState
+    suspend fun markSeasonReported(key: Int)
+    suspend fun markReminderShown(jdn: Int)
 }
 
 interface FuelRepository {
@@ -34,5 +48,5 @@ interface FuelRepository {
     suspend fun save(entry: FuelEntry): Long
     suspend fun delete(id: Long)
     suspend fun quarter(year: Int, season: Season): QuarterSummary
-    suspend fun lastOdometer(): Long?
+    suspend fun lastOdometer(vehicleId: Long): Long?
 }

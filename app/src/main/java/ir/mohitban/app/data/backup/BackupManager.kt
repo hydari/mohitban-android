@@ -36,7 +36,7 @@ class BackupManager(
         json.put("app", "mohitban")
         json.put("createdAt", System.currentTimeMillis())
         db.profileDao().get()?.let { json.put("profile", it.toJson()) }
-        db.vehicleDao().get()?.let { json.put("vehicle", it.toJson()) }
+        json.put("vehicles", JSONArray().apply { db.vehicleDao().getAll().forEach { put(it.toJson()) } })
         db.settingsDao().get()?.let { json.put("settings", it.toJson()) }
         json.put("entries", JSONArray().apply { db.fuelEntryDao().getAll().forEach { put(it.toJson()) } })
 
@@ -76,7 +76,8 @@ class BackupManager(
         require(json.optString("app") == "mohitban") { "not a mohitban backup" }
 
         val profile = json.optJSONObject("profile")?.toProfile()
-        val vehicle = json.optJSONObject("vehicle")?.toVehicle()
+        val vehicles = json.optJSONArray("vehicles")?.let { arr -> (0 until arr.length()).map { arr.getJSONObject(it).toVehicle() } }
+            ?: listOfNotNull(json.optJSONObject("vehicle")?.toVehicle())
         val settings = json.optJSONObject("settings")?.toSettings()
         val entries = json.optJSONArray("entries")?.let { arr -> (0 until arr.length()).map { arr.getJSONObject(it).toEntry() } }.orEmpty()
 
@@ -85,7 +86,7 @@ class BackupManager(
             db.profileDao().clear()
             db.vehicleDao().clear()
             profile?.let { db.profileDao().upsert(it) }
-            vehicle?.let { db.vehicleDao().upsert(it) }
+            vehicles.forEach { db.vehicleDao().insert(it) }
             settings?.let { db.settingsDao().upsert(it) }
             entries.forEach { db.fuelEntryDao().insert(it) }
         }
@@ -114,10 +115,11 @@ class BackupManager(
 
     private fun VehicleEntity.toJson() = JSONObject().apply {
         put("type", type); put("kind", kind); put("model", model); put("year", year); put("plate", plate)
-        put("odometer", odometer); put("photoPath", photoPath ?: JSONObject.NULL)
+        put("id", id); put("odometer", odometer); put("photoPath", photoPath ?: JSONObject.NULL); put("createdAt", createdAt)
     }
 
     private fun JSONObject.toVehicle() = VehicleEntity(
+        id = optLong("id", 1L), createdAt = optLong("createdAt"),
         type = str("type"), kind = str("kind"), model = str("model"), year = str("year"), plate = str("plate"),
         odometer = optLong("odometer"), photoPath = strOrNull("photoPath"),
     )
@@ -125,11 +127,15 @@ class BackupManager(
     private fun SettingsEntity.toJson() = JSONObject().apply {
         put("g1", gasolineRate1); put("g2", gasolineRate2); put("g3", gasolineRate3); put("cng", cngRate)
         put("lastBackupAt", lastBackupAt ?: JSONObject.NULL)
+        put("defaultVehicleId", defaultVehicleId ?: JSONObject.NULL)
+        put("reportedSeasonKey", reportedSeasonKey ?: JSONObject.NULL)
     }
 
     private fun JSONObject.toSettings() = SettingsEntity(
-        gasolineRate1 = optLong("g1", 10_000), gasolineRate2 = optLong("g2", 15_000), gasolineRate3 = optLong("g3", 30_000),
+        gasolineRate1 = optLong("g1", 15_000), gasolineRate2 = optLong("g2", 30_000), gasolineRate3 = optLong("g3", 100_000),
         cngRate = optLong("cng", 6_568), lastBackupAt = if (isNull("lastBackupAt")) null else optLong("lastBackupAt"),
+        defaultVehicleId = if (!has("defaultVehicleId") || isNull("defaultVehicleId")) null else optLong("defaultVehicleId"),
+        reportedSeasonKey = if (!has("reportedSeasonKey") || isNull("reportedSeasonKey")) null else optInt("reportedSeasonKey"),
     )
 
     private fun FuelEntryEntity.toJson() = JSONObject().apply {
@@ -139,6 +145,7 @@ class BackupManager(
         put("snapDriver", snapDriver); put("snapPlate", snapPlate); put("snapVehicleType", snapVehicleType)
         put("snapVehicleModel", snapVehicleModel); put("snapProvince", snapProvince); put("snapCity", snapCity)
         put("snapArea", snapArea); put("snapStation", snapStation); put("createdAt", createdAt)
+        put("vehicleId", vehicleId ?: JSONObject.NULL)
     }
 
     private fun JSONObject.toEntry() = FuelEntryEntity(
@@ -148,5 +155,6 @@ class BackupManager(
         passengerSignaturePath = strOrNull("passengerSignaturePath"), snapDriver = str("snapDriver"), snapPlate = str("snapPlate"),
         snapVehicleType = str("snapVehicleType"), snapVehicleModel = str("snapVehicleModel"), snapProvince = str("snapProvince"),
         snapCity = str("snapCity"), snapArea = str("snapArea"), snapStation = str("snapStation"), createdAt = optLong("createdAt"),
+        vehicleId = if (!has("vehicleId") || isNull("vehicleId")) 1L else optLong("vehicleId"),
     )
 }

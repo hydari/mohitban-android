@@ -69,7 +69,10 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
         val lastTop = if (pages.size == 1) firstTableTop else CONT_TOP
         val lastBottom = lastTop + HEAD_H + pages.last().count() * ROW_H + ROW_H
         val extraPage = lastBottom + FINAL_BLOCK > CONTENT_BOTTOM
-        val totalPages = pages.size + if (extraPage) 1 else 0
+        // appendix: photos of the POS receipts (فیش‌های پرداختی), four per page
+        val receipts = s.entries.mapIndexedNotNull { i, e -> if (e.receiptPath != null) (i + 1) to e else null }
+        val receiptPages = receipts.chunked(4)
+        val totalPages = pages.size + (if (extraPage) 1 else 0) + receiptPages.size
 
         val doc = PdfDocument()
         pages.forEachIndexed { pi, range ->
@@ -99,6 +102,13 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
             watermark(page.canvas)
             finalBlock(page.canvas, CONT_TOP, s, profile, sig)
             footer(page.canvas, totalPages, totalPages)
+            doc.finishPage(page)
+        }
+        receiptPages.forEachIndexed { ri, chunk ->
+            val number = pages.size + (if (extraPage) 1 else 0) + ri + 1
+            val page = doc.startPage(PdfDocument.PageInfo.Builder(W.toInt(), H.toInt(), number).create())
+            receiptsPage(page.canvas, s, chunk)
+            footer(page.canvas, number, totalPages)
             doc.finishPage(page)
         }
         val out = File(files.cacheDir, "quarter-report-${s.year}-${s.season.index}.pdf")
@@ -165,8 +175,8 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
         pair(colR, 160f, "شهرستان", p.city)
         pair(colL, 160f, "منطقه حفاظت‌شده", p.protectedArea)
         pair(colR, 178f, "پاسگاه محیط‌بانی", p.station)
-        val plate = s.entries.lastOrNull()?.snapshot
-        if (plate != null) pair(colL, 178f, "خودرو", "${plate.vehicleModel} | ${plate.plate.displayText().fa()}")
+        val vehiclesText = s.entries.map { "${it.snapshot.vehicleModel} ${it.snapshot.plate.displayText().fa()}" }.distinct().joinToString(" ، ")
+        if (vehiclesText.isNotBlank()) pair(colL, 178f, "وسیله", vehiclesText)
 
         // ---- stat boxes ----
         val stats = listOf(
@@ -280,8 +290,35 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
         }
     }
 
+    private fun receiptsPage(c: Canvas, s: QuarterSummary, items: List<Pair<Int, ir.mohitban.app.domain.model.FuelEntry>>) {
+        PdfKit.line(c, "پیوست: فیش‌های پرداختی (رسید کارتخوان) | ${s.season.title} ${s.year.fa()}", W - M, 46f, PdfKit.text(11f, true, PdfKit.GREEN))
+        c.drawLine(M, 56f, W - M, 56f, PdfKit.stroke(1f, PdfKit.GREEN))
+        val gap = 14f
+        val cellW = (W - 2 * M - gap) / 2
+        val top0 = 68f
+        val cellH = (H - 52f - top0 - gap) / 2
+        items.forEachIndexed { k, (row, e) ->
+            val col = k % 2
+            val line = k / 2
+            val right = W - M - col * (cellW + gap)
+            val top = top0 + line * (cellH + gap)
+            val box = RectF(right - cellW, top, right, top + cellH)
+            c.drawRoundRect(box, 6f, 6f, PdfKit.stroke(0.7f, Color.rgb(200, 209, 195)))
+            val caption = "ردیف ${row.fa()} | ${e.date.format().fa()} | ${if (e.fuelType == FuelType.CNG) "گاز" else "بنزین"} | ${e.total.rial()} ریال"
+            PdfKit.fitLine(c, caption, box.right - 8f, box.top + 16f, PdfKit.text(8.5f, true), cellW - 16f)
+            val img = files.loadBitmap(e.receiptPath, 1100)
+            val imgBox = RectF(box.left + 8f, box.top + 24f, box.right - 8f, box.bottom - 8f)
+            if (img != null) {
+                PdfKit.bitmapFit(c, img, imgBox)
+                img.recycle()
+            } else {
+                PdfKit.line(c, "تصویر رسید در دسترس نیست", imgBox.centerX(), imgBox.centerY(), PdfKit.text(9f, false, PdfKit.MUTED), Align.CENTER)
+            }
+        }
+    }
+
     private fun footer(c: Canvas, page: Int, total: Int) {
         c.drawLine(M, H - 34f, W - M, H - 34f, PdfKit.stroke(0.5f, Color.rgb(213, 220, 209)))
-        PdfKit.line(c, "صفحه ${page.fa()} از ${total.fa()}  |  تهیه‌شده با اپلیکیشن محیط‌بان (آفلاین)", W / 2, H - 22f, PdfKit.text(7.5f, false, Color.rgb(122, 134, 118)), Align.CENTER)
+        PdfKit.line(c, "صفحه ${page.fa()} از ${total.fa()}  |  تهیه‌شده با اپلیکیشن محیط‌یار (آفلاین)", W / 2, H - 22f, PdfKit.text(7.5f, false, Color.rgb(122, 134, 118)), Align.CENTER)
     }
 }

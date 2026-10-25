@@ -46,12 +46,12 @@ jobs:
       - name: Rename APK
         run: |
           mkdir -p out
-          cp app/build/outputs/apk/release/*.apk out/Mohitban.apk
+          cp app/build/outputs/apk/release/*.apk out/Mohityar.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Mohitban-APK-${{ github.run_number }}
+          name: Mohityar-APK-${{ github.run_number }}
           path: out/*.apk
           retention-days: 30
 
@@ -60,8 +60,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="v1.0.${{ github.run_number }}"
-          gh release create "$TAG" out/Mohitban.apk \
+          gh release create "$TAG" out/Mohityar.apk \
             --repo "${{ github.repository }}" \
-            --title "محیط‌بان ${TAG}" \
-            --notes "فایل Mohitban.apk را دانلود و روی گوشی نصب کنید." \
+            --title "محیط‌یار ${TAG}" \
+            --notes "فایل Mohityar.apk را دانلود و روی گوشی نصب کنید." \
             --latest

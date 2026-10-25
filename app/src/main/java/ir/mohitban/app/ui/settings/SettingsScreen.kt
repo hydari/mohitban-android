@@ -146,7 +146,7 @@ fun SettingsScreen(
                 AppCard(Modifier.fillMaxWidth()) {
                     SettingRow(Icons.Outlined.Person, "اطلاعات فردی و محل خدمت", "نام، کد ملی، استان، شهرستان، پاسگاه", onEditProfile)
                     Divider()
-                    SettingRow(Icons.Outlined.DirectionsCar, "اطلاعات خودرو", "نوع، مدل، پلاک قرمز، کیلومتر", onEditVehicle)
+                    SettingRow(Icons.Outlined.DirectionsCar, "وسایل نقلیه و پلاک‌ها", "خودرو و موتورسیکلت، پلاک قرمز، کیلومتر", onEditVehicle)
                 }
 
                 SectionTitle("نرخ سوخت (ریال)")
@@ -180,7 +180,7 @@ fun SettingsScreen(
                         Icons.Outlined.Backup, "ساخت فایل پشتیبان",
                         lastBackup?.let { "آخرین پشتیبان: ${formatMillis(it)}" } ?: "همه اطلاعات، امضاها و رسیدها در یک فایل",
                     ) {
-                        exportLauncher.launch("mohitban-backup-${JalaliDate.today().format().replace('/', '-')}.zip")
+                        exportLauncher.launch("mohityar-backup-${JalaliDate.today().format().replace('/', '-')}.zip")
                     }
                     Divider()
                     SettingRow(Icons.Outlined.Restore, "بازیابی از فایل پشتیبان", "اطلاعات فعلی با محتوای فایل جایگزین می‌شود") {
@@ -194,7 +194,7 @@ fun SettingsScreen(
 
                 SectionTitle("درباره")
                 AppCard(Modifier.fillMaxWidth()) {
-                    SettingRow(Icons.Outlined.Info, "محیط‌بان — نسخه ۱٫۰", "همراه محیط‌بانان، برای طبیعت ایران | کاملاً آفلاین", null)
+                    SettingRow(Icons.Outlined.Info, "محیط‌یار — نسخه ${ir.mohitban.app.BuildConfigCompat.versionName(LocalContext.current).fa()}", "طراح و برنامه‌نویس: مهندس محمدرضا حیدری | کاملاً آفلاین", null)
                 }
                 Spacer(Modifier.height(120.dp))
             }

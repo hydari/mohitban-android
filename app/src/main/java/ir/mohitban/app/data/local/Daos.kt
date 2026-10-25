@@ -25,19 +25,31 @@ interface ProfileDao {
 
 @Dao
 interface VehicleDao {
-    @Query("SELECT * FROM vehicle WHERE id = 1")
-    fun observe(): Flow<VehicleEntity?>
+    @Query("SELECT * FROM vehicles ORDER BY id ASC")
+    fun observeAll(): Flow<List<VehicleEntity>>
 
-    @Query("SELECT * FROM vehicle WHERE id = 1")
-    suspend fun get(): VehicleEntity?
+    @Query("SELECT * FROM vehicles ORDER BY id ASC")
+    suspend fun getAll(): List<VehicleEntity>
 
-    @Upsert
-    suspend fun upsert(entity: VehicleEntity)
+    @Query("SELECT * FROM vehicles WHERE id = :id")
+    suspend fun get(id: Long): VehicleEntity?
 
-    @Query("UPDATE vehicle SET odometer = :odometer WHERE id = 1 AND odometer < :odometer")
-    suspend fun raiseOdometer(odometer: Long)
+    @Query("SELECT COUNT(*) FROM vehicles")
+    suspend fun count(): Int
 
-    @Query("DELETE FROM vehicle")
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(entity: VehicleEntity): Long
+
+    @Update
+    suspend fun update(entity: VehicleEntity)
+
+    @Query("DELETE FROM vehicles WHERE id = :id")
+    suspend fun delete(id: Long)
+
+    @Query("UPDATE vehicles SET odometer = :odometer WHERE id = :id AND odometer < :odometer")
+    suspend fun raiseOdometer(id: Long, odometer: Long)
+
+    @Query("DELETE FROM vehicles")
     suspend fun clear()
 }
 
@@ -70,8 +82,11 @@ interface FuelEntryDao {
     @Query("SELECT * FROM fuel_entry WHERE id = :id")
     suspend fun get(id: Long): FuelEntryEntity?
 
-    @Query("SELECT MAX(odometer) FROM fuel_entry")
-    suspend fun maxOdometer(): Long?
+    @Query("SELECT MAX(odometer) FROM fuel_entry WHERE vehicleId = :vehicleId")
+    suspend fun maxOdometer(vehicleId: Long): Long?
+
+    @Query("SELECT COUNT(*) FROM fuel_entry WHERE vehicleId = :vehicleId")
+    suspend fun countForVehicle(vehicleId: Long): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: FuelEntryEntity): Long

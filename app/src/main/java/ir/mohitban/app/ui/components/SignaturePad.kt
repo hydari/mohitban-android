@@ -211,3 +211,60 @@ fun SignaturePad(
         FieldMessage(error = error, success = null)
     }
 }
+
+/** Large drawing surface used in the full-screen signature dialog. */
+@Composable
+fun BigSignatureCanvas(state: SignatureState, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(18.dp)
+    Box(
+        modifier
+            .clip(shape)
+            .background(Color(0xFFFAFBFA))
+            .drawBehind {
+                drawRoundRect(
+                    color = Color(0xFFBFC9C2),
+                    style = Stroke(width = 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(16f, 12f))),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(18.dp.toPx()),
+                )
+                val y = size.height * 0.72f
+                drawLine(
+                    Color(0xFFD3DAD5), Offset(28.dp.toPx(), y), Offset(size.width - 28.dp.toPx(), y),
+                    strokeWidth = 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f)),
+                )
+            }
+            .onSizeChanged { state.size = it }
+            .pointerInput(state) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    down.consume()
+                    state.start(down.position)
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) break
+                        if (change.positionChange() != Offset.Zero) state.move(change.position)
+                        change.consume()
+                    }
+                    state.end()
+                }
+            },
+    ) {
+        if (state.isEmpty) {
+            Text("اینجا امضا کنید", style = MaterialTheme.typography.titleMedium, color = Color(0xFFC5CCC7), modifier = Modifier.align(Alignment.Center))
+        }
+        Canvas(Modifier.fillMaxSize()) {
+            if (state.version < 0) return@Canvas
+            val stroke = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+            fun draw(points: List<Offset>) {
+                if (points.isEmpty()) return
+                val p = Path()
+                p.moveTo(points[0].x, points[0].y)
+                for (i in 1 until points.size) p.lineTo(points[i].x, points[i].y)
+                if (points.size == 1) p.lineTo(points[0].x + 0.5f, points[0].y + 0.5f)
+                drawPath(p, Color(0xFF102040), style = stroke)
+            }
+            state.strokes.forEach { draw(it) }
+            draw(state.liveStroke())
+        }
+    }
+}

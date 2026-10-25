@@ -233,7 +233,7 @@ class FuelFormRenderer(private val context: Context, private val files: FileStor
         }
 
         // ---------- footer ----------
-        val foot = if (e.id > 0) "شماره ثبت ${e.id.fa()} | تهیه‌شده با اپلیکیشن محیط‌بان" else "تهیه‌شده با اپلیکیشن محیط‌بان"
+        val foot = if (e.id > 0) "شماره ثبت ${e.id.fa()} | تهیه‌شده با اپلیکیشن محیط‌یار" else "تهیه‌شده با اپلیکیشن محیط‌یار"
         PdfKit.line(c, foot, W / 2, 413f, PdfKit.text(5.8f, false, Color.rgb(140, 150, 142)), Align.CENTER)
     }
 

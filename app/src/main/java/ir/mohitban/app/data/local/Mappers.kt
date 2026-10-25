@@ -22,6 +22,7 @@ fun RangerProfile.toEntity() = ProfileEntity(
 private val FALLBACK_PLATE = Plate.Car("", "الف", "", "")
 
 fun VehicleEntity.toDomain() = Vehicle(
+    id = id,
     type = runCatching { VehicleType.valueOf(type) }.getOrDefault(VehicleType.CAR),
     kind = kind,
     model = model,
@@ -31,9 +32,9 @@ fun VehicleEntity.toDomain() = Vehicle(
     photoPath = photoPath,
 )
 
-fun Vehicle.toEntity() = VehicleEntity(
-    type = type.name, kind = kind, model = model, year = year, plate = plate.encode(),
-    odometer = odometer, photoPath = photoPath,
+fun Vehicle.toEntity(createdAt: Long = System.currentTimeMillis()) = VehicleEntity(
+    id = id, type = type.name, kind = kind, model = model, year = year, plate = plate.encode(),
+    odometer = odometer, photoPath = photoPath, createdAt = createdAt,
 )
 
 fun SettingsEntity.toRates() = FuelRates(listOf(gasolineRate1, gasolineRate2, gasolineRate3), cngRate)
@@ -60,6 +61,7 @@ fun FuelEntryEntity.toDomain() = FuelEntry(
         station = snapStation,
     ),
     createdAt = createdAt,
+    vehicleId = vehicleId,
 )
 
 fun FuelEntry.toEntity() = FuelEntryEntity(
@@ -82,4 +84,5 @@ fun FuelEntry.toEntity() = FuelEntryEntity(
     snapArea = snapshot.protectedArea,
     snapStation = snapshot.station,
     createdAt = createdAt,
+    vehicleId = vehicleId,
 )

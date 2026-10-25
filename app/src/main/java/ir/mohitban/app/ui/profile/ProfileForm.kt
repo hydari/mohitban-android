@@ -51,6 +51,7 @@ data class ProfileForm(
 }
 
 data class VehicleForm(
+    val id: Long = 0,
     val type: VehicleType = VehicleType.CAR,
     val kind: String = "",
     val model: String = "",
@@ -73,19 +74,26 @@ data class VehicleForm(
 
     fun errors(): Map<String, String> = buildMap {
         plateError()?.let { put("plate", it) }
-        Validators.required(kind, "نوع وسیله")?.let { put("kind", it) }
-        Validators.required(model, "مدل")?.let { put("model", it) }
+        val noun = if (type == VehicleType.CAR) "خودرو" else "موتورسیکلت"
+        Validators.required(kind, "نوع $noun")?.let { put("kind", it) }
+        Validators.required(model, "مدل $noun")?.let { put("model", it) }
         if (year.isNotBlank() && year.digitsOnly().length != 4) put("year", "سال ساخت را چهار رقمی وارد کنید")
         if (odometer.digitsOnly().isEmpty()) put("odometer", "کیلومتر فعلی را وارد کنید")
     }
 
+    /** Switching car ↔ motorcycle clears the fields that belong to the other type. */
+    fun withType(t: VehicleType): VehicleForm =
+        if (t == type) this else copy(type = t, kind = "", model = "")
+
     fun toDomain() = Vehicle(
+        id = id,
         type = type, kind = kind.trim(), model = model.trim(), year = year.digitsOnly(), plate = plate,
         odometer = odometer.digitsOnly().toLongOrNull() ?: 0L, photoPath = photoPath,
     )
 
     companion object {
         fun from(v: Vehicle) = VehicleForm(
+            id = v.id,
             type = v.type,
             kind = v.kind,
             model = v.model,

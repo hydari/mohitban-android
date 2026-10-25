@@ -26,6 +26,7 @@ data class RangerProfile(
 )
 
 data class Vehicle(
+    val id: Long = 0,
     val type: VehicleType,
     val kind: String,
     val model: String,
@@ -33,11 +34,14 @@ data class Vehicle(
     val plate: Plate,
     val odometer: Long,
     val photoPath: String?,
-)
+) {
+    /** "تویوتا هایلوکس" or, when the model is empty, the vehicle type. */
+    val title: String get() = model.ifBlank { type.title }
+}
 
 /** Fuel prices in Rial. Editable in settings so a price change never needs a new APK. */
 data class FuelRates(
-    val gasoline: List<Long> = listOf(10_000L, 15_000L, 30_000L),
+    val gasoline: List<Long> = listOf(15_000L, 30_000L, 100_000L),
     val cng: Long = 6_568L,
 )
 
@@ -70,6 +74,7 @@ data class FuelEntry(
     val passengerSignaturePath: String?,
     val snapshot: EntrySnapshot,
     val createdAt: Long = System.currentTimeMillis(),
+    val vehicleId: Long? = null,
 )
 
 data class QuarterSummary(
@@ -83,6 +88,7 @@ data class QuarterSummary(
     val gasolineTotal: Long get() = entries.filter { it.fuelType == FuelType.GASOLINE }.sumOf { it.total }
     val cngTotal: Long get() = entries.filter { it.fuelType == FuelType.CNG }.sumOf { it.total }
     val total: Long get() = entries.sumOf { it.total }
+    val withReceipts: List<FuelEntry> get() = entries.filter { it.receiptPath != null }
     val firstOdometer: Long? get() = entries.minByOrNull { it.date.jdn * 10_000_000L + it.odometer }?.odometer
     val lastOdometer: Long? get() = entries.maxByOrNull { it.date.jdn * 10_000_000L + it.odometer }?.odometer
 }

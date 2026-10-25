@@ -22,6 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FileDownload
@@ -70,6 +71,8 @@ import ir.mohitban.app.domain.model.QuarterSummary
 import ir.mohitban.app.domain.model.RangerProfile
 import ir.mohitban.app.domain.repository.FuelRepository
 import ir.mohitban.app.domain.repository.ProfileRepository
+import ir.mohitban.app.domain.repository.SettingsRepository
+import ir.mohitban.app.reminder.ReportReminder
 import ir.mohitban.app.ui.common.Share
 import ir.mohitban.app.ui.common.appViewModel
 import ir.mohitban.app.ui.components.AppCard
@@ -79,9 +82,9 @@ import ir.mohitban.app.ui.components.MainTab
 import ir.mohitban.app.ui.components.OutlinePill
 import ir.mohitban.app.ui.components.PillButton
 import ir.mohitban.app.ui.components.SectionTitle
-import ir.mohitban.app.ui.components.SignaturePad
+import ir.mohitban.app.ui.components.SignatureField
 import ir.mohitban.app.ui.components.TopBar
-import ir.mohitban.app.ui.components.rememberSignatureState
+import ir.mohitban.app.ui.components.rememberSignatureFieldState
 import ir.mohitban.app.ui.components.rememberStoredImage
 import ir.mohitban.app.ui.records.SeasonChips
 import ir.mohitban.app.ui.records.YearSelector
@@ -98,7 +101,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class ReportViewModel(profiles: ProfileRepository, fuel: FuelRepository) : ViewModel() {
+class ReportViewModel(profiles: ProfileRepository, fuel: FuelRepository, private val settings: SettingsRepository) : ViewModel() {
     private val today = JalaliDate.today()
     val filter = MutableStateFlow(today.year to today.season)
     val profile = profiles.profile.stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -111,26 +114,33 @@ class ReportViewModel(profiles: ProfileRepository, fuel: FuelRepository) : ViewM
     fun setSeason(s: Season) { filter.value = filter.value.first to s }
 
     /** The ranger's own latest signature in this season, used as the default report signature. */
+    /** The report of this season was sent / saved / printed: stop the reminders. */
+    fun markReported() {
+        val (y, s) = filter.value
+        viewModelScope.launch { settings.markSeasonReported(ReportReminder.key(y, s)) }
+    }
+
     fun defaultSignature(summary: QuarterSummary?, profile: RangerProfile?): String? =
         summary?.entries?.lastOrNull { it.snapshot.driverName == profile?.fullName }?.driverSignaturePath
 }
 
 @Composable
 fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?) {
-    val vm = appViewModel { c, _ -> ReportViewModel(c.profileRepository, c.fuelRepository) }
+    val vm = appViewModel { c, _ -> ReportViewModel(c.profileRepository, c.fuelRepository, c.settingsRepository) }
     val filter by vm.filter.collectAsStateWithLifecycle()
     val summary by vm.summary.collectAsStateWithLifecycle()
     val profile by vm.profile.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val sig = rememberSignatureState()
+    val sig = rememberSignatureFieldState()
+    var viewReceipt by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var preview by remember { mutableStateOf<List<Bitmap>?>(null) }
     var pendingSave by remember { mutableStateOf<File?>(null) }
 
     val defaultSigPath = vm.defaultSignature(summary, profile)
     val defaultSig by rememberStoredImage(defaultSigPath, 600)
-    LaunchedEffect(defaultSig) { if (defaultSig != null && !sig.hasNewDrawing) sig.existing = defaultSig }
+    LaunchedEffect(defaultSig) { if (defaultSig != null && !sig.changed) sig.existing = defaultSig }
 
     val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
         val f = pendingSave
@@ -147,7 +157,7 @@ fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?) {
         val p = profile ?: return
         busy = true
         scope.launch {
-            val sigBitmap = withContext(Dispatchers.Default) { if (sig.hasNewDrawing) sig.toBitmap() else null }
+            val sigBitmap = sig.bitmap
             val file = withContext(Dispatchers.IO) {
                 context.container.quarterReport.createPdf(s, p, sigBitmap, if (sig.hasNewDrawing || sig.existing == null) null else defaultSigPath)
             }
@@ -163,7 +173,7 @@ fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?) {
             TopBar(
                 "گزارش فصلی", onBack = onBack,
                 action = {
-                    Box(Modifier.size(44.dp).clip(CircleShape).clickable { build { pendingSave = it; saveLauncher.launch(fileName) } }, contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(44.dp).clip(CircleShape).clickable { build { vm.markReported(); pendingSave = it; saveLauncher.launch(fileName) } }, contentAlignment = Alignment.Center) {
                         Icon(Icons.Outlined.FileDownload, "ذخیره PDF", tint = MColors.Green)
                     }
                 },
@@ -225,9 +235,22 @@ fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?) {
                         TableRow(listOf("بنزین", "${s.gasolineLiters.amountText()} لیتر", s.gasolineTotal.rial()))
                         TableRow(listOf("جمع کل", "—", s.total.rial()), last = true, highlight = true)
                     }
+                    val withReceipts = s.withReceipts
+                    SectionTitle("فیش‌های پرداختی (${withReceipts.size.fa()})")
+                    if (withReceipts.isEmpty()) {
+                        Text("برای این فصل عکس رسیدی ثبت نشده است.", style = MaterialTheme.typography.bodySmall, color = MColors.Muted, modifier = Modifier.padding(horizontal = 6.dp))
+                    } else {
+                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            withReceipts.forEach { e -> ReceiptThumb(e) { viewReceipt = e.receiptPath } }
+                        }
+                        Text(
+                            "تصویر فیش‌ها در صفحات پیوست گزارش PDF هم قرار می‌گیرد.",
+                            style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(6.dp),
+                        )
+                    }
                     Spacer(Modifier.height(16.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        SignaturePad(sig, "امضای محیط‌بان", Modifier.weight(1f))
+                        SignatureField(sig, "امضای محیط‌بان", Modifier.weight(1f))
                         Box(
                             Modifier
                                 .size(110.dp)
@@ -247,15 +270,24 @@ fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?) {
                         build { f -> scope.launch { preview = withContext(Dispatchers.IO) { context.container.quarterReport.renderPages(f) } } }
                     })
                     Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinePill("ارسال", { build { Share.file(context, it, "application/pdf") } }, Modifier.weight(1f), Icons.Outlined.ShareIcon)
-                        OutlinePill("ذخیره", { build { pendingSave = it; saveLauncher.launch(fileName) } }, Modifier.weight(1f), Icons.Outlined.FileDownload)
-                        OutlinePill("چاپ", { build { Share.print(context, it, fileName) } }, Modifier.weight(1f), Icons.Outlined.Print)
+                        OutlinePill("ارسال", { build { vm.markReported(); Share.file(context, it, "application/pdf") } }, Modifier.weight(1f), Icons.Outlined.ShareIcon)
+                        OutlinePill("ذخیره", { build { vm.markReported(); pendingSave = it; saveLauncher.launch(fileName) } }, Modifier.weight(1f), Icons.Outlined.FileDownload)
+                        OutlinePill("چاپ", { build { vm.markReported(); Share.print(context, it, fileName) } }, Modifier.weight(1f), Icons.Outlined.Print)
                     }
                 }
                 Spacer(Modifier.height(120.dp))
             }
         }
         BottomBar(MainTab.REPORTS, onTab, Modifier.align(Alignment.BottomCenter))
+    }
+
+    viewReceipt?.let { path ->
+        val img by rememberStoredImage(path, 1800)
+        Dialog(onDismissRequest = { viewReceipt = null }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            Box(Modifier.fillMaxSize().background(Color(0xF0101410)).clickable { viewReceipt = null }, contentAlignment = Alignment.Center) {
+                img?.let { Image(it, null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(16.dp)) }
+            }
+        }
     }
 
     preview?.let { pages ->
@@ -314,5 +346,25 @@ private fun TableRow(cells: List<String>, last: Boolean = false, highlight: Bool
             }
         }
         if (!last) Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFEEF1EE)))
+    }
+}
+
+@Composable
+private fun ReceiptThumb(e: ir.mohitban.app.domain.model.FuelEntry, onClick: () -> Unit) {
+    val img by rememberStoredImage(e.receiptPath, 400)
+    Column(
+        Modifier
+            .width(112.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color.White)
+            .clickable(onClick = onClick)
+            .padding(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(Modifier.fillMaxWidth().height(130.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFE4E3DE)), contentAlignment = Alignment.Center) {
+            img?.let { Image(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+        }
+        Text(e.date.format().fa(), style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 4.dp))
+        Text("${e.total.rial()} ریال", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Green)
     }
 }

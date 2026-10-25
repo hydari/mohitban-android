@@ -99,7 +99,7 @@ class OnboardingViewModel(
         } else {
             saving = true
             viewModelScope.launch {
-                profiles.save(profile.toDomain(), vehicle.toDomain())
+                profiles.register(profile.toDomain(), vehicle.toDomain())
                 saving = false
                 done = true
             }

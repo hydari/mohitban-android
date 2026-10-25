@@ -19,7 +19,7 @@ import ir.mohitban.app.ui.theme.AppFonts
 class AppContainer(context: Context) {
     val db: AppDatabase = AppDatabase.create(context)
     val files = FileStore(context)
-    val profileRepository: ProfileRepository = ProfileRepositoryImpl(db)
+    val profileRepository: ProfileRepository = ProfileRepositoryImpl(db, files)
     val settingsRepository: SettingsRepository = SettingsRepositoryImpl(db)
     val fuelRepository: FuelRepository = FuelRepositoryImpl(db, files)
     val fuelForm = FuelFormRenderer(context, files)
@@ -35,6 +35,7 @@ class MohitbanApp : Application() {
         super.onCreate()
         AppFonts.init(this)
         container = AppContainer(this)
+        ir.mohitban.app.reminder.ReportReminder.schedule(this)
     }
 }
 
