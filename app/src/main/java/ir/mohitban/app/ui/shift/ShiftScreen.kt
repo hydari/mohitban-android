@@ -131,12 +131,12 @@ class ShiftViewModel(private val settings: SettingsRepository) : ViewModel() {
         else {
             val w = customWork.toIntOrNull()
             val r = customRest.toIntOrNull()
-            if (w == null || r == null || w !in 1..30 || r !in 0..30) null else w to r
+            if (w == null || r == null || w !in 1..30 || r !in 1..30) null else w to r
         }
 
     fun save() {
         val wr = draftWorkRest()
-        if (wr == null) { error = "تعداد روز کار باید ۱ تا ۳۰ و روز استراحت ۰ تا ۳۰ باشد"; return }
+        if (wr == null) { error = "تعداد روز کار باید ۱ تا ۳۰ و روز استراحت ۱ تا ۳۰ باشد"; return }
         error = null
         viewModelScope.launch {
             // a new pattern starts clean; manual day changes belong to the old one
