@@ -155,15 +155,32 @@ class GlassBackdrop(val blurred: ImageBitmap, val rootSize: IntSize)
 
 val LocalGlassBackdrop = staticCompositionLocalOf<GlassBackdrop?> { null }
 
+/** Draws the blurred backdrop that lies behind a glass element at [position] (screen coordinates). */
+fun androidx.compose.ui.graphics.drawscope.DrawScope.drawBackdrop(backdrop: GlassBackdrop?, position: Offset) {
+    if (backdrop == null) return
+    val img = backdrop.blurred
+    val root = backdrop.rootSize
+    if (root.width == 0 || root.height == 0) return
+    val scale = maxOf(root.width.toFloat() / img.width, root.height.toFloat() / img.height)
+    val w = img.width * scale
+    val h = img.height * scale
+    drawImage(
+        img,
+        dstOffset = IntOffset(((root.width - w) / 2f - position.x).roundToInt(), ((root.height - h) / 2f - position.y).roundToInt()),
+        dstSize = IntSize(w.roundToInt(), h.roundToInt()),
+        filterQuality = FilterQuality.Low,
+    )
+}
+
 /**
- * Frosted-glass (glassmorphism) card: the blurred background is drawn behind the card at the
- * card's own screen position, then a translucent tint, a light edge and a soft shadow on top.
+ * Liquid-glass card: the blurred photo behind the card at its exact screen position, a translucent
+ * tint, a specular sheen on the upper half, a light gradient rim and a soft shadow.
  */
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
     dark: Boolean = false,
-    radius: Dp = 22.dp,
+    radius: Dp = 24.dp,
     onClick: (() -> Unit)? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
@@ -172,33 +189,35 @@ fun GlassCard(
     var position by remember { mutableStateOf(Offset.Zero) }
     Row(
         modifier = modifier
-            .shadow(if (dark) 6.dp else 16.dp, shape, ambientColor = Color.Black, spotColor = Color(0x55000000))
+            .shadow(if (dark) 8.dp else 18.dp, shape, ambientColor = Color.Black, spotColor = Color(0x66000000))
             .clip(shape)
             .onGloballyPositioned { position = it.positionInRoot() }
             .drawBehind {
-                if (backdrop != null) {
-                    val img = backdrop.blurred
-                    val root = backdrop.rootSize
-                    val scale = maxOf(root.width.toFloat() / img.width, root.height.toFloat() / img.height)
-                    val w = img.width * scale
-                    val h = img.height * scale
-                    val dx = (root.width - w) / 2f - position.x
-                    val dy = (root.height - h) / 2f - position.y
-                    drawImage(
-                        img,
-                        dstOffset = IntOffset(dx.roundToInt(), dy.roundToInt()),
-                        dstSize = IntSize(w.roundToInt(), h.roundToInt()),
-                        filterQuality = FilterQuality.Low,
-                    )
-                }
+                drawBackdrop(backdrop, position)
+                // tint
+                drawRect(
+                    if (dark) Brush.verticalGradient(listOf(Color(0x3DFFFFFF), Color(0x14FFFFFF)))
+                    else Brush.verticalGradient(listOf(Color(0xD1F7FBF8), Color(0xB8E6F1EA))),
+                )
+                // specular sheen (liquid glass)
+                drawRect(
+                    Brush.verticalGradient(
+                        0f to Color.White.copy(alpha = if (dark) 0.22f else 0.45f),
+                        0.42f to Color.White.copy(alpha = 0.04f),
+                        1f to Color.Transparent,
+                    ),
+                    size = this.size.copy(height = this.size.height * 0.55f),
+                )
+                drawRect(
+                    Brush.linearGradient(
+                        listOf(Color.White.copy(alpha = 0.18f), Color.Transparent, Color.Transparent, Color.White.copy(alpha = 0.08f)),
+                        start = Offset.Zero, end = Offset(this.size.width, this.size.height),
+                    ),
+                )
             }
-            .background(
-                if (dark) Brush.verticalGradient(listOf(Color(0x47FFFFFF), Color(0x1FFFFFFF)))
-                else Brush.verticalGradient(listOf(Color(0xC7F4FAF6), Color(0xB3E8F2EC))),
-            )
             .border(
-                1.dp,
-                Brush.verticalGradient(listOf(Color(0xB3FFFFFF), Color(0x26FFFFFF))),
+                1.2.dp,
+                Brush.linearGradient(listOf(Color(0xD9FFFFFF), Color(0x33FFFFFF), Color(0x14FFFFFF), Color(0x80FFFFFF))),
                 shape,
             )
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
@@ -289,19 +308,34 @@ enum class MainTab(val title: String, val icon: ImageVector) {
     SETTINGS("تنظیمات", Icons.Outlined.Settings),
 }
 
-/** Dark green floating navigation bar. */
+/** Floating glass navigation bar (blurred photo behind it on the dashboard, frosted green elsewhere). */
 @Composable
 fun BottomBar(current: MainTab, onSelect: (MainTab) -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(24.dp)
+    val shape = RoundedCornerShape(28.dp)
+    val backdrop = LocalGlassBackdrop.current
+    var position by remember { mutableStateOf(Offset.Zero) }
     Row(
         modifier = modifier
             .navigationBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .padding(horizontal = 14.dp, vertical = 10.dp)
             .fillMaxWidth()
-            .height(70.dp)
-            .shadow(16.dp, shape)
+            .height(72.dp)
+            .shadow(20.dp, shape, ambientColor = Color.Black, spotColor = Color(0x80000000))
             .clip(shape)
-            .background(MColors.GreenNav),
+            .onGloballyPositioned { position = it.positionInRoot() }
+            .drawBehind {
+                drawBackdrop(backdrop, position)
+                drawRect(
+                    if (backdrop != null) Brush.verticalGradient(listOf(Color(0x8C0E2A18), Color(0xB30A1F12)))
+                    else Brush.verticalGradient(listOf(Color(0xE61C4A2C), Color(0xF20E2417))),
+                )
+                drawRect(
+                    Brush.verticalGradient(0f to Color.White.copy(alpha = 0.20f), 0.5f to Color.Transparent),
+                    size = this.size.copy(height = this.size.height * 0.5f),
+                )
+            }
+            .border(1.dp, Brush.verticalGradient(listOf(Color(0x99FFFFFF), Color(0x1AFFFFFF))), shape)
+            .padding(horizontal = 6.dp),
         horizontalArrangement = Arrangement.SpaceAround,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -310,17 +344,23 @@ fun BottomBar(current: MainTab, onSelect: (MainTab) -> Unit, modifier: Modifier 
             Column(
                 Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(20.dp))
+                    .then(
+                        if (on) Modifier
+                            .background(Brush.verticalGradient(listOf(Color(0x47FFFFFF), Color(0x1AFFFFFF))))
+                            .border(1.dp, Color(0x40FFFFFF), RoundedCornerShape(20.dp))
+                        else Modifier,
+                    )
                     .clickable { onSelect(tab) }
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = 7.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
-                Icon(tab.icon, tab.title, tint = if (on) Color(0xFF7FD39A) else Color(0xA6FFFFFF), modifier = Modifier.size(23.dp))
+                Icon(tab.icon, tab.title, tint = if (on) Color(0xFF9BF0B6) else Color(0xCCFFFFFF), modifier = Modifier.size(23.dp))
                 Text(
                     tab.title,
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = if (on) FontWeight.Bold else FontWeight.Normal),
-                    color = if (on) Color.White else Color(0xA6FFFFFF),
+                    color = if (on) Color.White else Color(0xBFFFFFFF),
                 )
             }
         }

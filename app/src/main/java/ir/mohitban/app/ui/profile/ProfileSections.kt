@@ -139,9 +139,6 @@ private fun TypeCard(title: String, icon: ImageVector, selected: Boolean, modifi
 
 @Composable
 fun VehicleSection(form: VehicleForm, errors: Map<String, String>, onChange: (VehicleForm) -> Unit, showErrors: Boolean) {
-    val picker = rememberImagePicker("vehicle", onImported = { onChange(form.copy(photoPath = it)) })
-    val photo by rememberStoredImage(form.photoPath, 700)
-
     FieldLabel("نوع وسیله", Icons.Outlined.DirectionsCar)
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         TypeCard("خودرو", Icons.Outlined.DirectionsCar, form.type == VehicleType.CAR, Modifier.weight(1f)) {
@@ -199,38 +196,6 @@ fun VehicleSection(form: VehicleForm, errors: Map<String, String>, onChange: (Ve
         MField(
             form.odometer, { onChange(form.copy(odometer = it)) }, label = "کیلومتر فعلی", leadingIcon = Icons.Outlined.Speed,
             numeric = NumericMode.Grouped, maxLength = 7, placeholder = "۰", error = errors["odometer"], modifier = Modifier.weight(1f),
-        )
-    }
-    FieldLabel("عکس $noun (اختیاری)")
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .height(96.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MColors.GreenTint)
-            .border(1.5.dp, Color(0xFFBFD3C5), RoundedCornerShape(16.dp))
-            .clickable { picker.openSheet() },
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        val p = photo
-        if (p != null) {
-            Image(p, null, contentScale = ContentScale.Crop, modifier = Modifier.weight(1f).fillMaxSize())
-        } else {
-            Row(Modifier.weight(1f).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                CircleIcon(Icons.Outlined.PhotoCamera, MColors.Green, Color.White, size = 44.dp)
-                Column {
-                    Text("افزودن عکس $noun", style = MaterialTheme.typography.titleSmall, color = MColors.Green)
-                    Text("در کارت خودرو و فرم سوخت نمایش داده می‌شود", style = MaterialTheme.typography.labelSmall, color = MColors.Muted)
-                }
-            }
-        }
-    }
-    if (form.photoPath != null) {
-        Text(
-            "حذف عکس",
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-            color = MColors.Error,
-            modifier = Modifier.padding(6.dp).clickable { onChange(form.copy(photoPath = null)) },
         )
     }
 }

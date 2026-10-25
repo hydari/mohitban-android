@@ -7,9 +7,9 @@ enum class VehicleType(val title: String) {
     MOTORCYCLE("موتورسیکلت"),
 }
 
-enum class FuelType(val title: String, val unit: String, val unitShort: String) {
-    GASOLINE("بنزین", "لیتر", "لیتر"),
-    CNG("گاز CNG", "کیلوگرم", "کیلو"),
+enum class FuelType(val title: String, val unit: String, val unitShort: String, val short: String) {
+    GASOLINE("بنزین", "لیتر", "لیتر", "بنزین"),
+    CNG("گاز CNG", "کیلوگرم", "کیلو", "گاز"),
 }
 
 data class RangerProfile(

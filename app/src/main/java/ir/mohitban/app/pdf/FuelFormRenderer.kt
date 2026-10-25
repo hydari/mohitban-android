@@ -21,8 +21,9 @@ import java.io.FileOutputStream
 /**
  * The official "فرم هزینه سوخت" of the Department of Environment, redrawn with exactly the
  * fields and positions of the paper form, on half an A5 sheet (A6, 105 × 148 mm).
- * One page: the form with driver / passenger signatures, an empty box for the gas station
- * stamp, and the photographed POS receipt placed in the "محل الصاق رسید پوز" box.
+ *  - page 1: the form (driver / passenger signatures, empty box for the gas station stamp,
+ *            box where the POS slip is stapled)
+ *  - page 2: the photographed POS receipt (if any)
  */
 class FuelFormRenderer(private val context: Context, private val files: FileStore) {
 
@@ -41,6 +42,12 @@ class FuelFormRenderer(private val context: Context, private val files: FileStor
         val p1 = doc.startPage(PdfDocument.PageInfo.Builder(W.toInt(), H.toInt(), 1).create())
         draw(p1.canvas, entry)
         doc.finishPage(p1)
+        val receipt = files.loadBitmap(entry.receiptPath, 1800)
+        if (receipt != null) {
+            val p2 = doc.startPage(PdfDocument.PageInfo.Builder(W.toInt(), H.toInt(), 2).create())
+            drawReceiptPage(p2.canvas, entry, receipt)
+            doc.finishPage(p2)
+        }
         val out = File(files.cacheDir, "fuel-form-${entry.date.format().replace('/', '-')}-${entry.id}.pdf")
         FileOutputStream(out).use { doc.writeTo(it) }
         doc.close()
@@ -68,14 +75,10 @@ class FuelFormRenderer(private val context: Context, private val files: FileStor
         data class Value(val text: String, val weight: Float = 1f, val fixed: Float = 0f) : Seg
     }
 
-    /**
-     * Draws one row from right to left exactly like the paper form, without dotted lines:
-     * bold labels, bold values centred in their slots, and a ruled line through the slot
-     * when the field does not apply (e.g. the gas line of a gasoline entry).
-     */
+    /** Draws one "label ..... value ..... label" row from right to left like the paper form. */
     private fun row(c: Canvas, y: Float, segs: List<Seg>, right: Float = W - M, left: Float = M) {
-        val label = PdfKit.text(9.8f, true)
-        val value = PdfKit.text(11f, true, Color.rgb(12, 16, 14))
+        val label = PdfKit.text(9.5f, true)
+        val value = PdfKit.text(12f, true, PdfKit.INK)
         val gap = 3f
         val fixed = segs.sumOf {
             when (it) {
@@ -86,6 +89,7 @@ class FuelFormRenderer(private val context: Context, private val files: FileStor
         val weights = segs.filterIsInstance<Seg.Value>().filter { it.fixed == 0f }.sumOf { it.weight.toDouble() }.toFloat()
         val flexTotal = (right - left - fixed).coerceAtLeast(10f)
         var x = right
+        val dots = PdfKit.dotted(1.1f, Color.rgb(95, 105, 95))
         for (s in segs) {
             when (s) {
                 is Seg.Label -> {
@@ -94,11 +98,12 @@ class FuelFormRenderer(private val context: Context, private val files: FileStor
                 }
                 is Seg.Value -> {
                     val w = if (s.fixed > 0f) s.fixed else flexTotal * (s.weight / weights.coerceAtLeast(0.01f))
-                    if (s.text == "—" || s.text.isEmpty()) {
-                        // not applicable: rule a line through the empty slot
-                        c.drawLine(x - w * 0.88f, y - 3.5f, x - w * 0.12f, y - 3.5f, PdfKit.stroke(1.1f, Color.rgb(40, 44, 42)))
-                    } else {
-                        PdfKit.fitLine(c, s.text, x - w / 2, y, value, w - 4f, Align.CENTER)
+                    c.drawLine(x - w, y + 2f, x, y + 2f, dots)
+                    val txt = s.text
+                    if (txt.isNotEmpty()) {
+                        val muted = txt == "—"
+                        val p = if (muted) PdfKit.text(10f, false, PdfKit.MUTED) else value
+                        PdfKit.fitLine(c, txt, x - w / 2, y - 1f, p, w - 4f, Align.CENTER)
                     }
                     x -= w + gap
                 }
@@ -110,47 +115,49 @@ class FuelFormRenderer(private val context: Context, private val files: FileStor
         val s = e.snapshot
         // ---------- header ----------
         emblem?.let { PdfKit.bitmapFit(c, it, RectF(W / 2 - 18f, 10f, W / 2 + 18f, 46f)) }
-        PdfKit.line(c, "ریاست جمهوری", W / 2, 59f, PdfKit.text(9.8f, true), Align.CENTER)
-        PdfKit.fitLine(c, "اداره کل حفاظت محیط زیست ${s.province}", W / 2, 72f, PdfKit.text(9.5f, true), W - 2 * M, Align.CENTER)
+        PdfKit.line(c, "ریاست جمهوری", W / 2, 59f, PdfKit.text(9.5f, true), Align.CENTER)
+        PdfKit.fitLine(c, "اداره کل حفاظت محیط زیست ${s.province}", W / 2, 72f, PdfKit.text(9.2f, true), W - 2 * M, Align.CENTER)
         c.drawLine(62f, 80f, W - 62f, 80f, PdfKit.stroke(1.3f, PdfKit.GREEN))
-        PdfKit.line(c, "فرم هزینه سوخت خودرو", W / 2, 91f, PdfKit.text(7.5f, true, PdfKit.GREEN), Align.CENTER)
+        PdfKit.line(c, "فرم هزینه سوخت خودرو", W / 2, 91f, PdfKit.text(7.5f, false, PdfKit.GREEN), Align.CENTER)
 
-        // ---------- city: centred on the page ----------
+        // ---------- city (centred, as on the paper form) ----------
         run {
-            val lab = PdfKit.text(9.8f, true)
-            val v = PdfKit.text(11f, true, Color.rgb(12, 16, 14))
-            val labText = "شهرستان :"
-            val gap = 6f
-            val total = lab.measureText(labText) + gap + v.measureText(s.city)
+            val lab = PdfKit.text(9.5f, true)
+            val labW = lab.measureText("شهرستان")
+            val valW = 92f
+            val total = labW + 4f + valW
             val right = W / 2 + total / 2
-            PdfKit.line(c, labText, right, 113f, lab, Align.RIGHT)
-            PdfKit.line(c, s.city, right - lab.measureText(labText) - gap, 113f, v, Align.RIGHT)
+            row(c, 110f, listOf(Seg.Label("شهرستان"), Seg.Value(s.city, fixed = valW)), right = right, left = right - total)
         }
 
-        // ---------- vehicle number with a larger red plate ----------
+        // ---------- vehicle number with the red plate ----------
         run {
-            val y = 145f
-            val lab = PdfKit.text(9.8f, true)
-            val labText = if (s.vehicleType == ir.mohitban.app.domain.model.VehicleType.MOTORCYCLE) "شماره موتورسیکلت :" else "شماره خودرو :"
-            PdfKit.line(c, labText, W - M, y, lab, Align.RIGHT)
-            val areaRight = W - M - lab.measureText(labText) - 6f
-            val isCar = s.plate is ir.mohitban.app.domain.model.Plate.Car
-            val plateH = if (isCar) 27f else 21f
+            val y = 141f
+            val lab = PdfKit.text(9.5f, true)
+            PdfKit.line(c, "شماره خودرو :", W - M, y, lab, Align.RIGHT)
+            val labW = lab.measureText("شماره خودرو :") + 6f
+            val areaRight = W - M - labW
+            val areaLeft = M
+            c.drawLine(areaLeft, y + 2f, areaRight, y + 2f, PdfKit.dotted(1.1f, Color.rgb(95, 105, 95)))
+            // centre the plate over the dotted line
             val tmp = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
-            val pw = PdfKit.plate(Canvas(tmp), s.plate, 400f, 0f, plateH)
+            val probe = Canvas(tmp)
+            val plateH = if (s.plate is ir.mohitban.app.domain.model.Plate.Car) 27f else 20f
+            val pw = PdfKit.plate(probe, s.plate, 400f, 0f, plateH)
             tmp.recycle()
-            val cx = (M + areaRight) / 2
-            val cy = if (isCar) y - 9f else y - 12f
+            val cx = (areaLeft + areaRight) / 2
+            val cy = if (s.plate is ir.mohitban.app.domain.model.Plate.Car) y - 9f else y - 10f
+            c.drawRect(cx - pw / 2 - 3f, cy - plateH, cx + pw / 2 + 3f, y + 4f, PdfKit.fill(Color.WHITE))
             PdfKit.plate(c, s.plate, cx + pw / 2, cy, plateH)
         }
 
         // ---------- odometer ----------
-        row(c, 176f, listOf(Seg.Label("کیلومتر فعلی :"), Seg.Value(e.odometer.rial())))
+        row(c, 168f, listOf(Seg.Label("کیلومتر فعلی"), Seg.Value(e.odometer.rial())))
 
-        // ---------- gasoline / gas lines (the line that does not apply is ruled through) ----------
+        // ---------- gasoline / gas lines ----------
         val isGas = e.fuelType == FuelType.CNG
         row(
-            c, 202f,
+            c, 194f,
             listOf(
                 Seg.Label("مقدار بنزین"),
                 Seg.Value(if (!isGas) e.amount.amountText() else "—", 1f),
@@ -161,7 +168,7 @@ class FuelFormRenderer(private val context: Context, private val files: FileStor
             ),
         )
         row(
-            c, 228f,
+            c, 220f,
             listOf(
                 Seg.Label("مقدار گاز :"),
                 Seg.Value(if (isGas) e.amount.amountText() else "—", 1f),
@@ -174,7 +181,7 @@ class FuelFormRenderer(private val context: Context, private val files: FileStor
 
         // ---------- date & total ----------
         row(
-            c, 255f,
+            c, 248f,
             listOf(
                 Seg.Label("تاریخ :"),
                 Seg.Value(e.date.format().fa(), 1f),
@@ -185,51 +192,59 @@ class FuelFormRenderer(private val context: Context, private val files: FileStor
         )
 
         // ---------- signatures ----------
-        val sigLabel = PdfKit.text(9.8f, true)
+        val sigLabel = PdfKit.text(9.5f, true)
         val half = (W - 2 * M) / 2
         val rightCenter = W - M - half / 2
         val leftCenter = M + half / 2
-        PdfKit.line(c, "امضاء راننده", rightCenter, 276f, sigLabel, Align.CENTER)
-        PdfKit.line(c, "امضاء سرنشین", leftCenter, 276f, sigLabel, Align.CENTER)
+        PdfKit.line(c, "امضاء راننده", rightCenter, 272f, sigLabel, Align.CENTER)
+        PdfKit.line(c, "امضاء سرنشین", leftCenter, 272f, sigLabel, Align.CENTER)
         files.loadBitmap(e.driverSignaturePath, 700)?.let {
-            PdfKit.bitmapFit(c, it, RectF(rightCenter - 52f, 280f, rightCenter + 52f, 314f))
+            PdfKit.bitmapFit(c, it, RectF(rightCenter - 52f, 276f, rightCenter + 52f, 312f))
         }
-        PdfKit.line(c, e.snapshot.driverName, rightCenter, 322f, PdfKit.text(7f, true, PdfKit.MUTED), Align.CENTER)
+        PdfKit.line(c, e.snapshot.driverName, rightCenter, 320f, PdfKit.text(7f, false, PdfKit.MUTED), Align.CENTER)
         val passenger = files.loadBitmap(e.passengerSignaturePath, 700)
         if (passenger != null) {
-            PdfKit.bitmapFit(c, passenger, RectF(leftCenter - 52f, 280f, leftCenter + 52f, 314f))
+            PdfKit.bitmapFit(c, passenger, RectF(leftCenter - 52f, 276f, leftCenter + 52f, 312f))
         } else {
-            c.drawLine(leftCenter - 24f, 298f, leftCenter + 24f, 298f, PdfKit.stroke(1.1f, Color.rgb(40, 44, 42)))
+            PdfKit.line(c, "—", leftCenter, 298f, PdfKit.text(10f, false, PdfKit.MUTED), Align.CENTER)
         }
 
-        // ---------- stamp box & POS slip box (the receipt photo is placed in its box) ----------
+        // ---------- stamp box & POS slip box ----------
         val top = 330f
-        val bottom = 404f
+        val bottom = 400f
         val boxGap = 8f
         val boxW = (W - 2 * M - boxGap) / 2
         val stampBox = RectF(W - M - boxW, top, W - M, bottom)
         val slipBox = RectF(M, top, M + boxW, bottom)
         val dash = PdfKit.dashed(0.9f, Color.rgb(120, 135, 118), 3.5f, 2.5f)
         c.drawRoundRect(stampBox, 6f, 6f, dash)
-        PdfKit.paragraph(c, "مهر و امضاء فروشنده شرکت نفت", stampBox.right - 4f, top + 5f, boxW - 8f, PdfKit.text(8.4f, true), Align.CENTER)
-        val receipt = files.loadBitmap(e.receiptPath, 1400)
-        if (receipt != null) {
-            c.drawRoundRect(slipBox, 6f, 6f, PdfKit.stroke(0.8f, Color.rgb(170, 180, 166)))
-            PdfKit.bitmapFit(c, receipt, RectF(slipBox.left + 3f, slipBox.top + 3f, slipBox.right - 3f, slipBox.bottom - 3f))
-            receipt.recycle()
-        } else {
-            c.drawRoundRect(slipBox, 6f, 6f, dash)
-            PdfKit.line(c, "محل الصاق رسید پوز", slipBox.centerX(), top + 16f, PdfKit.text(8.2f, true, PdfKit.MUTED), Align.CENTER)
-            val sx = slipBox.centerX()
-            val st = PdfKit.stroke(1.4f, PdfKit.MUTED)
-            c.drawLine(sx - 11f, top + 35f, sx + 11f, top + 35f, st)
-            c.drawLine(sx - 11f, top + 35f, sx - 11f, top + 39f, st)
-            c.drawLine(sx + 11f, top + 35f, sx + 11f, top + 39f, st)
-            PdfKit.line(c, "منگنه", sx, top + 50f, PdfKit.text(7f, true, PdfKit.MUTED), Align.CENTER)
+        c.drawRoundRect(slipBox, 6f, 6f, dash)
+        PdfKit.paragraph(c, "مهر و امضاء فروشنده شرکت نفت", stampBox.right - 4f, top + 5f, boxW - 8f, PdfKit.text(8.2f, true), Align.CENTER)
+        PdfKit.line(c, "محل الصاق رسید پوز", slipBox.centerX(), top + 14f, PdfKit.text(8f, false, PdfKit.MUTED), Align.CENTER)
+        // staple mark
+        val sx = slipBox.centerX()
+        val st = PdfKit.stroke(1.4f, PdfKit.MUTED)
+        c.drawLine(sx - 11f, top + 33f, sx + 11f, top + 33f, st)
+        c.drawLine(sx - 11f, top + 33f, sx - 11f, top + 37f, st)
+        c.drawLine(sx + 11f, top + 33f, sx + 11f, top + 37f, st)
+        PdfKit.line(c, "منگنه", sx, top + 48f, PdfKit.text(7f, false, PdfKit.MUTED), Align.CENTER)
+        if (e.receiptPath != null) {
+            PdfKit.line(c, "تصویر رسید در صفحه ۲", sx, top + 60f, PdfKit.text(6.5f, false, PdfKit.GREEN), Align.CENTER)
         }
 
         // ---------- footer ----------
         val foot = if (e.id > 0) "شماره ثبت ${e.id.fa()} | تهیه‌شده با اپلیکیشن محیط‌یار" else "تهیه‌شده با اپلیکیشن محیط‌یار"
-        PdfKit.line(c, foot, W / 2, 415f, PdfKit.text(5.8f, false, Color.rgb(140, 150, 142)), Align.CENTER)
+        PdfKit.line(c, foot, W / 2, 413f, PdfKit.text(5.8f, false, Color.rgb(140, 150, 142)), Align.CENTER)
+    }
+
+    private fun drawReceiptPage(c: Canvas, e: FuelEntry, receipt: Bitmap) {
+        PdfKit.line(c, "پیوست فرم هزینه سوخت | رسید کارتخوان", W / 2, 24f, PdfKit.text(9f, true), Align.CENTER)
+        PdfKit.line(
+            c, "${e.date.formatLong().fa()} | ${e.fuelType.short} | ${e.total.rial()} ریال",
+            W / 2, 37f, PdfKit.text(7.5f, false, PdfKit.MUTED), Align.CENTER,
+        )
+        val box = RectF(M, 46f, W - M, H - M)
+        PdfKit.bitmapFit(c, receipt, box)
+        c.drawRect(box, PdfKit.stroke(0.5f, Color.rgb(210, 214, 210)))
     }
 }

@@ -251,22 +251,7 @@ fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?) {
                         )
                     }
                     Spacer(Modifier.height(16.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        SignatureField(sig, "امضای محیط‌بان", Modifier.weight(1f))
-                        Box(
-                            Modifier
-                                .size(110.dp)
-                                .drawBehind {
-                                    drawCircle(
-                                        Color(0xFF9DB3A4), radius = size.minDimension / 2 - 2.dp.toPx(),
-                                        style = Stroke(width = 2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(14f, 10f))),
-                                    )
-                                },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text("محل مهر\nرئیس اداره", style = MaterialTheme.typography.labelSmall, color = Color(0xFF8DA294), textAlign = TextAlign.Center)
-                        }
-                    }
+                    SignatureField(sig, "امضای محیط‌بان", Modifier.fillMaxWidth())
                     Spacer(Modifier.height(18.dp))
                     PillButton("مشاهده گزارش A4", icon = Icons.Outlined.Visibility, loading = busy, onClick = {
                         build { f -> scope.launch { preview = withContext(Dispatchers.IO) { context.container.quarterReport.renderPages(f) } } }

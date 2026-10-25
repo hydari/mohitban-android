@@ -14,12 +14,12 @@ android {
 
     defaultConfig {
         applicationId = "ir.mohitban.app"
-        minSdk = 24
+        minSdk = 21
         targetSdk = 35
         // every GitHub build gets a higher version so it installs as an update
         val run = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
         versionCode = run
-        versionName = "1.1.$run"
+        versionName = "1.0"
         vectorDrawables { useSupportLibrary = true }
     }
 

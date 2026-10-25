@@ -69,9 +69,9 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
         val lastTop = if (pages.size == 1) firstTableTop else CONT_TOP
         val lastBottom = lastTop + HEAD_H + pages.last().count() * ROW_H + ROW_H
         val extraPage = lastBottom + FINAL_BLOCK > CONTENT_BOTTOM
-        // appendix: photos of the POS receipts (فیش‌های پرداختی), four per page
+        // appendix: photos of the POS receipts (فیش‌های پرداختی), twelve per A4 page (4 × 3)
         val receipts = s.entries.mapIndexedNotNull { i, e -> if (e.receiptPath != null) (i + 1) to e else null }
-        val receiptPages = receipts.chunked(4)
+        val receiptPages = receipts.chunked(12)
         val totalPages = pages.size + (if (extraPage) 1 else 0) + receiptPages.size
 
         val doc = PdfDocument()
@@ -80,7 +80,7 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
             val c = page.canvas
             watermark(c)
             val tableTop = if (pi == 0) {
-                header(c, s, profile)
+                header(c, s, profile, receiptPages.size)
                 firstTableTop
             } else {
                 PdfKit.line(c, "ادامه گزارش فصلی هزینه سوخت | ${s.season.title} ${s.year.fa()}", W - M, 48f, PdfKit.text(10f, true, PdfKit.GREEN))
@@ -145,7 +145,7 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
         emblem?.let { PdfKit.bitmapFit(c, it, RectF(W / 2 - 150f, H / 2 - 150f, W / 2 + 150f, H / 2 + 150f), alpha = 14) }
     }
 
-    private fun header(c: Canvas, s: QuarterSummary, p: RangerProfile) {
+    private fun header(c: Canvas, s: QuarterSummary, p: RangerProfile, attachmentPages: Int) {
         emblem?.let { PdfKit.bitmapFit(c, it, RectF(W - M - 54f, 30f, W - M, 84f)) }
         PdfKit.line(c, "ریاست جمهوری", W / 2, 46f, PdfKit.text(11f, true), Align.CENTER)
         PdfKit.line(c, "اداره کل حفاظت محیط زیست ${p.province}", W / 2, 63f, PdfKit.text(11f, true), Align.CENTER)
@@ -153,7 +153,7 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
         val small = PdfKit.text(8.5f, false, PdfKit.MUTED)
         PdfKit.line(c, "شماره: ................", M, 44f, small, Align.LEFT)
         PdfKit.line(c, "تاریخ تهیه: ${JalaliDate.today().format().fa()}", M, 58f, small, Align.LEFT)
-        PdfKit.line(c, "پیوست: ندارد", M, 72f, small, Align.LEFT)
+        PdfKit.line(c, if (attachmentPages > 0) "پیوست: دارد (${attachmentPages.fa()} برگ فیش)" else "پیوست: ندارد", M, 72f, small, Align.LEFT)
         c.drawLine(M, 96f, W - M, 96f, PdfKit.stroke(1.4f, PdfKit.GREEN))
 
         // ---- info box ----
@@ -291,34 +291,38 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
     }
 
     private fun receiptsPage(c: Canvas, s: QuarterSummary, items: List<Pair<Int, ir.mohitban.app.domain.model.FuelEntry>>) {
-        PdfKit.line(c, "پیوست: فیش‌های پرداختی (رسید کارتخوان) | ${s.season.title} ${s.year.fa()}", W - M, 46f, PdfKit.text(11f, true, PdfKit.GREEN))
-        c.drawLine(M, 56f, W - M, 56f, PdfKit.stroke(1f, PdfKit.GREEN))
-        val gap = 14f
-        val cellW = (W - 2 * M - gap) / 2
-        val top0 = 68f
-        val cellH = (H - 52f - top0 - gap) / 2
+        PdfKit.line(c, "پیوست: فیش‌های پرداختی (رسید کارتخوان) | ${s.season.title} ${s.year.fa()}", W - M, 40f, PdfKit.text(10.5f, true, PdfKit.GREEN))
+        c.drawLine(M, 48f, W - M, 48f, PdfKit.stroke(1f, PdfKit.GREEN))
+        val cols = 4
+        val rows = 3
+        val gap = 7f
+        val top0 = 56f
+        val cellW = (W - 2 * M - gap * (cols - 1)) / cols
+        val cellH = (H - 44f - top0 - gap * (rows - 1)) / rows
+        val cap1 = PdfKit.text(7.6f, true)
+        val cap2 = PdfKit.text(7.2f, true, PdfKit.GREEN)
         items.forEachIndexed { k, (row, e) ->
-            val col = k % 2
-            val line = k / 2
+            val col = k % cols
+            val line = k / cols
             val right = W - M - col * (cellW + gap)
             val top = top0 + line * (cellH + gap)
             val box = RectF(right - cellW, top, right, top + cellH)
-            c.drawRoundRect(box, 6f, 6f, PdfKit.stroke(0.7f, Color.rgb(200, 209, 195)))
-            val caption = "ردیف ${row.fa()} | ${e.date.format().fa()} | ${if (e.fuelType == FuelType.CNG) "گاز" else "بنزین"} | ${e.total.rial()} ریال"
-            PdfKit.fitLine(c, caption, box.right - 8f, box.top + 16f, PdfKit.text(8.5f, true), cellW - 16f)
-            val img = files.loadBitmap(e.receiptPath, 1100)
-            val imgBox = RectF(box.left + 8f, box.top + 24f, box.right - 8f, box.bottom - 8f)
+            c.drawRoundRect(box, 5f, 5f, PdfKit.stroke(0.6f, Color.rgb(200, 209, 195)))
+            PdfKit.fitLine(c, "ردیف ${row.fa()} | ${e.date.format().fa()}", box.centerX(), box.top + 11f, cap1, cellW - 8f, Align.CENTER)
+            PdfKit.fitLine(c, "${e.fuelType.short} | ${e.total.rial()} ریال", box.centerX(), box.top + 21f, cap2, cellW - 8f, Align.CENTER)
+            val img = files.loadBitmap(e.receiptPath, 1000)
+            val imgBox = RectF(box.left + 3f, box.top + 25f, box.right - 3f, box.bottom - 3f)
             if (img != null) {
                 PdfKit.bitmapFit(c, img, imgBox)
                 img.recycle()
             } else {
-                PdfKit.line(c, "تصویر رسید در دسترس نیست", imgBox.centerX(), imgBox.centerY(), PdfKit.text(9f, false, PdfKit.MUTED), Align.CENTER)
+                PdfKit.line(c, "تصویر در دسترس نیست", imgBox.centerX(), imgBox.centerY(), PdfKit.text(7.5f, false, PdfKit.MUTED), Align.CENTER)
             }
         }
     }
 
     private fun footer(c: Canvas, page: Int, total: Int) {
         c.drawLine(M, H - 34f, W - M, H - 34f, PdfKit.stroke(0.5f, Color.rgb(213, 220, 209)))
-        PdfKit.line(c, "صفحه ${page.fa()} از ${total.fa()}  |  تهیه‌شده با اپلیکیشن محیط‌یار (آفلاین)", W / 2, H - 22f, PdfKit.text(7.5f, false, Color.rgb(122, 134, 118)), Align.CENTER)
+        PdfKit.line(c, "صفحه ${page.fa()} از ${total.fa()}  |  تهیه‌شده با اپلیکیشن محیط‌یار", W / 2, H - 22f, PdfKit.text(7.5f, false, Color.rgb(122, 134, 118)), Align.CENTER)
     }
 }

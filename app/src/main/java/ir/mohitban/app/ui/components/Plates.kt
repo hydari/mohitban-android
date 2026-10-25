@@ -81,10 +81,11 @@ private fun FlagStrip(width: Dp, small: Boolean) {
         Box(Modifier.size(w, h).background(MColors.FlagGreen))
         Box(Modifier.size(w, h).background(Color.White))
         Box(Modifier.size(w, h).background(MColors.FlagRed))
-        if (!small) {
-            Spacer(Modifier.height(2.dp))
-            Text("I.R.\nIRAN", color = Color.White, fontSize = (width * 0.26f).sp(), lineHeight = (width * 0.3f).sp(), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
-        }
+        Spacer(Modifier.height(if (small) 1.dp else 2.dp))
+        Text(
+            "I.R.\nIRAN", color = Color.White, fontSize = (width * 0.26f).sp(), lineHeight = (width * 0.29f).sp(),
+            textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, softWrap = false,
+        )
     }
 }
 
@@ -100,9 +101,10 @@ private fun plateStyle(size: TextUnit) = TextStyle(
 @Composable
 fun RedCarPlate(plate: Plate.Car, height: Dp = 46.dp, modifier: Modifier = Modifier) {
     val small = height < 40.dp
+    Box(modifier) {
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Row(
-            modifier
+            Modifier
                 .height(height)
                 .width(IntrinsicSize.Max)
                 .clip(RoundedCornerShape(height * 0.14f))
@@ -110,7 +112,7 @@ fun RedCarPlate(plate: Plate.Car, height: Dp = 46.dp, modifier: Modifier = Modif
                 .border(height * 0.05f, Color(0xFF1B1B1B), RoundedCornerShape(height * 0.14f)),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            FlagStrip(height * if (small) 0.32f else 0.36f, small)
+            FlagStrip(height * if (small) 0.38f else 0.4f, small)
             Row(
                 Modifier.padding(horizontal = height * 0.2f),
                 verticalAlignment = Alignment.CenterVertically,
@@ -131,14 +133,16 @@ fun RedCarPlate(plate: Plate.Car, height: Dp = 46.dp, modifier: Modifier = Modif
             }
         }
     }
+    }
 }
 
 /** Red government motorcycle plate: two rows. [height] is the whole plate height. */
 @Composable
 fun RedMotoPlate(plate: Plate.Motorcycle, height: Dp = 70.dp, modifier: Modifier = Modifier) {
+    Box(modifier) {
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Row(
-            modifier
+            Modifier
                 .height(height)
                 .width(IntrinsicSize.Max)
                 .clip(RoundedCornerShape(height * 0.12f))
@@ -156,6 +160,7 @@ fun RedMotoPlate(plate: Plate.Motorcycle, height: Dp = 70.dp, modifier: Modifier
                 Text(plate.bottom.fa(), style = plateStyle((height * 0.33f).sp()).copy(letterSpacing = (height * 0.04f).sp()))
             }
         }
+    }
     }
 }
 
@@ -219,9 +224,10 @@ fun CarPlateInput(plate: Plate.Car, onChange: (Plate.Car) -> Unit, modifier: Mod
     val r3 = remember { FocusRequester() }
     var letterOpen by remember { mutableStateOf(false) }
     val h = 64.dp
+    Box(modifier) {
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Row(
-            modifier
+            Modifier
                 .height(h)
                 .width(IntrinsicSize.Max)
                 .clip(RoundedCornerShape(9.dp))
@@ -266,6 +272,7 @@ fun CarPlateInput(plate: Plate.Car, onChange: (Plate.Car) -> Unit, modifier: Mod
             }
         }
     }
+    }
 }
 
 /** Editable red motorcycle plate; rows accept 2–5 and 4–6 digits. */
@@ -273,9 +280,10 @@ fun CarPlateInput(plate: Plate.Car, onChange: (Plate.Car) -> Unit, modifier: Mod
 fun MotoPlateInput(plate: Plate.Motorcycle, onChange: (Plate.Motorcycle) -> Unit, modifier: Modifier = Modifier) {
     val r1 = remember { FocusRequester() }
     val r2 = remember { FocusRequester() }
+    Box(modifier) {
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Row(
-            modifier
+            Modifier
                 .height(104.dp)
                 .width(IntrinsicSize.Max)
                 .clip(RoundedCornerShape(11.dp))
@@ -294,5 +302,6 @@ fun MotoPlateInput(plate: Plate.Motorcycle, onChange: (Plate.Motorcycle) -> Unit
                 PlateDigitBox(plate.bottom, { onChange(plate.copy(bottom = it)) }, PlateRules.MOTO_BOTTOM_MAX, 28.dp.sp(), 100.dp, r2, null)
             }
         }
+    }
     }
 }

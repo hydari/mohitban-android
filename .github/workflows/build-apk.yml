@@ -67,9 +67,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v1.0.${{ github.run_number }}"
-          gh release create "$TAG" out/Mohityar.apk \
+          # one stable release "v1.0": the previous build is replaced by the newest one
+          gh release delete v1.0 --repo "${{ github.repository }}" --cleanup-tag -y || true
+          gh release create v1.0 out/Mohityar.apk \
             --repo "${{ github.repository }}" \
-            --title "محیط‌یار ${TAG}" \
-            --notes "فایل Mohityar.apk را دانلود و روی گوشی نصب کنید." \
+            --title "محیط‌یار نسخه ۱.۰" \
+            --notes "فایل Mohityar.apk را دانلود و روی گوشی نصب کنید. (ساخت شماره ${{ github.run_number }})" \
             --latest

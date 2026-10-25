@@ -136,7 +136,6 @@ fun FuelFormScreen(
     }
 
     val receiptPicker = rememberImagePicker("receipt", onImported = { vm.onReceipt(it) }, rawCameraFile = onCropReceipt)
-    val vehiclePicker = rememberImagePicker("vehicle", onImported = { vm.onVehiclePhoto(it) })
 
     Column(Modifier.fillMaxSize().background(Color.White)) {
         TopBar(if (vm.isEdit) "ویرایش هزینه سوخت" else "ثبت هزینه سوخت", onBack = onBack)
@@ -148,7 +147,30 @@ fun FuelFormScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 18.dp),
         ) {
-            // ---------- date + odometer ----------
+            // ---------- 1. vehicle (chosen first) ----------
+            val vehicle = vm.vehicle
+            val isMoto = vehicle?.type == VehicleType.MOTORCYCLE
+            FieldLabel(if (isMoto) "موتورسیکلت" else "خودرو", if (isMoto) Icons.Outlined.TwoWheeler else Icons.Outlined.DirectionsCar) {
+                if (vm.vehicles.size > 1) TagBadge("برای تغییر لمس کنید", MColors.GreenLight, MColors.Green)
+            }
+            AppCard(Modifier.fillMaxWidth(), onClick = { vehicleSheet = true }) {
+                Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f).padding(start = 4.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(vehicle?.title ?: "انتخاب وسیله", style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                            Icon(Icons.Outlined.ExpandMore, null, tint = MColors.Muted, modifier = Modifier.size(20.dp))
+                        }
+                        val sub = listOfNotNull(vehicle?.kind?.takeIf { it.isNotBlank() }, vehicle?.year?.takeIf { it.isNotBlank() }?.let { "مدل ${it.fa()}" })
+                        Text(sub.joinToString(" | "), style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
+                        vehicle?.let { PlateView(it.plate, height = if (it.type == VehicleType.CAR) 34.dp else 30.dp) }
+                    }
+                }
+            }
+
+
+            FieldMessage(vm.errors["vehicle"], null)
+
+            // ---------- 2. date + odometer ----------
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 MField(
                     value = vm.date.format(), onValueChange = {}, numeric = NumericMode.Digits,
@@ -167,50 +189,6 @@ fun FuelFormScreen(
                     style = MaterialTheme.typography.labelSmall, color = MColors.Muted,
                     modifier = Modifier.padding(start = 6.dp, top = 4.dp),
                 )
-            }
-
-            // ---------- vehicle ----------
-            val vehicle = vm.vehicle
-            val isMoto = vehicle?.type == VehicleType.MOTORCYCLE
-            FieldLabel(if (isMoto) "موتورسیکلت" else "خودرو", if (isMoto) Icons.Outlined.TwoWheeler else Icons.Outlined.DirectionsCar) {
-                if (vm.vehicles.size > 1) TagBadge("برای تغییر لمس کنید", MColors.GreenLight, MColors.Green)
-            }
-            val vPhoto by rememberStoredImage(vehicle?.photoPath, 700)
-            AppCard(Modifier.fillMaxWidth(), onClick = { vehicleSheet = true }) {
-                Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f).padding(start = 4.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(vehicle?.title ?: "انتخاب وسیله", style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                            Icon(Icons.Outlined.ExpandMore, null, tint = MColors.Muted, modifier = Modifier.size(20.dp))
-                        }
-                        val sub = listOfNotNull(vehicle?.kind?.takeIf { it.isNotBlank() }, vehicle?.year?.takeIf { it.isNotBlank() }?.let { "مدل ${it.fa()}" })
-                        Text(sub.joinToString(" | "), style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
-                        vehicle?.let { PlateView(it.plate, height = if (it.type == VehicleType.CAR) 34.dp else 30.dp) }
-                    }
-                    Box(
-                        Modifier
-                            .size(width = 128.dp, height = 96.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MColors.GreenTint)
-                            .border(1.5.dp, Color(0xFFBFD3C5), RoundedCornerShape(14.dp))
-                            .clickable { vehiclePicker.openSheet() },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        val p = vPhoto
-                        if (p != null) {
-                            Image(p, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                            CircleIcon(
-                                Icons.Outlined.PhotoCamera, MColors.Green, Color.White, size = 30.dp, iconSize = 16.dp,
-                                modifier = Modifier.align(Alignment.BottomStart).padding(6.dp),
-                            )
-                        } else {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                CircleIcon(Icons.Outlined.PhotoCamera, MColors.Green, Color.White, size = 40.dp, iconSize = 20.dp)
-                                Text("افزودن عکس خودرو", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Green, modifier = Modifier.padding(top = 6.dp))
-                            }
-                        }
-                    }
-                }
             }
 
             // ---------- fuel type ----------
@@ -261,10 +239,6 @@ fun FuelFormScreen(
                             Spacer(Modifier.width(4.dp))
                             Text("ریال", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = MColors.Green, modifier = Modifier.padding(bottom = 4.dp))
                         }
-                        Text(
-                            "${vm.amount.ifBlank { "0" }.fa().replace('.', '٫')} × ${vm.unitPrice.rial()}",
-                            style = MaterialTheme.typography.labelSmall, color = MColors.Muted,
-                        )
                     }
                 }
             }

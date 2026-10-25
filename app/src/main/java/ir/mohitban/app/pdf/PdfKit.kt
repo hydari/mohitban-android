@@ -61,12 +61,17 @@ object PdfKit {
             Align.CENTER -> Layout.Alignment.ALIGN_CENTER
             Align.LEFT -> Layout.Alignment.ALIGN_OPPOSITE
         }
-        val layout = StaticLayout.Builder.obtain(s, 0, s.length, p, width.toInt())
-            .setAlignment(alignment)
-            .setTextDirection(TextDirectionHeuristics.RTL)
-            .setLineSpacing(0f, spacing)
-            .setIncludePad(false)
-            .build()
+        val layout = if (android.os.Build.VERSION.SDK_INT >= 23) {
+            StaticLayout.Builder.obtain(s, 0, s.length, p, width.toInt())
+                .setAlignment(alignment)
+                .setTextDirection(TextDirectionHeuristics.RTL)
+                .setLineSpacing(0f, spacing)
+                .setIncludePad(false)
+                .build()
+        } else {
+            @Suppress("DEPRECATION")
+            StaticLayout(s, p, width.toInt(), alignment, spacing, 0f, false)
+        }
         c.save()
         c.translate(right - width, top)
         layout.draw(c)
@@ -119,12 +124,16 @@ object PdfKit {
     private fun flag(c: Canvas, left: Float, top: Float, w: Float, h: Float) {
         c.drawRect(left, top, left + w, top + h, fill(PLATE_BLUE))
         val sw = w * 0.56f
-        val sh = h * 0.08f
+        val sh = h * 0.07f
         val sx = left + (w - sw) / 2
-        var sy = top + h * 0.22f
+        var sy = top + h * 0.14f
         listOf(Color.rgb(35, 159, 64), Color.WHITE, Color.rgb(218, 0, 0)).forEach {
             c.drawRect(sx, sy, sx + sw, sy + sh, fill(it)); sy += sh
         }
+        // "I.R. IRAN" under the flag, like the real plate
+        val t = text(minOf(w * 0.3f, h * 0.15f), true, Color.WHITE)
+        line(c, "I.R.", left + w / 2, top + h * 0.62f, t, Align.CENTER)
+        line(c, "IRAN", left + w / 2, top + h * 0.82f, t, Align.CENTER)
     }
 
     private fun carPlate(c: Canvas, p: Plate.Car, right: Float, cy: Float, h: Float): Float {

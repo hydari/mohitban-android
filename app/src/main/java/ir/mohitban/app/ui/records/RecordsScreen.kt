@@ -3,6 +3,7 @@ package ir.mohitban.app.ui.records
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.outlined.Close
@@ -228,7 +229,7 @@ fun RecordsScreen(onEdit: (Long) -> Unit, onTab: (MainTab) -> Unit, onBack: (() 
     toDelete?.let { e ->
         ConfirmDialog(
             title = "حذف ثبت سوخت",
-            text = "ثبت ${e.fuelType.title} تاریخ ${e.date.format().fa()} به مبلغ ${e.total.rial()} ریال حذف شود؟ این کار برگشت‌پذیر نیست.",
+            text = "ثبت ${e.fuelType.short} تاریخ ${e.date.format().fa()} به مبلغ ${e.total.rial()} ریال حذف شود؟ این کار برگشت‌پذیر نیست.",
             confirm = "حذف",
             danger = true,
             onConfirm = { vm.delete(e.id); toDelete = null },
@@ -250,7 +251,7 @@ private fun EntryCard(e: FuelEntry, onOpen: () -> Unit, onPdf: () -> Unit, onIma
                     size = 42.dp,
                 )
                 Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
-                    Text("${e.fuelType.title} | ${e.amount.amountText()} ${e.fuelType.unit}", style = MaterialTheme.typography.titleSmall)
+                    Text("${e.fuelType.short} | ${e.amount.amountText()} ${e.fuelType.unit}", style = MaterialTheme.typography.titleSmall)
                     Text(
                         "${e.date.formatLong().fa()} | کیلومتر ${e.odometer.rial()}",
                         style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 3.dp),
@@ -320,10 +321,10 @@ private fun FormPreviewDialog(e: FuelEntry, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(
             Modifier
-                .fillMaxSize()
-                .background(Color(0xF2101410))
-                .statusBarsPadding()
-                .navigationBarsPadding()
+                .fillMaxWidth(0.96f)
+                .fillMaxHeight(0.88f)
+                .clip(RoundedCornerShape(24.dp))
+                .background(Color(0xF7101410))
                 .padding(16.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {

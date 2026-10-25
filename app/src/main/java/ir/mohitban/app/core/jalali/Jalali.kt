@@ -22,8 +22,8 @@ data class JalaliDate(val year: Int, val month: Int, val day: Int) : Comparable<
 
     fun plusMonths(months: Int): JalaliDate {
         val total = (year * 12 + (month - 1)) + months
-        val y = Math.floorDiv(total, 12)
-        val m = Math.floorMod(total, 12) + 1
+        val y = fdiv(total, 12)
+        val m = fmod(total, 12) + 1
         val d = minOf(day, Jalali.monthLength(y, m))
         return JalaliDate(y, m, d)
     }
@@ -168,8 +168,16 @@ object Jalali {
     }
 
     /** 0 = شنبه … 6 = جمعه. (JDN mod 7: 0 = Monday) */
-    fun dayOfWeek(jdn: Int): Int = Math.floorMod(jdn + 2, 7)
+    fun dayOfWeek(jdn: Int): Int = fmod(jdn + 2, 7)
 
     fun isValid(jy: Int, jm: Int, jd: Int): Boolean =
         jy in -60..3176 && jm in 1..12 && jd >= 1 && jd <= monthLength(jy, jm)
 }
+
+/** floor division / modulo (Math.floorDiv / floorMod need Android 7+). */
+internal fun fdiv(a: Int, b: Int): Int {
+    val q = a / b
+    return if ((a % b != 0) && ((a xor b) < 0)) q - 1 else q
+}
+
+internal fun fmod(a: Int, b: Int): Int = a - fdiv(a, b) * b

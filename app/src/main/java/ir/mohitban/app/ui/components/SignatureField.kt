@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -125,12 +126,14 @@ fun SignatureField(
     if (open) {
         val pad = rememberSignatureState()
         Dialog(onDismissRequest = { open = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            // a centred card (not edge to edge) so the buttons are never hidden behind the navigation bar
+            Box(Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 24.dp), contentAlignment = Alignment.Center) {
             Column(
                 Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.82f)
+                    .clip(RoundedCornerShape(26.dp))
                     .background(Color.White)
-                    .statusBarsPadding()
-                    .navigationBarsPadding()
                     .padding(16.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -167,6 +170,7 @@ fun SignatureField(
                             .clickable { state.set(null); open = false }.padding(6.dp),
                     )
                 }
+            }
             }
         }
     }
