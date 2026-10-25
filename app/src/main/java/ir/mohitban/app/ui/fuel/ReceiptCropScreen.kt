@@ -2,9 +2,9 @@ package ir.mohitban.app.ui.fuel
 
 import android.graphics.Bitmap
 import android.graphics.PointF
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.scaleIn
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.material.icons.outlined.Crop
@@ -112,12 +112,15 @@ fun ReceiptCropScreen(rawPath: String, onDone: (String) -> Unit, onCancel: () ->
             val r = result
             if (r != null) {
                 val img = remember(r) { r.asImageBitmap() }
-                AnimatedVisibility(visible = true, enter = fadeIn() + scaleIn(initialScale = 0.9f)) {
-                    Image(
-                        img, "رسید برش‌خورده", contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
-                    )
-                }
+                val appear = remember(r) { Animatable(0f) }
+                LaunchedEffect(r) { appear.animateTo(1f, tween(350)) }
+                Image(
+                    img, "رسید برش‌خورده", contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { alpha = appear.value; scaleX = 0.9f + 0.1f * appear.value; scaleY = 0.9f + 0.1f * appear.value }
+                        .clip(RoundedCornerShape(8.dp)),
+                )
             } else if (b == null || corners.size != 4) {
                 CircularProgressIndicator(color = Color.White)
             } else {
