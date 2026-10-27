@@ -54,6 +54,7 @@ object Routes {
     const val VEHICLES = "vehicles"
     const val ALERTS = "alerts"
     const val SHIFT = "shift"
+    const val GASHT = "gasht"
     const val VEHICLE = "vehicle/{id}"
 
     fun fuel(id: Long = 0L) = "fuel?entryId=$id"
@@ -80,7 +81,7 @@ private fun NavHostController.openTab(tab: MainTab) {
 }
 
 @Composable
-fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0) {
+fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0, openGashtRequest: Int = 0) {
     val nav = rememberNavController()
     val context = LocalContext.current
     var started by remember { mutableStateOf(false) }
@@ -88,6 +89,10 @@ fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0) {
     // a tap on the quarterly-report reminder opens the reports tab
     LaunchedEffect(openReportsRequest, started) {
         if (openReportsRequest > 0 && started) nav.openTab(MainTab.REPORTS)
+    }
+    // a tap on the گشت‌یار notification (recording / off-route) opens it
+    LaunchedEffect(openGashtRequest, started) {
+        if (openGashtRequest > 0 && started && nav.currentDestination?.route != Routes.GASHT) nav.navigate(Routes.GASHT)
     }
     // a tap on the shift reminder opens the shift calendar
     LaunchedEffect(openShiftRequest, started) {
@@ -124,6 +129,7 @@ fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0) {
                 onSettings = { nav.openTab(MainTab.SETTINGS) },
                 onAlerts = { nav.navigate(Routes.ALERTS) },
                 onShift = { nav.navigate(Routes.SHIFT) },
+                onGasht = { nav.navigate(Routes.GASHT) },
                 onTab = { nav.openTab(it) },
             )
         }
@@ -195,6 +201,9 @@ fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0) {
                     }
                 },
             )
+        }
+        composable(Routes.GASHT) {
+            ir.mohitban.app.ui.gasht.GashtScreen(onBack = { nav.popBackStack() })
         }
         composable(Routes.SHIFT) {
             ir.mohitban.app.ui.shift.ShiftScreen(onBack = { nav.popBackStack() })

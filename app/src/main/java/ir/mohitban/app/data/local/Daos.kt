@@ -100,3 +100,69 @@ interface FuelEntryDao {
     @Query("DELETE FROM fuel_entry")
     suspend fun clear()
 }
+
+@Dao
+interface GashtDao {
+    @Query("SELECT * FROM tracks ORDER BY createdAt DESC")
+    fun observeTracks(): Flow<List<TrackEntity>>
+
+    @Query("SELECT * FROM tracks ORDER BY createdAt DESC")
+    suspend fun getTracks(): List<TrackEntity>
+
+    @Query("SELECT * FROM tracks WHERE id = :id")
+    suspend fun getTrack(id: Long): TrackEntity?
+
+    @Insert
+    suspend fun insertTrack(t: TrackEntity): Long
+
+    @Update
+    suspend fun updateTrack(t: TrackEntity)
+
+    @Query("UPDATE tracks SET name = :name WHERE id = :id")
+    suspend fun renameTrack(id: Long, name: String)
+
+    @Query("DELETE FROM tracks WHERE id = :id")
+    suspend fun deleteTrack(id: Long)
+
+    @Query("SELECT * FROM track_points WHERE trackId = :trackId ORDER BY seq ASC")
+    suspend fun points(trackId: Long): List<TrackPointEntity>
+
+    @Query("SELECT * FROM track_points WHERE trackId = :trackId ORDER BY seq ASC")
+    fun observePoints(trackId: Long): Flow<List<TrackPointEntity>>
+
+    @Query("SELECT COALESCE(MAX(seq), -1) FROM track_points WHERE trackId = :trackId")
+    suspend fun lastSeq(trackId: Long): Int
+
+    @Insert
+    suspend fun insertPoints(points: List<TrackPointEntity>)
+
+    @Query("DELETE FROM track_points WHERE trackId = :trackId")
+    suspend fun deletePoints(trackId: Long)
+
+    @Query("SELECT * FROM waypoints ORDER BY createdAt DESC")
+    fun observeWaypoints(): Flow<List<WaypointEntity>>
+
+    @Query("SELECT * FROM waypoints ORDER BY createdAt DESC")
+    suspend fun getWaypoints(): List<WaypointEntity>
+
+    @Insert
+    suspend fun insertWaypoint(w: WaypointEntity): Long
+
+    @Insert
+    suspend fun insertWaypoints(w: List<WaypointEntity>)
+
+    @Query("SELECT * FROM waypoints WHERE id = :id")
+    suspend fun getWaypoint(id: Long): WaypointEntity?
+
+    @Query("DELETE FROM waypoints WHERE id = :id")
+    suspend fun deleteWaypoint(id: Long)
+
+    @Query("DELETE FROM tracks")
+    suspend fun clearTracks()
+
+    @Query("DELETE FROM track_points")
+    suspend fun clearPoints()
+
+    @Query("DELETE FROM waypoints")
+    suspend fun clearWaypoints()
+}

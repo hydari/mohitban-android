@@ -126,6 +126,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.layout.navigationBarsPadding
 import ir.mohitban.app.ui.alerts.AlertSeen
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.outlined.Explore
 
 data class DashboardState(
     val profile: RangerProfile? = null,
@@ -173,6 +174,7 @@ fun DashboardScreen(
     onSettings: () -> Unit,
     onAlerts: () -> Unit,
     onShift: () -> Unit,
+    onGasht: () -> Unit,
     onTab: (MainTab) -> Unit,
 ) {
     val vm = appViewModel { c, _ -> DashboardViewModel(c.profileRepository, c.fuelRepository, c.settingsRepository) }
@@ -334,6 +336,28 @@ fun DashboardScreen(
                             )
                         }
                     }
+                }
+
+                // ---------- گشت‌یار ----------
+                val rec by ir.mohitban.app.gasht.GashtSession.record.collectAsStateWithLifecycle()
+                GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp), dark = true, onClick = onGasht) {
+                    CircleIcon(
+                        Icons.Outlined.Explore, Color(0xFF2F7FC1), Color.White,
+                        size = 42.dp, iconSize = 21.dp, modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 10.dp),
+                    )
+                    Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                        Text("گشت‌یار", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = Color.White)
+                        Text(
+                            if (rec.active) "در حال ضبط مسیر گشت…" else "موقعیت من، ضبط مسیر، راهنمای بازگشت و ابزارها",
+                            style = MaterialTheme.typography.labelSmall, color = if (rec.active) Color(0xFFFF9C8F) else Color(0xCCFFFFFF),
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
+                    if (rec.active) Box(Modifier.padding(end = 6.dp).size(10.dp).clip(CircleShape).background(Color(0xFFE5483B)))
+                    Icon(
+                        Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = Color.White,
+                        modifier = Modifier.padding(start = 6.dp, end = 14.dp).size(20.dp),
+                    )
                 }
 
                 // ---------- main action ----------

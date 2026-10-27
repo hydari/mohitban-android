@@ -39,6 +39,28 @@ class BackupManager(
         json.put("vehicles", JSONArray().apply { db.vehicleDao().getAll().forEach { put(it.toJson()) } })
         db.settingsDao().get()?.let { json.put("settings", it.toJson()) }
         json.put("entries", JSONArray().apply { db.fuelEntryDao().getAll().forEach { put(it.toJson()) } })
+        // گشت‌یار: tracks with compact point arrays, and marked places
+        val gd = db.gashtDao()
+        json.put("tracks", JSONArray().apply {
+            gd.getTracks().forEach { t ->
+                put(JSONObject().apply {
+                    put("name", t.name); put("source", t.source); put("createdAt", t.createdAt)
+                    put("points", JSONArray().apply {
+                        gd.points(t.id).forEach { p ->
+                            put(JSONArray().apply { put(p.lat); put(p.lon); put(p.ele ?: JSONObject.NULL); put(p.time ?: JSONObject.NULL) })
+                        }
+                    })
+                })
+            }
+        })
+        json.put("waypoints", JSONArray().apply {
+            gd.getWaypoints().forEach { w ->
+                put(JSONObject().apply {
+                    put("name", w.name); put("kind", w.kind); put("lat", w.lat); put("lon", w.lon); put("ele", w.ele ?: JSONObject.NULL)
+                    put("note", w.note); put("photoPath", w.photoPath ?: JSONObject.NULL); put("createdAt", w.createdAt); put("source", w.source)
+                })
+            }
+        })
 
         val out = context.contentResolver.openOutputStream(target) ?: error("cannot open target")
         ZipOutputStream(out.buffered()).use { zip ->
@@ -80,6 +102,8 @@ class BackupManager(
             ?: listOfNotNull(json.optJSONObject("vehicle")?.toVehicle())
         val settings = json.optJSONObject("settings")?.toSettings()
         val entries = json.optJSONArray("entries")?.let { arr -> (0 until arr.length()).map { arr.getJSONObject(it).toEntry() } }.orEmpty()
+        val tracks = json.optJSONArray("tracks")
+        val places = json.optJSONArray("waypoints")
 
         db.withTransaction {
             db.fuelEntryDao().clear()
@@ -89,7 +113,43 @@ class BackupManager(
             vehicles.forEach { db.vehicleDao().insert(it) }
             settings?.let { db.settingsDao().upsert(it) }
             entries.forEach { db.fuelEntryDao().insert(it) }
+            // older backups have no گشت‌یار data: keep what is on the phone in that case
+            if (tracks != null || places != null) {
+                val gd = db.gashtDao()
+                gd.clearPoints(); gd.clearTracks(); gd.clearWaypoints()
+                tracks?.let { arr ->
+                    for (i in 0 until arr.length()) {
+                        val t = arr.getJSONObject(i)
+                        val id = gd.insertTrack(
+                            ir.mohitban.app.data.local.TrackEntity(name = t.optString("name"), source = t.optString("source", "REC"), createdAt = t.optLong("createdAt")),
+                        )
+                        val pts = t.optJSONArray("points")
+                        if (pts != null) {
+                            gd.insertPoints((0 until pts.length()).map { k ->
+                                val p = pts.getJSONArray(k)
+                                ir.mohitban.app.data.local.TrackPointEntity(
+                                    trackId = id, seq = k, lat = p.getDouble(0), lon = p.getDouble(1),
+                                    ele = if (p.isNull(2)) null else p.getDouble(2), time = if (p.isNull(3)) null else p.getLong(3),
+                                )
+                            })
+                        }
+                    }
+                }
+                places?.let { arr ->
+                    gd.insertWaypoints((0 until arr.length()).map { k ->
+                        val w = arr.getJSONObject(k)
+                        ir.mohitban.app.data.local.WaypointEntity(
+                            name = w.optString("name"), kind = w.optString("kind", "OTHER"), lat = w.getDouble("lat"), lon = w.getDouble("lon"),
+                            ele = if (w.isNull("ele")) null else w.optDouble("ele"), note = w.optString("note"),
+                            photoPath = if (w.isNull("photoPath")) null else w.optString("photoPath"),
+                            createdAt = w.optLong("createdAt"), source = w.optString("source", "MANUAL"),
+                        )
+                    })
+                }
+            }
         }
+        // track statistics are derived; recompute after restore
+        if (tracks != null) db.gashtDao().getTracks().forEach { ir.mohitban.app.gasht.GashtRepository(db, files).refreshStats(it.id) }
         // replace pictures
         files.allMedia().forEach { it.delete() }
         staging.listFiles()?.forEach { it.copyTo(File(files.mediaRoot(), it.name), overwrite = true) }

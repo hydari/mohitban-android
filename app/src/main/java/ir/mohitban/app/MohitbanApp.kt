@@ -17,6 +17,7 @@ import ir.mohitban.app.ui.theme.AppFonts
 
 /** Simple manual dependency container (no DI framework needed for an app of this size). */
 class AppContainer(context: Context) {
+    val appContext: Context = context.applicationContext
     val db: AppDatabase = AppDatabase.create(context)
     val files = FileStore(context)
     val profileRepository: ProfileRepository = ProfileRepositoryImpl(db, files)
@@ -25,6 +26,7 @@ class AppContainer(context: Context) {
     val fuelForm = FuelFormRenderer(context, files)
     val quarterReport = QuarterReportRenderer(context, files)
     val backup = BackupManager(context, db, files)
+    val gasht = ir.mohitban.app.gasht.GashtRepository(db, files)
 }
 
 class MohitbanApp : Application() {

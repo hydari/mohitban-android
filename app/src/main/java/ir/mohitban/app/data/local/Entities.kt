@@ -82,3 +82,41 @@ data class FuelEntryEntity(
     val vehicleId: Long? = null,
     val editedAt: Long? = null,
 )
+
+/** A patrol track: recorded by the app (source REC) or imported from a GPS file (source IMPORT). */
+@Entity(tableName = "tracks")
+data class TrackEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val source: String,
+    val createdAt: Long,
+    val distance: Double = 0.0,
+    val duration: Long = 0,
+    val pointCount: Int = 0,
+)
+
+@Entity(tableName = "track_points", indices = [Index("trackId")])
+data class TrackPointEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val trackId: Long,
+    val seq: Int,
+    val lat: Double,
+    val lon: Double,
+    val ele: Double? = null,
+    val time: Long? = null,
+)
+
+/** A marked place (spring, ambush spot, den, find…), saved in the field or imported. */
+@Entity(tableName = "waypoints")
+data class WaypointEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val kind: String,
+    val lat: Double,
+    val lon: Double,
+    val ele: Double? = null,
+    val note: String = "",
+    val photoPath: String? = null,
+    val createdAt: Long,
+    val source: String = "MANUAL",
+)
