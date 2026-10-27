@@ -94,6 +94,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import ir.mohitban.app.ui.components.clay
+import ir.mohitban.app.ui.components.clayInset
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -138,7 +140,7 @@ fun FuelFormScreen(
 
     val receiptPicker = rememberImagePicker("receipt", onImported = { vm.onReceipt(it) }, rawCameraFile = onCropReceipt)
 
-    Column(Modifier.fillMaxSize().background(Color.White)) {
+    Column(Modifier.fillMaxSize().background(MColors.Bg)) {
         TopBar(if (vm.isEdit) "ویرایش هزینه سوخت" else "ثبت هزینه سوخت", onBack = onBack)
         if (!vm.loaded) return@Column
         Column(
@@ -436,9 +438,7 @@ private fun FuelTypeCard(
     val shape = RoundedCornerShape(Corners.R)
     Box(
         modifier
-            .clip(shape)
-            .background(if (selected) MColors.GreenTint else Color.White)
-            .border(if (selected) 2.dp else 1.5.dp, if (selected) MColors.Green2 else MColors.Line, shape)
+            .then(if (selected) Modifier.clayInset(Corners.R, Color(0xFFDCEEE2)).border(1.5.dp, MColors.Green2, RoundedCornerShape(Corners.R)) else Modifier.clay(Corners.R, depth = 6.dp))
             .clickable(onClick = onClick)
             .padding(12.dp),
     ) {

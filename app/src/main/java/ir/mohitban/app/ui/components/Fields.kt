@@ -158,9 +158,9 @@ fun MField(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = if (big) 56.dp else 50.dp)
-                .shadow(3.dp, shape, clip = false, ambientColor = Color(0x14143C1E), spotColor = Color(0x1F143C1E))
-                .background(Color.White, shape)
-                .border(if (focused || highlight || error != null) 1.5.dp else 1.dp, borderColor, shape)
+                // pressed-in clay well; a coloured rim only when focused, valid or wrong
+                .clayInset()
+                .border(1.5.dp, if (borderColor == MColors.Line) Color.Transparent else borderColor, shape)
                 .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
                 .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,

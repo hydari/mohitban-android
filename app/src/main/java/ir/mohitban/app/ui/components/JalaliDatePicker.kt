@@ -64,7 +64,7 @@ fun JalaliDatePickerDialog(
         Column(
             Modifier
                 .clip(RoundedCornerShape(Corners.R))
-                .background(Color.White)
+                .background(Clay.Surface)
                 .padding(16.dp),
         ) {
             Text(title, style = MaterialTheme.typography.labelMedium, color = MColors.Muted)

@@ -57,6 +57,8 @@ import ir.mohitban.app.ui.components.NumericMode
 import ir.mohitban.app.ui.components.rememberImagePicker
 import ir.mohitban.app.ui.components.rememberStoredImage
 import ir.mohitban.app.ui.theme.MColors
+import ir.mohitban.app.ui.components.clay
+import ir.mohitban.app.ui.components.clayInset
 
 @Composable
 fun PersonalSection(form: ProfileForm, errors: Map<String, String>, onChange: (ProfileForm) -> Unit) {
@@ -128,9 +130,7 @@ private fun TypeCard(title: String, icon: ImageVector, selected: Boolean, modifi
     Row(
         modifier
             .height(58.dp)
-            .clip(shape)
-            .background(if (selected) MColors.GreenTint else Color.White)
-            .border(if (selected) 2.dp else 1.dp, if (selected) MColors.Green2 else MColors.Line, shape)
+            .then(if (selected) Modifier.clayInset(Corners.R, Color(0xFFDCEEE2)).border(1.5.dp, MColors.Green2, RoundedCornerShape(Corners.R)) else Modifier.clay(Corners.R, depth = 4.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,

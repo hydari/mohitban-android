@@ -207,21 +207,8 @@ fun DashboardScreen(
     val unseen = urgentCount > 0 && seenKey != Alerts.key(alerts)
     val shiftStatus = state.shift?.status(vm.today.jdn)
 
-    val blurred = ImageBitmap.imageResource(R.drawable.bg_forest_blur)
-    var rootSize by remember { mutableStateOf(IntSize.Zero) }
-    Box(Modifier.fillMaxSize().background(MColors.GreenDark).onSizeChanged { rootSize = it }) {
-        Image(painterResource(R.drawable.bg_forest), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-        Box(
-            Modifier.fillMaxSize().background(
-                Brush.verticalGradient(
-                    0f to Color(0xB3061A10),
-                    0.3f to Color(0x33061A10),
-                    0.62f to Color(0x26061A10),
-                    1f to Color(0xB3041209),
-                ),
-            ),
-        )
-        CompositionLocalProvider(LocalGlassBackdrop provides GlassBackdrop(blurred, rootSize)) {
+    Box(Modifier.fillMaxSize().background(MColors.Bg)) {
+        CompositionLocalProvider(LocalGlassBackdrop provides null) {
             Column(
                 Modifier
                     .fillMaxSize()
@@ -265,9 +252,8 @@ fun DashboardScreen(
                             profile?.fullName ?: "",
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.Black,
-                                shadow = Shadow(Color(0xCC000000), Offset(0f, 3f), 8f),
                             ),
-                            color = Color.White,
+                            color = MColors.GreenDark,
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                         val rank = profile?.rank?.takeIf { it.isNotBlank() }
@@ -278,7 +264,7 @@ fun DashboardScreen(
                                 if (rank != null) {
                                     VerifiedBadge()
                                     Text(
-                                        " $rank", style = MaterialTheme.typography.bodySmall, color = Color(0xF2FFFFFF),
+                                        " $rank", style = MaterialTheme.typography.bodySmall, color = MColors.Ink,
                                         maxLines = 1,
                                     )
                                 }
@@ -286,7 +272,7 @@ fun DashboardScreen(
                                 if (station != null) {
                                     CircleIcon(Icons.Outlined.LocationOn, Color(0xFFE5483B), Color.White, size = 17.dp, iconSize = 11.dp)
                                     Text(
-                                        " پاسگاه $station", style = MaterialTheme.typography.bodySmall, color = Color(0xE6FFFFFF),
+                                        " پاسگاه $station", style = MaterialTheme.typography.bodySmall, color = MColors.Muted,
                                         maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
                                     )
                                 }
@@ -312,11 +298,11 @@ fun DashboardScreen(
                         Text(
                             if (shiftStatus == null) "شیفت کاری" else ShiftText.title(shiftStatus),
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = if (onDuty) Color(0xFF7CF0A6) else Color.White,
+                            color = if (onDuty) ShiftColors.On else MColors.Ink,
                         )
                         Text(
                             if (shiftStatus == null) "الگوی شیفت خود را ثبت کنید" else ShiftText.detail(shiftStatus),
-                            style = MaterialTheme.typography.labelSmall, color = Color(0xCCFFFFFF), modifier = Modifier.padding(top = 2.dp),
+                            style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 2.dp),
                         )
                     }
                     if (shiftStatus != null) {
@@ -325,14 +311,14 @@ fun DashboardScreen(
                             Modifier
                                 .padding(end = 14.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(if (onDuty) ShiftColors.On else Color(0x40FFFFFF))
-                                .border(1.dp, if (onDuty) Color(0x99FFFFFF) else Color(0x33FFFFFF), RoundedCornerShape(8.dp))
+                                .background(if (onDuty) ShiftColors.On else Color(0xFFE1E7E2))
+                                .border(1.dp, if (onDuty) Color(0x99FFFFFF) else Color(0xFFD3DAD5), RoundedCornerShape(8.dp))
                                 .padding(horizontal = 12.dp, vertical = 6.dp),
                         ) {
                             Text(
                                 if (onDuty) "شیفت" else "استراحت",
                                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                color = if (onDuty) Color.White else Color(0xB3FFFFFF),
+                                color = if (onDuty) Color.White else MColors.Muted,
                             )
                         }
                     }
@@ -346,16 +332,16 @@ fun DashboardScreen(
                         size = 42.dp, iconSize = 21.dp, modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 10.dp),
                     )
                     Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                        Text("گشت‌یار", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = Color.White)
+                        Text("گشت‌یار", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Ink)
                         Text(
                             if (rec.active) "در حال ضبط مسیر گشت…" else "موقعیت من، ضبط مسیر، راهنمای بازگشت و ابزارها",
-                            style = MaterialTheme.typography.labelSmall, color = if (rec.active) Color(0xFFFF9C8F) else Color(0xCCFFFFFF),
+                            style = MaterialTheme.typography.labelSmall, color = if (rec.active) MColors.Error else MColors.Muted,
                             modifier = Modifier.padding(top = 2.dp),
                         )
                     }
                     if (rec.active) Box(Modifier.padding(end = 6.dp).size(10.dp).clip(CircleShape).background(Color(0xFFE5483B)))
                     Icon(
-                        Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = Color.White,
+                        Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = MColors.Muted,
                         modifier = Modifier.padding(start = 6.dp, end = 14.dp).size(20.dp),
                     )
                 }
@@ -381,10 +367,10 @@ fun DashboardScreen(
                             Color(0xFF2F7FC1), Color.White, size = 40.dp, iconSize = 21.dp, modifier = Modifier.padding(start = 14.dp),
                         )
                         Column(Modifier.weight(1f).padding(horizontal = 10.dp, vertical = 12.dp)) {
-                            Text(v.title, style = MaterialTheme.typography.titleSmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(v.title, style = MaterialTheme.typography.titleSmall, color = MColors.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
                                 "آخرین کیلومتر: ${v.odometer.rial()}",
-                                style = MaterialTheme.typography.labelSmall, color = Color(0xCCFFFFFF), modifier = Modifier.padding(top = 3.dp),
+                                style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 3.dp),
                             )
                         }
                         Box(Modifier.padding(start = 6.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)) {
@@ -410,18 +396,18 @@ fun DashboardScreen(
                         modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 10.dp),
                     )
                     Text(
-                        "اعلان‌ها و یادآوری‌ها", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = Color.White,
+                        "اعلان‌ها و یادآوری‌ها", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Ink,
                         modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                     )
                     if (alerts.isNotEmpty()) {
                         Box(
                             Modifier.size(24.dp).clip(CircleShape)
-                                .background(if (urgentCount > 0) Color(0xFFE5483B) else Color(0x40FFFFFF)),
+                                .background(if (urgentCount > 0) Color(0xFFE5483B) else MColors.Muted),
                             contentAlignment = Alignment.Center,
                         ) { Text(alerts.size.fa(), style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = Color.White) }
                     }
                     Icon(
-                        Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = Color.White,
+                        Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = MColors.Muted,
                         modifier = Modifier.padding(start = 8.dp, end = 14.dp).size(20.dp),
                     )
                 }
@@ -431,13 +417,13 @@ fun DashboardScreen(
                 if (entries.isNotEmpty()) {
                     GlassCard(Modifier.fillMaxWidth().padding(top = 14.dp), dark = true, onClick = onReport) {
                         Column(Modifier.padding(16.dp).weight(1f)) {
-                            Text("جمع ${vm.season.title} ${vm.year.fa()}", style = MaterialTheme.typography.labelMedium, color = Color(0xCCFFFFFF))
-                            Text("${entries.sumOf { it.total }.rial()} ریال", style = MaterialTheme.typography.titleLarge, color = Color.White, modifier = Modifier.padding(top = 2.dp))
+                            Text("جمع ${vm.season.title} ${vm.year.fa()}", style = MaterialTheme.typography.labelMedium, color = MColors.Muted)
+                            Text("${entries.sumOf { it.total }.rial()} ریال", style = MaterialTheme.typography.titleLarge, color = MColors.GreenDark, modifier = Modifier.padding(top = 2.dp))
                             val g = entries.filter { it.fuelType == FuelType.GASOLINE }.sumOf { it.amount }
                             val c = entries.filter { it.fuelType == FuelType.CNG }.sumOf { it.amount }
                             Text(
                                 "بنزین ${g.amountText()} لیتر  |  گاز ${c.amountText()} کیلوگرم",
-                                style = MaterialTheme.typography.labelSmall, color = Color(0xCCFFFFFF), modifier = Modifier.padding(top = 4.dp),
+                                style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 4.dp),
                             )
                         }
                     }
@@ -451,11 +437,11 @@ fun DashboardScreen(
                 ) {
                     Text(
                         "طراح و برنامه‌نویس: ${Developer.NAME}",
-                        style = MaterialTheme.typography.bodySmall, color = Color(0xE6FFFFFF), textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodySmall, color = MColors.Ink, textAlign = TextAlign.Center,
                     )
                     Text(
                         "محیط‌یار نسخه ${ir.mohitban.app.BuildConfigCompat.versionName(context).fa()}",
-                        style = MaterialTheme.typography.labelSmall, color = Color(0xB3FFFFFF), textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelSmall, color = MColors.Muted, textAlign = TextAlign.Center,
                         modifier = Modifier.padding(top = 2.dp),
                     )
                 }
@@ -508,8 +494,8 @@ private fun QuickTile(icon: ImageVector, title: String, subtitle: String, modifi
     GlassCard(modifier.height(86.dp), dark = true, radius = Corners.R, onClick = onClick) {
         CircleIcon(icon, color, Color.White, size = 44.dp, iconSize = 22.dp, modifier = Modifier.padding(start = 12.dp))
         Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(subtitle, style = MaterialTheme.typography.labelSmall, color = Color(0xCCFFFFFF), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 3.dp))
+            Text(title, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 3.dp))
         }
     }
 }
@@ -573,7 +559,7 @@ private fun MinimalBell(ringing: Boolean, count: Int, onClick: () -> Unit, modif
     Box(modifier.size(44.dp).clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Icon(
             if (ringing) Icons.Filled.Notifications else Icons.Outlined.NotificationsNone, "اعلان‌ها",
-            tint = if (ringing) Color(0xFFFFC21A) else Color.White,
+            tint = if (ringing) Color(0xFFFFC21A) else MColors.Ink,
             modifier = Modifier
                 .size(27.dp)
                 .graphicsLayer {

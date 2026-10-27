@@ -111,6 +111,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import ir.mohitban.app.ui.components.clay
+import ir.mohitban.app.ui.components.clayInset
 
 // ============================================================================ view-model
 
@@ -298,9 +300,8 @@ fun GashtScreen(onBack: () -> Unit) {
             listOf("نقشه", "مسیرها", "نقاط", "ابزارها").forEachIndexed { i, t ->
                 val on = vm.tab == i
                 Box(
-                    Modifier.weight(1f).height(40.dp).clip(RoundedCornerShape(Corners.R))
-                        .background(if (on) MColors.Green else Color.White)
-                        .border(1.dp, if (on) MColors.Green else MColors.Line, RoundedCornerShape(Corners.R))
+                    Modifier.weight(1f).height(40.dp)
+                        .clay(12.dp, color = if (on) MColors.Green2 else ir.mohitban.app.ui.components.Clay.Surface, depth = if (on) 6.dp else 3.dp)
                         .clickable { vm.tab = i },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -460,8 +461,7 @@ fun SmallAction(icon: ImageVector, text: String, modifier: Modifier = Modifier, 
     Row(
         modifier
             .height(40.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (enabled) color.copy(alpha = 0.1f) else MColors.Bg)
+            .then(if (enabled) Modifier.clay(10.dp, depth = 3.dp) else Modifier.clayInset(10.dp))
             .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -573,9 +573,7 @@ fun ChoiceChip(text: String, selected: Boolean, modifier: Modifier = Modifier, o
     Box(
         modifier
             .height(38.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (selected) MColors.GreenTint else Color.White)
-            .border(if (selected) 2.dp else 1.dp, if (selected) MColors.Green2 else MColors.Line, RoundedCornerShape(10.dp))
+            .then(if (selected) Modifier.clayInset(10.dp, Color(0xFFDCEEE2)).border(1.5.dp, MColors.Green2, RoundedCornerShape(10.dp)) else Modifier.clay(10.dp, depth = 3.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 6.dp),
         contentAlignment = Alignment.Center,

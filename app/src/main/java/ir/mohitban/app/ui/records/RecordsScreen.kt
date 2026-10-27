@@ -95,6 +95,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import ir.mohitban.app.ui.components.clay
+import ir.mohitban.app.ui.components.clayInset
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class RecordsViewModel(private val fuel: FuelRepository) : ViewModel() {
@@ -119,9 +121,7 @@ fun SeasonChips(selected: Season, onSelect: (Season) -> Unit, modifier: Modifier
                 Modifier
                     .weight(1f)
                     .height(42.dp)
-                    .clip(shape)
-                    .background(if (on) MColors.Green else Color.White)
-                    .border(1.5.dp, if (on) MColors.Green else MColors.Line, shape)
+                    .clay(12.dp, color = if (on) MColors.Green2 else ir.mohitban.app.ui.components.Clay.Surface, depth = if (on) 6.dp else 3.dp)
                     .clickable { onSelect(s) },
                 contentAlignment = Alignment.Center,
             ) {

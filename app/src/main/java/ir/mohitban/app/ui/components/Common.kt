@@ -79,15 +79,14 @@ fun PillButton(
     enabled: Boolean = true,
     loading: Boolean = false,
 ) {
-    val shape = RoundedCornerShape(Corners.R)
+    val press = rememberPress()
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(56.dp)
-            .shadow(if (enabled) 10.dp else 0.dp, shape, ambientColor = MColors.Green, spotColor = MColors.Green)
-            .clip(shape)
-            .background(if (enabled) MColors.Green else Color(0xFFA9C2B1))
-            .clickable(enabled = enabled && !loading, onClick = onClick),
+            .clayPress(press)
+            .clay(color = if (enabled) MColors.Green2 else Color(0xFFA9C2B1), depth = if (enabled) 10.dp else 2.dp)
+            .clickable(interactionSource = press, indication = androidx.compose.material3.ripple(), enabled = enabled && !loading, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         if (loading) {
@@ -109,13 +108,13 @@ fun PillButton(
 
 @Composable
 fun OutlinePill(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null, color: Color = MColors.Green) {
-    val shape = RoundedCornerShape(Corners.R)
+    val press = rememberPress()
     Row(
         modifier = modifier
             .height(52.dp)
-            .clip(shape)
-            .border(1.5.dp, color, shape)
-            .clickable(onClick = onClick)
+            .clayPress(press)
+            .clay(depth = 6.dp)
+            .clickable(interactionSource = press, indication = androidx.compose.material3.ripple(), onClick = onClick)
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
@@ -124,7 +123,7 @@ fun OutlinePill(text: String, onClick: () -> Unit, modifier: Modifier = Modifier
             Icon(icon, null, tint = color, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
         }
-        Text(text, color = color, style = MaterialTheme.typography.labelLarge)
+        Text(text, color = color, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold))
     }
 }
 
@@ -138,14 +137,12 @@ fun AppCard(
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val shape = RoundedCornerShape(radius)
+    val press = rememberPress()
     Column(
         modifier = modifier
-            .shadow(5.dp, shape, ambientColor = Color(0x22143C1E), spotColor = Color(0x22143C1E))
-            .clip(shape)
-            .background(Color.White)
-            .border(1.dp, Color(0xFFEEF1EE), shape)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+            .then(if (onClick != null) Modifier.clayPress(press) else Modifier)
+            .clay(radius)
+            .then(if (onClick != null) Modifier.clickable(interactionSource = press, indication = androidx.compose.material3.ripple(), onClick = onClick) else Modifier),
         content = content,
     )
 }
@@ -187,43 +184,13 @@ fun GlassCard(
     onClick: (() -> Unit)? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
-    val shape = RoundedCornerShape(radius)
-    val backdrop = LocalGlassBackdrop.current
-    var position by remember { mutableStateOf(Offset.Zero) }
+    // formerly liquid glass; now the same clay surface as every card (dark = a faint green tint)
+    val press = rememberPress()
     Row(
         modifier = modifier
-            .shadow(if (dark) 8.dp else 18.dp, shape, ambientColor = Color.Black, spotColor = Color(0x66000000))
-            .clip(shape)
-            .onGloballyPositioned { position = it.positionInRoot() }
-            .drawBehind {
-                drawBackdrop(backdrop, position)
-                // tint
-                drawRect(
-                    if (dark) Brush.verticalGradient(listOf(Color(0x3DFFFFFF), Color(0x14FFFFFF)))
-                    else Brush.verticalGradient(listOf(Color(0xD1F7FBF8), Color(0xB8E6F1EA))),
-                )
-                // specular sheen (liquid glass)
-                drawRect(
-                    Brush.verticalGradient(
-                        0f to Color.White.copy(alpha = if (dark) 0.22f else 0.45f),
-                        0.42f to Color.White.copy(alpha = 0.04f),
-                        1f to Color.Transparent,
-                    ),
-                    size = this.size.copy(height = this.size.height * 0.55f),
-                )
-                drawRect(
-                    Brush.linearGradient(
-                        listOf(Color.White.copy(alpha = 0.18f), Color.Transparent, Color.Transparent, Color.White.copy(alpha = 0.08f)),
-                        start = Offset.Zero, end = Offset(this.size.width, this.size.height),
-                    ),
-                )
-            }
-            .border(
-                1.2.dp,
-                Brush.linearGradient(listOf(Color(0xD9FFFFFF), Color(0x33FFFFFF), Color(0x14FFFFFF), Color(0x80FFFFFF))),
-                shape,
-            )
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+            .then(if (onClick != null) Modifier.clayPress(press) else Modifier)
+            .clay(radius, color = if (dark) Color(0xFFF1F6F2) else Clay.Surface)
+            .then(if (onClick != null) Modifier.clickable(interactionSource = press, indication = androidx.compose.material3.ripple(), onClick = onClick) else Modifier),
         verticalAlignment = Alignment.CenterVertically,
         content = content,
     )
@@ -356,37 +323,14 @@ enum class MainTab(val title: String, val icon: ImageVector, val color: Color) {
 /** Floating glass navigation bar (blurred photo behind it on the dashboard, frosted green elsewhere). */
 @Composable
 fun BottomBar(current: MainTab, onSelect: (MainTab) -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(Corners.R)
-    val backdrop = LocalGlassBackdrop.current
-    val glass = backdrop != null
-    var position by remember { mutableStateOf(Offset.Zero) }
+    val glass = false // every screen uses the clay bar now
     Row(
         modifier = modifier
             .navigationBarsPadding()
             .padding(horizontal = 14.dp, vertical = 10.dp)
             .fillMaxWidth()
             .height(72.dp)
-            .shadow(if (glass) 20.dp else 10.dp, shape, ambientColor = Color.Black, spotColor = if (glass) Color(0x80000000) else Color(0x40143C1E))
-            .clip(shape)
-            .onGloballyPositioned { position = it.positionInRoot() }
-            .drawBehind {
-                if (glass) {
-                    drawBackdrop(backdrop, position)
-                    drawRect(Brush.verticalGradient(listOf(Color(0x8C0E2A18), Color(0xB30A1F12))))
-                    drawRect(
-                        Brush.verticalGradient(0f to Color.White.copy(alpha = 0.20f), 0.5f to Color.Transparent),
-                        size = this.size.copy(height = this.size.height * 0.5f),
-                    )
-                } else {
-                    drawRect(Color.White)
-                }
-            }
-            .border(
-                if (glass) 1.dp else 0.8.dp,
-                if (glass) Brush.verticalGradient(listOf(Color(0x99FFFFFF), Color(0x1AFFFFFF)))
-                else Brush.verticalGradient(listOf(MColors.Green2, MColors.Green)),
-                shape,
-            )
+            .clay(depth = 12.dp)
             .padding(horizontal = 6.dp),
         horizontalArrangement = Arrangement.SpaceAround,
         verticalAlignment = Alignment.CenterVertically,
@@ -396,13 +340,9 @@ fun BottomBar(current: MainTab, onSelect: (MainTab) -> Unit, modifier: Modifier 
             Column(
                 Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(9.dp))
+                    .clip(RoundedCornerShape(12.dp))
                     .then(
-                        if (on && glass) Modifier
-                            .background(Brush.verticalGradient(listOf(Color(0x47FFFFFF), Color(0x1AFFFFFF))))
-                            .border(1.dp, Color(0x40FFFFFF), RoundedCornerShape(9.dp))
-                        else if (on) Modifier.background(MColors.GreenLight)
-                        else Modifier,
+                        if (on) Modifier.clayInset(12.dp, Color(0xFFE2EEE5)) else Modifier,
                     )
                     .clickable { onSelect(tab) }
                     .padding(vertical = 5.dp),

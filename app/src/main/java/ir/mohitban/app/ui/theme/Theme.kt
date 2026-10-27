@@ -34,7 +34,7 @@ object MColors {
     val Muted = Color(0xFF6B756F)
     val Hint = Color(0xFFA3ABA5)
     val Line = Color(0xFFE3E8E4)
-    val Bg = Color(0xFFF6F8F6)
+    val Bg = Color(0xFFE8EEE9)
     val White = Color(0xFFFFFFFF)
     val PlateRed = Color(0xFFC62828)
     val PlateBlue = Color(0xFF1D4FA3)
@@ -138,7 +138,7 @@ fun MohitbanTheme(content: @Composable () -> Unit) {
 
 /** One modest corner radius for cards, buttons, fields, dialogs and the bottom bar (formal look). */
 object Corners {
-    val R = 12.dp
+    val R = 16.dp
     val Shape = androidx.compose.foundation.shape.RoundedCornerShape(R)
     val materialShapes = androidx.compose.material3.Shapes(
         extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),

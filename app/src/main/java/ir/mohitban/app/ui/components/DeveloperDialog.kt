@@ -61,7 +61,7 @@ fun DeveloperDialog(onDismiss: () -> Unit) {
                 .widthIn(max = 380.dp)
                 .shadow(24.dp, RoundedCornerShape(Corners.R))
                 .clip(RoundedCornerShape(Corners.R))
-                .background(Color.White)
+                .background(Clay.Surface)
                 .padding(22.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {

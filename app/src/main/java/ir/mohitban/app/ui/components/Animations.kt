@@ -90,7 +90,7 @@ fun SuccessDialog(message: String, onFinished: () -> Unit, durationMs: Long = 14
             Modifier
                 .graphicsLayer { scaleX = appear.value; scaleY = appear.value }
                 .clip(RoundedCornerShape(Corners.R))
-                .background(Color.White)
+                .background(Clay.Surface)
                 .widthIn(min = 220.dp)
                 .padding(horizontal = 28.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,

@@ -134,7 +134,7 @@ fun SignatureField(
                     .fillMaxWidth()
                     .fillMaxHeight(0.82f)
                     .clip(RoundedCornerShape(Corners.R))
-                    .background(Color.White)
+                    .background(Clay.Surface)
                     .padding(16.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
