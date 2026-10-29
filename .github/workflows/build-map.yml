@@ -35,25 +35,25 @@ jobs:
           set -o pipefail
           bash maps/build_map.sh azarbaijan-sharghi 44.95 36.65 48.45 39.45 "آذربایجان شرقی — نقشه توپوگرافی" 2>&1 | tee map.log
 
-      - name: Report errors
-        if: failure()
-        run: |
-          tail -40 map.log | while IFS= read -r line; do [ -n "$line" ] && echo "::error::${line}"; done
-
-      - name: Publish previews (branch map-previews)
+      - name: Publish previews and log (branch map-previews)
+        if: always()
         run: |
           git config user.name "map-bot"
           git config user.email "map-bot@users.noreply.github.com"
-          mkdir -p /tmp/prev && cp out/preview/*.jpg /tmp/prev/
+          mkdir -p /tmp/prev
+          cp out/preview/*.jpg /tmp/prev/ 2>/dev/null || true
+          cp map.log /tmp/prev/map.log 2>/dev/null || true
+          df -h . > /tmp/prev/disk.txt
           git checkout --orphan map-previews
           git rm -rf -q . || true
-          cp /tmp/prev/*.jpg .
+          cp /tmp/prev/* .
           echo "Map previews from run ${{ github.run_number }}" > README.md
           git add -A
           git commit -q -m "Map previews (run ${{ github.run_number }})"
           git push -f origin map-previews
 
       - name: Publish map file (release map-azarbaijan-sharghi)
+        if: success()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

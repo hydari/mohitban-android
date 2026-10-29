@@ -4,6 +4,7 @@
 #   water, rivers, forest, roads, villages  <- OpenStreetMap (ODbL)
 # Usage: build_map.sh <slug> <west> <south> <east> <north> "<title>"
 set -euo pipefail
+trap 'echo "FAILED at line $LINENO: $BASH_COMMAND"' ERR
 
 SLUG="$1"; W="$2"; S="$3"; E="$4"; N="$5"; TITLE="$6"
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -16,11 +17,17 @@ echo "::group::Copernicus DEM"
 for lat in $(seq "${S%.*}" "${N%.*}"); do
   for lon in $(seq "${W%.*}" "${E%.*}"); do
     name=$(printf "Copernicus_DSM_COG_10_N%02d_00_E%03d_00_DEM" "$lat" "$lon")
-    [ -s "dem/$name.tif" ] || curl -fsSL --retry 3 -o "dem/$name.tif" "https://copernicus-dem-30m.s3.amazonaws.com/$name/$name.tif" || rm -f "dem/$name.tif"
+    [ -s "dem/$name.tif" ] && continue
+    if ! curl -fsSL --retry 3 -o "dem/$name.tif" "https://copernicus-dem-30m.s3.amazonaws.com/$name/$name.tif"; then
+      rm -f "dem/$name.tif"
+      # some border tiles are only published at 90 m
+      n90=$(printf "Copernicus_DSM_COG_30_N%02d_00_E%03d_00_DEM" "$lat" "$lon")
+      curl -fsSL --retry 3 -o "dem/$n90.tif" "https://copernicus-dem-90m.s3.amazonaws.com/$n90/$n90.tif" && echo "90 m: $n90" || { rm -f "dem/$n90.tif"; echo "no DEM: $name"; }
+    fi
   done
 done
 ls -la dem
-gdalbuildvrt -q dem.vrt dem/*.tif
+gdalbuildvrt -q -resolution highest dem.vrt dem/*.tif
 gdalwarp -q -overwrite -t_srs EPSG:3857 -te_srs EPSG:4326 -te "$W" "$S" "$E" "$N" -tr $RES $RES -tap -r bilinear \
   -co TILED=YES -co COMPRESS=DEFLATE -co PREDICTOR=3 -co BIGTIFF=YES -multi -wo NUM_THREADS=ALL_CPUS dem.vrt dem.tif
 gdalinfo dem.tif | grep -E "Size is|Origin|Pixel Size"
