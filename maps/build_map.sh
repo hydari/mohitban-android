@@ -25,8 +25,9 @@ for lat in $(seq "${S%.*}" "${N%.*}"); do
   done
 done
 ls dem30 dem90 | wc -l
-gdalbuildvrt -q dem90.vrt dem90/*.tif
-gdalbuildvrt -q dem30.vrt dem30/*.tif
+gdalbuildvrt -q -vrtnodata -32767 dem90.vrt dem90/*.tif
+# gaps between published 30 m tiles must be "no data", not 0 m, so the 90 m base shows through
+gdalbuildvrt -q -vrtnodata -32767 dem30.vrt dem30/*.tif
 # later inputs are painted over earlier ones: 90 m base first, then 30 m detail
 gdalwarp -q -overwrite -t_srs EPSG:3857 -te_srs EPSG:4326 -te "$W" "$S" "$E" "$N" -tr $RES $RES -tap -r bilinear \
   -srcnodata -32767 -dstnodata -32767 -wo SOURCE_EXTRA=4 \
