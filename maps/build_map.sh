@@ -37,7 +37,7 @@ echo "::group::relief"
 LAT_MID=$(python3 -c "print(($S+$N)/2)")
 SCALE=$(python3 -c "import math;print(math.cos(math.radians($LAT_MID)))")   # web-mercator metres -> ground metres
 gdaldem hillshade -q -multidirectional -z 1.6 -s "$SCALE" -co TILED=YES -co COMPRESS=DEFLATE -co BIGTIFF=YES dem.tif hill.tif
-gdaldem color-relief -q "$HERE/elevation.txt" dem.tif -co TILED=YES -co COMPRESS=DEFLATE -co BIGTIFF=YES tint.tif
+gdaldem color-relief -q dem.tif "$HERE/elevation.txt" tint.tif -co TILED=YES -co COMPRESS=DEFLATE -co BIGTIFF=YES
 # contours from a slightly smoothed DEM so the lines stay clean
 gdalwarp -q -overwrite -tr 38.2185141426 38.2185141426 -r average -co TILED=YES -co COMPRESS=DEFLATE dem.tif dem40.tif
 gdal_contour -q -a ele -i 50 dem40.tif contours.gpkg
