@@ -114,6 +114,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ir.mohitban.app.ui.components.clay
 import ir.mohitban.app.ui.components.clayInset
+import androidx.compose.animation.core.animateFloat
 
 // ============================================================================ view-model
 
@@ -181,8 +182,8 @@ class GashtViewModel(private val c: AppContainer) : ViewModel() {
 
     fun deleteZones() {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { ir.mohitban.app.gasht.ZoneStore.delete(ctx) }
-            applyZones(emptyList())
+            val z = withContext(Dispatchers.IO) { ir.mohitban.app.gasht.ZoneStore.delete(ctx); ir.mohitban.app.gasht.ZoneStore.load(ctx) }
+            applyZones(z)
         }
     }
 
@@ -461,14 +462,30 @@ private fun MapTab(vm: GashtViewModel) {
     var mapsDialog by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
-        if (!GpsLocation.isGpsOn(context)) {
-            AppCard(Modifier.fillMaxWidth().padding(bottom = 10.dp), onClick = {
-                runCatching { context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) }
-            }) {
-                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    CircleIcon(Icons.Outlined.GpsOff, MColors.Amber, Color.White, size = 36.dp, iconSize = 18.dp)
-                    Text("موقعیت مکانی (GPS) گوشی خاموش است. برای روشن کردن بزنید.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 10.dp))
+        // GPS switched off: a red, pulsing warning that stays until it is turned on
+        var gpsOn by remember { mutableStateOf(GpsLocation.isGpsOn(context)) }
+        LaunchedEffect(Unit) { while (true) { gpsOn = GpsLocation.isGpsOn(context); delay(1500) } }
+        if (!gpsOn) {
+            val pulse by androidx.compose.animation.core.rememberInfiniteTransition(label = "gps").animateFloat(
+                0.85f, 1f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(700), androidx.compose.animation.core.RepeatMode.Reverse), label = "gpsPulse",
+            )
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 10.dp)
+                    .clay(color = Color(0xFFD32F2F), depth = 10.dp)
+                    .clickable { runCatching { context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Outlined.GpsOff, null, tint = Color.White, modifier = Modifier.size((30 * pulse).dp))
+                Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                    Text("موقعیت مکانی (GPS) گوشی خاموش است!", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black), color = Color.White)
+                    Text("بدون GPS موقعیت، ضبط مسیر و هشدارها کار نمی‌کنند.", style = MaterialTheme.typography.labelSmall, color = Color(0xF2FFFFFF))
                 }
+                Box(
+                    Modifier.clip(RoundedCornerShape(10.dp)).background(Color.White).padding(horizontal = 12.dp, vertical = 8.dp),
+                ) { Text("روشن کن", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black), color = Color(0xFFD32F2F)) }
             }
         }
 
@@ -505,6 +522,23 @@ private fun MapTab(vm: GashtViewModel) {
                     ).joinToString(" | ")
                     Text(info, style = MaterialTheme.typography.labelMedium, color = MColors.Muted, modifier = Modifier.padding(top = 4.dp))
                     if (age > 30) Text("آخرین موقعیت ${durationText(age * 1000)} پیش", style = MaterialTheme.typography.labelSmall, color = MColors.Amber)
+                    // province, county and nearest settlement, from the built-in OpenStreetMap data
+                    val where by androidx.compose.runtime.produceState<ir.mohitban.app.gasht.Whereabouts.Result?>(null, (f.point.lat * 500).toInt(), (f.point.lon * 500).toInt()) {
+                        value = withContext(Dispatchers.Default) { runCatching { ir.mohitban.app.gasht.Whereabouts.locate(context, f.point) }.getOrNull() }
+                    }
+                    where?.takeIf { !it.isEmpty }?.let { w ->
+                        val parts = listOfNotNull(w.province?.let { "استان $it" }, w.county?.let { "شهرستان $it" })
+                        if (parts.isNotEmpty()) {
+                            Text(parts.joinToString(" | "), style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = MColors.Ink, modifier = Modifier.padding(top = 6.dp), textAlign = TextAlign.Center)
+                        }
+                        w.place?.let { pl ->
+                            val d = w.placeDistance ?: 0.0
+                            Text(
+                                if (d < 700) "در ${pl.label}" else "${CoordFormat.meters(d).fa()} از ${pl.label}",
+                                style = MaterialTheme.typography.labelMedium, color = MColors.Muted, textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
                     // which protected area the ranger is in
                     if (vm.zones.isNotEmpty()) {
                         val zs = remember(f.point, vm.zones) { ir.mohitban.app.gasht.ZoneStore.status(vm.zones, f.point) }
@@ -829,14 +863,18 @@ private fun MapsDialog(vm: GashtViewModel, onDismiss: () -> Unit) {
                 message?.let { Text(it, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = MColors.Green, modifier = Modifier.padding(top = 6.dp)) }
                 // ---- protected-area boundaries ----
                 Text("مرز مناطق چهارگانه", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), modifier = Modifier.padding(top = 16.dp))
+                val imported = ir.mohitban.app.gasht.ZoneStore.isImported(context)
                 Text(
-                    if (vm.zones.isEmpty()) "فایل مرز مناطق (GeoJSON) را وارد کنید. فقط روی همین گوشی نگه داشته می‌شود."
-                    else "${vm.zones.size.fa()} منطقه وارد شده است.",
+                    when {
+                        imported -> "${vm.zones.size.fa()} منطقه از فایلی که وارد کرده‌اید."
+                        vm.zones.isNotEmpty() -> "مرز ${vm.zones.size.fa()} منطقه‌ی استان آذربایجان شرقی در برنامه موجود است. برای مرزهای جدیدتر، فایل GeoJSON اداره را وارد کنید."
+                        else -> "فایل مرز مناطق (GeoJSON) را وارد کنید."
+                    },
                     style = MaterialTheme.typography.labelSmall, color = MColors.Muted,
                 )
                 Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SmallAction(Icons.Outlined.Layers, if (vm.zones.isEmpty()) "وارد کردن مرز مناطق" else "جایگزینی فایل", Modifier.weight(1.4f)) { zonePicker.launch(arrayOf("*/*")) }
-                    if (vm.zones.isNotEmpty()) SmallAction(Icons.Outlined.Close, "حذف", Modifier.weight(1f), color = MColors.Error) { vm.deleteZones() }
+                    SmallAction(Icons.Outlined.Layers, if (imported) "جایگزینی فایل" else "وارد کردن فایل جدیدتر", Modifier.weight(1.4f)) { zonePicker.launch(arrayOf("*/*")) }
+                    if (imported) SmallAction(Icons.Outlined.Close, "بازگشت به نسخه‌ی برنامه", Modifier.weight(1.4f), color = MColors.Error) { vm.deleteZones() }
                 }
                 vm.maps.forEach { f ->
                     Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {

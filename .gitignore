@@ -12,3 +12,6 @@
 *.jks
 # fonts are downloaded automatically at build time
 /app/src/main/assets/fonts/*.ttf
+
+# protected-area boundaries are decrypted only inside CI (see private/)
+app/src/main/assets/zones/

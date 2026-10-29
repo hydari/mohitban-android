@@ -224,8 +224,8 @@ fun DashboardScreen(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     ShimmerLogo(size = 66.dp, modifier = Modifier.padding(bottom = 4.dp))
-                    OrgPlate("سازمان حفاظت محیط زیست", 9.5.sp)
-                    if (province.isNotEmpty()) OrgPlate("اداره کل حفاظت محیط زیست استان $province", 8.5.sp)
+                    OrgPlate("سازمان حفاظت محیط زیست", 10.5.sp)
+                    if (province.isNotEmpty()) OrgPlate("اداره کل حفاظت محیط زیست استان $province", 9.5.sp)
                 }
 
                 // ---------- personal card (liquid glass): photo | name, rank · station | bell ----------
@@ -284,7 +284,7 @@ fun DashboardScreen(
 
                 // ---------- today's shift ----------
                 val onDuty = shiftStatus is ShiftStatus.OnDuty
-                GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp), dark = true, onClick = onShift) {
+                GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).height(DashH), dark = true, onClick = onShift) {
                     CircleIcon(
                         when {
                             shiftStatus == null -> Icons.Outlined.EventRepeat
@@ -292,7 +292,7 @@ fun DashboardScreen(
                             else -> Icons.Outlined.Bedtime
                         },
                         if (shiftStatus == null || onDuty) ShiftColors.On else ShiftColors.Off, Color.White,
-                        size = 42.dp, iconSize = 21.dp, modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 10.dp),
+                        size = DashIcon, iconSize = 23.dp, modifier = Modifier.padding(start = 14.dp),
                     )
                     Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                         Text(
@@ -326,10 +326,10 @@ fun DashboardScreen(
 
                 // ---------- گشت‌یار ----------
                 val rec by ir.mohitban.app.gasht.GashtSession.record.collectAsStateWithLifecycle()
-                GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp), dark = true, onClick = onGasht) {
+                GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).height(DashH), dark = true, onClick = onGasht) {
                     CircleIcon(
                         Icons.Outlined.Explore, Color(0xFF2F7FC1), Color.White,
-                        size = 42.dp, iconSize = 21.dp, modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 10.dp),
+                        size = DashIcon, iconSize = 23.dp, modifier = Modifier.padding(start = 14.dp),
                     )
                     Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                         Text("گشت‌یار", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Ink)
@@ -347,40 +347,40 @@ fun DashboardScreen(
                 }
 
                 // ---------- main action ----------
-                GlassCard(Modifier.fillMaxWidth().padding(top = 22.dp), radius = Corners.R, onClick = onFuel) {
-                    CircleIcon(Icons.Outlined.LocalGasStation, Color(0xFF239B56), Color.White, size = 70.dp, iconSize = 34.dp, modifier = Modifier.padding(14.dp))
-                    Column(Modifier.weight(1f).padding(vertical = 14.dp)) {
-                        Text("ثبت هزینه سوخت", style = MaterialTheme.typography.titleLarge, color = MColors.Ink)
-                        Text("بنزین یا گاز، رسید و امضا", style = MaterialTheme.typography.bodySmall, color = Color(0xFF3E4A44), modifier = Modifier.padding(top = 4.dp))
+                GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).height(DashH), radius = Corners.R, onClick = onFuel) {
+                    CircleIcon(Icons.Outlined.LocalGasStation, Color(0xFF239B56), Color.White, size = DashIcon, iconSize = 23.dp, modifier = Modifier.padding(start = 14.dp))
+                    Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                        Text("ثبت هزینه سوخت", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.GreenDark)
+                        Text("بنزین یا گاز، رسید و امضا", style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 2.dp))
                     }
                     CircleIcon(
                         Icons.AutoMirrored.Outlined.KeyboardArrowRight, MColors.Green.copy(alpha = 0.14f), MColors.Green,
-                        size = 34.dp, iconSize = 19.dp, modifier = Modifier.padding(end = 16.dp),
+                        size = 30.dp, iconSize = 17.dp, modifier = Modifier.padding(end = 14.dp),
                     )
                 }
 
                 // ---------- default vehicle ----------
                 state.vehicle?.let { v ->
-                    GlassCard(Modifier.fillMaxWidth().padding(top = 14.dp), dark = true, onClick = onVehicle) {
+                    GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).height(DashH), dark = true, onClick = onVehicle) {
                         CircleIcon(
                             if (v.type == VehicleType.MOTORCYCLE) Icons.Outlined.TwoWheeler else Icons.Outlined.DirectionsCar,
-                            Color(0xFF2F7FC1), Color.White, size = 40.dp, iconSize = 21.dp, modifier = Modifier.padding(start = 14.dp),
+                            Color(0xFF2F7FC1), Color.White, size = DashIcon, iconSize = 23.dp, modifier = Modifier.padding(start = 14.dp),
                         )
-                        Column(Modifier.weight(1f).padding(horizontal = 10.dp, vertical = 12.dp)) {
-                            Text(v.title, style = MaterialTheme.typography.titleSmall, color = MColors.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                            Text(v.title, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
                                 "آخرین کیلومتر: ${v.odometer.rial()}",
                                 style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 3.dp),
                             )
                         }
-                        Box(Modifier.padding(start = 6.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)) {
-                            PlateView(v.plate, height = 34.dp)
+                        Box(Modifier.padding(start = 6.dp, end = 14.dp)) {
+                            PlateView(v.plate, height = if (v.type == VehicleType.CAR) 32.dp else 28.dp)
                         }
                     }
                 }
 
                 // ---------- quick tiles ----------
-                Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     QuickTile(Icons.AutoMirrored.Outlined.FormatListBulleted, "سوابق سوخت", "${state.seasonEntries.size.fa()} ثبت در ${vm.season.title}", Modifier.weight(1f), onRecords, Color(0xFF2F7FC1))
                     QuickTile(Icons.Outlined.Assessment, "گزارش فصلی", "${vm.season.title} ${vm.year.fa()}", Modifier.weight(1f), onReport, Color(0xFFE08A1E))
                 }
@@ -390,10 +390,10 @@ fun DashboardScreen(
                 }
 
                 // ---------- alerts entry (details in their own page) ----------
-                GlassCard(Modifier.fillMaxWidth().padding(top = 14.dp), dark = true, onClick = onAlerts) {
+                GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).height(DashH), dark = true, onClick = onAlerts) {
                     CircleIcon(
-                        Icons.Outlined.NotificationsActive, Color(0xFFD99A1E), Color.White, size = 42.dp, iconSize = 21.dp,
-                        modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 10.dp),
+                        Icons.Outlined.NotificationsActive, Color(0xFFD99A1E), Color.White, size = DashIcon, iconSize = 23.dp,
+                        modifier = Modifier.padding(start = 14.dp),
                     )
                     Text(
                         "اعلان‌ها و یادآوری‌ها", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Ink,
@@ -415,15 +415,16 @@ fun DashboardScreen(
                 // ---------- season summary ----------
                 val entries = state.seasonEntries
                 if (entries.isNotEmpty()) {
-                    GlassCard(Modifier.fillMaxWidth().padding(top = 14.dp), dark = true, onClick = onReport) {
-                        Column(Modifier.padding(16.dp).weight(1f)) {
-                            Text("جمع ${vm.season.title} ${vm.year.fa()}", style = MaterialTheme.typography.labelMedium, color = MColors.Muted)
-                            Text("${entries.sumOf { it.total }.rial()} ریال", style = MaterialTheme.typography.titleLarge, color = MColors.GreenDark, modifier = Modifier.padding(top = 2.dp))
+                    GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).height(DashH), dark = true, onClick = onReport) {
+                        CircleIcon(Icons.Outlined.Assessment, Color(0xFF239B56), Color.White, size = DashIcon, iconSize = 23.dp, modifier = Modifier.padding(start = 14.dp))
+                        Column(Modifier.padding(horizontal = 12.dp).weight(1f)) {
+                            Text("جمع ${vm.season.title} ${vm.year.fa()}", style = MaterialTheme.typography.labelSmall, color = MColors.Muted)
+                            Text("${entries.sumOf { it.total }.rial()} ریال", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.GreenDark)
                             val g = entries.filter { it.fuelType == FuelType.GASOLINE }.sumOf { it.amount }
                             val c = entries.filter { it.fuelType == FuelType.CNG }.sumOf { it.amount }
                             Text(
                                 "بنزین ${g.amountText()} لیتر  |  گاز ${c.amountText()} کیلوگرم",
-                                style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 4.dp),
+                                style = MaterialTheme.typography.labelSmall, color = MColors.Muted,
                             )
                         }
                     }
@@ -491,8 +492,8 @@ private fun initials(name: String?): String {
 
 @Composable
 private fun QuickTile(icon: ImageVector, title: String, subtitle: String, modifier: Modifier, onClick: () -> Unit, color: Color) {
-    GlassCard(modifier.height(86.dp), dark = true, radius = Corners.R, onClick = onClick) {
-        CircleIcon(icon, color, Color.White, size = 44.dp, iconSize = 22.dp, modifier = Modifier.padding(start = 12.dp))
+    GlassCard(modifier.height(DashH), dark = true, radius = Corners.R, onClick = onClick) {
+        CircleIcon(icon, color, Color.White, size = DashIcon, iconSize = 23.dp, modifier = Modifier.padding(start = 12.dp))
         Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
             Text(title, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 3.dp))
@@ -584,3 +585,7 @@ private tailrec fun Context.findActivity(): android.app.Activity? = when (this) 
     is android.content.ContextWrapper -> baseContext.findActivity()
     else -> null
 }
+
+/** One height and icon size for every dashboard card, so the page reads as a tidy grid. */
+private val DashH = 78.dp
+private val DashIcon = 46.dp

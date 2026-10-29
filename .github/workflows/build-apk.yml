@@ -6,6 +6,7 @@ on:
     paths-ignore:
       - 'maps/**'
       - '.github/workflows/build-map.yml'
+      - '.github/workflows/build-geodata.yml'
   workflow_dispatch:
 
 permissions:
@@ -39,6 +40,11 @@ jobs:
           if [ -n "$MOHITBAN_KEY_PASSWORD" ]; then
             openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in signing/mohitban.jks.enc -out signing/mohitban.jks -pass env:MOHITBAN_KEY_PASSWORD
             echo "keystore sha256: $(sha256sum signing/mohitban.jks | cut -c1-16)"
+            # protected-area boundaries built into the app (kept encrypted in the repository)
+            mkdir -p app/src/main/assets/zones
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in private/zones-azarbaijan-sharghi.geojson.gz.enc \
+              -out app/src/main/assets/zones/bundled.geojson.gz -pass env:MOHITBAN_KEY_PASSWORD
+            echo "zones: $(stat -c %s app/src/main/assets/zones/bundled.geojson.gz) bytes"
           else
             echo "::warning::Secret MOHITBAN_KEY_PASSWORD is missing - the APK is signed with a temporary debug key."
           fi
