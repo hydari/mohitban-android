@@ -61,7 +61,7 @@ object ZoneTypes {
  */
 object ZoneStore {
     private const val FILE = "zones.geojson"
-    private const val BUNDLED = "zones/bundled.geojson.gz"
+    private const val BUNDLED = "zones/bundled.geojson"
 
     /** True when the boundaries come from a file the ranger imported (not the built-in ones). */
     fun isImported(context: Context) = file(context).exists()
@@ -76,9 +76,7 @@ object ZoneStore {
         val f = file(context)
         // a file the ranger imported wins; otherwise the boundaries built into the app
         val z = if (f.exists()) runCatching { parse(f.readText()) }.getOrDefault(emptyList())
-        else runCatching {
-            context.assets.open(BUNDLED).use { java.util.zip.GZIPInputStream(it).readBytes().toString(Charsets.UTF_8) }.let(::parse)
-        }.getOrDefault(emptyList())
+        else runCatching { assetText(context, BUNDLED)?.let(::parse) }.getOrNull() ?: emptyList()
         cache = z
         return z
     }

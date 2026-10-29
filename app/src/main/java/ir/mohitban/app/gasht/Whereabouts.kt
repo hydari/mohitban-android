@@ -48,18 +48,17 @@ object Whereabouts {
     @Volatile private var areas: List<Area>? = null
     @Volatile private var places: List<Settlement>? = null
 
-    fun available(context: Context): Boolean = runCatching { context.assets.list("geo")?.contains("admin.geojson.gz") == true }.getOrDefault(false)
+    fun available(context: Context): Boolean = runCatching { context.assets.list("geo")?.any { it.startsWith("admin.geojson") } == true }.getOrDefault(false)
 
-    private fun text(context: Context, name: String): String? = runCatching {
-        context.assets.open("geo/$name").use { GZIPInputStream(it).readBytes().toString(Charsets.UTF_8) }
-    }.getOrNull()
+    /** The build tool unpacks ".gz" assets and drops the extension; accept either form. */
+    private fun text(context: Context, name: String): String? = assetText(context, "geo/$name")
 
     private fun load(context: Context) {
         if (areas == null) {
-            areas = text(context, "admin.geojson.gz")?.let { parseAreas(it) } ?: emptyList()
+            areas = text(context, "admin.geojson")?.let { parseAreas(it) } ?: emptyList()
         }
         if (places == null) {
-            places = text(context, "places.tsv.gz")?.lineSequence()?.mapNotNull { line ->
+            places = text(context, "places.tsv")?.lineSequence()?.mapNotNull { line ->
                 val f = line.split('\t')
                 if (f.size < 4) null else Settlement(f[0].firstOrNull() ?: 'v', f[1].toDoubleOrNull() ?: return@mapNotNull null, f[2].toDoubleOrNull() ?: return@mapNotNull null, f[3])
             }?.toList() ?: emptyList()
@@ -115,3 +114,8 @@ object Whereabouts {
         return Result(province, county, best, realD)
     }
 }
+
+/** Reads a text asset stored either plain or gzip-compressed (with a ".gz" name). */
+internal fun assetText(context: Context, path: String): String? =
+    runCatching { context.assets.open(path).use { it.readBytes().toString(Charsets.UTF_8) } }.getOrNull()
+        ?: runCatching { context.assets.open("$path.gz").use { GZIPInputStream(it).readBytes().toString(Charsets.UTF_8) } }.getOrNull()
