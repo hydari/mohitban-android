@@ -37,20 +37,23 @@ jobs:
 
       - name: Publish previews and log (branch map-previews)
         if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          git config user.name "map-bot"
-          git config user.email "map-bot@users.noreply.github.com"
           mkdir -p /tmp/prev
           cp out/preview/*.jpg /tmp/prev/ 2>/dev/null || true
           cp map.log /tmp/prev/map.log 2>/dev/null || true
           df -h . > /tmp/prev/disk.txt
-          git checkout --orphan map-previews
-          git rm -rf -q . || true
-          cp /tmp/prev/* .
+          ls -la out work > /tmp/prev/files.txt 2>&1 || true
+          # a separate tiny repository, so the large work files are never committed
+          cd /tmp/prev
           echo "Map previews from run ${{ github.run_number }}" > README.md
+          git init -q -b map-previews
+          git config user.name "map-bot"
+          git config user.email "map-bot@users.noreply.github.com"
           git add -A
           git commit -q -m "Map previews (run ${{ github.run_number }})"
-          git push -f origin map-previews
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" map-previews
 
       - name: Publish map file (release map-azarbaijan-sharghi)
         if: success()
@@ -58,7 +61,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete map-azarbaijan-sharghi --repo "${{ github.repository }}" --cleanup-tag -y || true
-          gh release create map-azarbaijan-sharghi out/azarbaijan-sharghi.mbtiles /tmp/prev/*.jpg \
+          gh release create map-azarbaijan-sharghi out/azarbaijan-sharghi.mbtiles out/preview/*.jpg \
             --repo "${{ github.repository }}" \
             --title "نقشه آفلاین آذربایجان شرقی (گشت‌یار)" \
             --notes "فایل azarbaijan-sharghi.mbtiles را دانلود کنید و در گشت‌یار، زبانه‌ی «نقشه»، گزینه‌ی «نقشه‌های آفلاین» وارد کنید. داده‌ها: Copernicus DEM و OpenStreetMap. (ساخت شماره ${{ github.run_number }})" \
