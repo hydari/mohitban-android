@@ -160,21 +160,21 @@ class GashtViewModel(private val c: AppContainer) : ViewModel() {
     var showZones by mutableStateOf(true)
     var fitPoints by mutableStateOf<List<GeoPoint>>(emptyList())
 
-    private fun setZones(z: List<ir.mohitban.app.gasht.Zone>) {
+    private fun applyZones(z: List<ir.mohitban.app.gasht.Zone>) {
         zones = z
         mapZones = z.map { MapZone(it) }
     }
 
     init {
         viewModelScope.launch {
-            setZones(withContext(Dispatchers.IO) { ir.mohitban.app.gasht.ZoneStore.load(ctx) })
+            applyZones(withContext(Dispatchers.IO) { ir.mohitban.app.gasht.ZoneStore.load(ctx) })
         }
     }
 
     fun importZones(uri: Uri, onDone: (String) -> Unit) {
         viewModelScope.launch {
             val r = withContext(Dispatchers.IO) { runCatching { ir.mohitban.app.gasht.ZoneStore.import(ctx, uri) } }
-            r.onSuccess { setZones(it); showZones = true; onDone("${it.size.fa()} منطقه وارد شد") }
+            r.onSuccess { applyZones(it); showZones = true; onDone("${it.size.fa()} منطقه وارد شد") }
                 .onFailure { onDone("در این فایل مرز منطقه‌ای پیدا نشد (فایل GeoJSON لازم است)") }
         }
     }
@@ -182,7 +182,7 @@ class GashtViewModel(private val c: AppContainer) : ViewModel() {
     fun deleteZones() {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { ir.mohitban.app.gasht.ZoneStore.delete(ctx) }
-            setZones(emptyList())
+            applyZones(emptyList())
         }
     }
 
