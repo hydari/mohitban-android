@@ -1,0 +1,65 @@
+name: ساخت نقشه آفلاین
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'maps/**'
+      - '.github/workflows/build-map.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-map
+  cancel-in-progress: true
+
+jobs:
+  azarbaijan-sharghi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Tools (GDAL, osmium)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q gdal-bin python3-gdal python3-numpy osmium-tool
+          gdalinfo --version
+          df -h .
+
+      - name: Build map
+        run: |
+          set -o pipefail
+          bash maps/build_map.sh azarbaijan-sharghi 44.95 36.65 48.45 39.45 "آذربایجان شرقی — نقشه توپوگرافی" 2>&1 | tee map.log
+
+      - name: Report errors
+        if: failure()
+        run: |
+          tail -40 map.log | while IFS= read -r line; do [ -n "$line" ] && echo "::error::${line}"; done
+
+      - name: Publish previews (branch map-previews)
+        run: |
+          git config user.name "map-bot"
+          git config user.email "map-bot@users.noreply.github.com"
+          mkdir -p /tmp/prev && cp out/preview/*.jpg /tmp/prev/
+          git checkout --orphan map-previews
+          git rm -rf -q . || true
+          cp /tmp/prev/*.jpg .
+          echo "Map previews from run ${{ github.run_number }}" > README.md
+          git add -A
+          git commit -q -m "Map previews (run ${{ github.run_number }})"
+          git push -f origin map-previews
+
+      - name: Publish map file (release map-azarbaijan-sharghi)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete map-azarbaijan-sharghi --repo "${{ github.repository }}" --cleanup-tag -y || true
+          gh release create map-azarbaijan-sharghi out/azarbaijan-sharghi.mbtiles /tmp/prev/*.jpg \
+            --repo "${{ github.repository }}" \
+            --title "نقشه آفلاین آذربایجان شرقی (گشت‌یار)" \
+            --notes "فایل azarbaijan-sharghi.mbtiles را دانلود کنید و در گشت‌یار، زبانه‌ی «نقشه»، گزینه‌ی «نقشه‌های آفلاین» وارد کنید. داده‌ها: Copernicus DEM و OpenStreetMap. (ساخت شماره ${{ github.run_number }})" \
+            --latest=false

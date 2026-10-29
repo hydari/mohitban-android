@@ -3,6 +3,9 @@ name: ساخت APK
 on:
   push:
     branches: [ main, master ]
+    paths-ignore:
+      - 'maps/**'
+      - '.github/workflows/build-map.yml'
   workflow_dispatch:
 
 permissions:
@@ -72,9 +75,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           # one stable release "v1.0": the previous build is replaced by the newest one
-          for t in $(gh release list --repo "${{ github.repository }}" --limit 50 --json tagName -q '.[].tagName'); do
-            gh release delete "$t" --repo "${{ github.repository }}" --cleanup-tag -y || true
-          done
+          # (map releases such as map-azarbaijan-sharghi are left alone)
+          gh release delete v1.0 --repo "${{ github.repository }}" --cleanup-tag -y || true
           gh release create v1.0 out/Mohityar.apk \
             --repo "${{ github.repository }}" \
             --title "محیط‌یار نسخه ۱.۰.۰" \
