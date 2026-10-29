@@ -110,6 +110,18 @@ class MapTrack(val id: Long, val points: List<GeoPoint>, val color: Color, val w
     val ys = DoubleArray(points.size) { Geo.mercatorY(points[it].lat) }
 }
 
+/** A protected-area boundary prepared for drawing (Web Mercator rings, colour by category). */
+class MapZone(val zone: ir.mohitban.app.gasht.Zone) {
+    val color = Color(ir.mohitban.app.gasht.ZoneTypes.color(zone.type))
+    val rings: List<Pair<DoubleArray, DoubleArray>> = zone.rings.map { r ->
+        DoubleArray(r.size) { Geo.mercatorX(r[it].lon) } to DoubleArray(r.size) { Geo.mercatorY(r[it].lat) }
+    }
+    val cx = Geo.mercatorX(zone.center.lon)
+    val cy = Geo.mercatorY(zone.center.lat)
+    val minX = rings.minOf { it.first.min() }; val maxX = rings.maxOf { it.first.max() }
+    val minY = rings.minOf { it.second.min() }; val maxY = rings.maxOf { it.second.max() }
+}
+
 class MapPlace(val name: String, val point: GeoPoint, val color: Color, val highlight: Boolean = false)
 
 @Composable
@@ -124,6 +136,8 @@ fun TrackCanvas(
     labels: List<ir.mohitban.app.gasht.MapLabel> = emptyList(),
     attribution: String = "",
     initialCenter: GeoPoint? = null,
+    zones: List<MapZone> = emptyList(),
+    fitPoints: List<GeoPoint> = emptyList(),
 ) {
     var cx by remember { mutableDoubleStateOf(Double.NaN) }
     var cy by remember { mutableDoubleStateOf(Double.NaN) }
@@ -133,6 +147,13 @@ fun TrackCanvas(
     val measurer = rememberTextMeasurer()
 
     fun fitAll() {
+        if (fitPoints.isNotEmpty() && size != Size.Zero) {
+            val fx = fitPoints.map { Geo.mercatorX(it.lon) }; val fy = fitPoints.map { Geo.mercatorY(it.lat) }
+            cx = (fx.min() + fx.max()) / 2; cy = (fy.min() + fy.max()) / 2
+            mpp = (maxOf((fx.max() - fx.min()) / size.width, (fy.max() - fy.min()) / size.height) * 1.2).coerceIn(0.3, 2000.0)
+            follow = false
+            return
+        }
         val xs = tracks.flatMap { it.xs.asList() } + places.map { Geo.mercatorX(it.point.lon) } + listOfNotNull(fix?.let { Geo.mercatorX(it.point.lon) })
         val ys = tracks.flatMap { it.ys.asList() } + places.map { Geo.mercatorY(it.point.lat) } + listOfNotNull(fix?.let { Geo.mercatorY(it.point.lat) })
         if (xs.isEmpty() || size == Size.Zero) return
@@ -146,7 +167,7 @@ fun TrackCanvas(
     // first view: the selected tracks; otherwise the ranger's position
     LaunchedEffect(fitKey, size) {
         if (size == Size.Zero) return@LaunchedEffect
-        if (tracks.isNotEmpty() || places.isNotEmpty()) fitAll()
+        if (tracks.isNotEmpty() || places.isNotEmpty() || fitPoints.isNotEmpty()) fitAll()
     }
     // with a map but no GPS fix yet, open on the map's area
     LaunchedEffect(initialCenter) {
@@ -181,6 +202,36 @@ fun TrackCanvas(
             }
             val v = Viewport(cx, cy, mpp, this.size)
             background.draw(this, v)
+
+            // protected-area boundaries: light fill, solid edge, name in the middle
+            val vl = v.cx - v.size.width / 2 * v.metersPerPx; val vr = v.cx + v.size.width / 2 * v.metersPerPx
+            val vb = v.cy - v.size.height / 2 * v.metersPerPx; val vt = v.cy + v.size.height / 2 * v.metersPerPx
+            for (mz in zones) {
+                if (mz.maxX < vl || mz.minX > vr || mz.maxY < vb || mz.minY > vt) continue
+                val path = Path().apply { fillType = androidx.compose.ui.graphics.PathFillType.EvenOdd }
+                val step = if (v.metersPerPx > 60) 4 else if (v.metersPerPx > 15) 2 else 1
+                for ((xs, ys) in mz.rings) {
+                    var i = 0
+                    while (i < xs.size) {
+                        val p = v.toScreen(xs[i], ys[i])
+                        if (i == 0) path.moveTo(p.x, p.y) else path.lineTo(p.x, p.y)
+                        i += step
+                    }
+                    path.close()
+                }
+                drawPath(path, mz.color.copy(alpha = 0.10f))
+                drawPath(path, Color.White.copy(alpha = 0.8f), style = Stroke(6f, join = StrokeJoin.Round))
+                drawPath(path, mz.color, style = Stroke(3f, join = StrokeJoin.Round))
+                if (zoomOf(v.metersPerPx) >= 8.5) {
+                    val c = v.toScreen(mz.cx, mz.cy)
+                    val layout = measurer.measure(
+                        mz.zone.title,
+                        TextStyle(fontSize = 11.sp, fontFamily = AppFonts.family(), fontWeight = FontWeight.Black, color = mz.color,
+                            shadow = androidx.compose.ui.graphics.Shadow(Color.White, Offset(0f, 0f), 8f)),
+                    )
+                    drawText(layout, topLeft = Offset(c.x - layout.size.width / 2, c.y - layout.size.height / 2))
+                }
+            }
 
             // tracks
             for (t in tracks) {

@@ -107,6 +107,7 @@ class GashtService : Service() {
         private const val ALERT_CHANNEL = "gasht_alert"
         private const val NOTE_ID = 1501
         private const val ALERT_ID = 1502
+        private const val ZONE_ID = 1503
         private const val PREFS = "gasht"
         private const val KEY_TRACK = "recording_track"
     }
@@ -115,6 +116,8 @@ class GashtService : Service() {
     private var gpsJob: Job? = null
     private var lastAlarmAt = 0L
     private var starting = false
+    private var lastZone: String? = null
+    private var zoneKnown = false
     /** Work that must finish even if the service stops right away (saving a finished track). */
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -216,7 +219,41 @@ class GashtService : Service() {
             }
             if (!off) NotificationManagerCompat.from(this).cancel(ALERT_ID)
         }
+        // entering / leaving a protected area
+        val zones = ZoneStore.load(this)
+        if (zones.isNotEmpty() && acc < 60f) {
+            val now = zones.filter { it.contains(fix.point) }.minByOrNull { it.hectares ?: Double.MAX_VALUE }?.title
+            if (zoneKnown && now != lastZone) zoneAlert(entered = now, left = lastZone)
+            lastZone = now
+            zoneKnown = true
+        }
         refresh()
+    }
+
+    private fun zoneAlert(entered: String?, left: String?) {
+        val v = getSystemService(VIBRATOR_SERVICE) as? Vibrator
+        runCatching {
+            if (Build.VERSION.SDK_INT >= 26) v?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 300, 150, 300), -1))
+            else @Suppress("DEPRECATION") v?.vibrate(longArrayOf(0, 300, 150, 300), -1)
+        }
+        val title = if (entered != null) "ورود به $entered" else "خروج از $left"
+        val text = when {
+            entered != null && left != null -> "از $left خارج و وارد $entered شدید."
+            entered != null -> "اکنون داخل $entered هستید."
+            else -> "از محدوده‌ی $left خارج شدید."
+        }
+        val n = NotificationCompat.Builder(this, ALERT_CHANNEL)
+            .setSmallIcon(R.drawable.ic_stat_leaf)
+            .setColor(0xFF1B7F3B.toInt())
+            .setContentTitle(title)
+            .setContentText(text)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setContentIntent(openApp())
+            .setAutoCancel(true)
+            .build()
+        runCatching { NotificationManagerCompat.from(this).notify(ZONE_ID, n) }
     }
 
     private fun alarm(distance: Double) {

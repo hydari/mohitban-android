@@ -298,7 +298,10 @@ fun AddPlaceDialog(vm: GashtViewModel, point: GeoPoint, onDismiss: () -> Unit) {
                 vm.addPlace(
                     WaypointEntity(
                         name = name.trim().ifEmpty { kind.title }, kind = kind.name, lat = point.lat, lon = point.lon, ele = point.ele,
-                        note = note.trim(), photoPath = photo, createdAt = System.currentTimeMillis(),
+                        // remember which protected area the place is in
+                        note = (vm.zones.filter { it.contains(point) }.minByOrNull { it.hectares ?: Double.MAX_VALUE }
+                            ?.let { z -> "[${z.title}] " }.orEmpty() + note.trim()).trim(),
+                        photoPath = photo, createdAt = System.currentTimeMillis(),
                     ),
                 )
                 onDismiss()

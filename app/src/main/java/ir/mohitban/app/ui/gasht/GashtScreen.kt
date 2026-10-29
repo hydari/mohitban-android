@@ -154,6 +154,45 @@ class GashtViewModel(private val c: AppContainer) : ViewModel() {
     var labels by mutableStateOf<List<ir.mohitban.app.gasht.MapLabel>>(emptyList())
     var mapBusy by mutableStateOf(false)
 
+    // ---- protected-area boundaries (imported file, private to the phone) ----
+    var zones by mutableStateOf<List<ir.mohitban.app.gasht.Zone>>(emptyList())
+    var mapZones by mutableStateOf<List<MapZone>>(emptyList())
+    var showZones by mutableStateOf(true)
+    var fitPoints by mutableStateOf<List<GeoPoint>>(emptyList())
+
+    private fun setZones(z: List<ir.mohitban.app.gasht.Zone>) {
+        zones = z
+        mapZones = z.map { MapZone(it) }
+    }
+
+    init {
+        viewModelScope.launch {
+            setZones(withContext(Dispatchers.IO) { ir.mohitban.app.gasht.ZoneStore.load(ctx) })
+        }
+    }
+
+    fun importZones(uri: Uri, onDone: (String) -> Unit) {
+        viewModelScope.launch {
+            val r = withContext(Dispatchers.IO) { runCatching { ir.mohitban.app.gasht.ZoneStore.import(ctx, uri) } }
+            r.onSuccess { setZones(it); showZones = true; onDone("${it.size.fa()} منطقه وارد شد") }
+                .onFailure { onDone("در این فایل مرز منطقه‌ای پیدا نشد (فایل GeoJSON لازم است)") }
+        }
+    }
+
+    fun deleteZones() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { ir.mohitban.app.gasht.ZoneStore.delete(ctx) }
+            setZones(emptyList())
+        }
+    }
+
+    fun showZone(z: ir.mohitban.app.gasht.Zone) {
+        fitPoints = listOf(GeoPoint(z.south, z.west), GeoPoint(z.north, z.east))
+        showZones = true
+        fitKey++
+        tab = 0
+    }
+
     init { ir.mohitban.app.gasht.MapStore.active(ctx)?.let { openMap(it) } }
 
     private fun openMap(file: java.io.File?) {
@@ -466,6 +505,23 @@ private fun MapTab(vm: GashtViewModel) {
                     ).joinToString(" | ")
                     Text(info, style = MaterialTheme.typography.labelMedium, color = MColors.Muted, modifier = Modifier.padding(top = 4.dp))
                     if (age > 30) Text("آخرین موقعیت ${durationText(age * 1000)} پیش", style = MaterialTheme.typography.labelSmall, color = MColors.Amber)
+                    // which protected area the ranger is in
+                    if (vm.zones.isNotEmpty()) {
+                        val zs = remember(f.point, vm.zones) { ir.mohitban.app.gasht.ZoneStore.status(vm.zones, f.point) }
+                        val inside = zs.inside
+                        val text = when {
+                            inside != null -> "داخل ${inside.title}" + (zs.distance?.let { " — ${CoordFormat.meters(it).fa()} تا مرز" } ?: "")
+                            zs.nearest != null -> "خارج از مناطق — ${zs.nearest.title} در ${CoordFormat.meters(zs.distance ?: 0.0).fa()}"
+                            else -> ""
+                        }
+                        if (text.isNotEmpty()) {
+                            Text(
+                                text, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                color = if (inside != null) Color(ir.mohitban.app.gasht.ZoneTypes.color(inside.type)) else MColors.Muted,
+                                textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp),
+                            )
+                        }
+                    }
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SmallAction(Icons.Outlined.ContentCopy, "کپی", Modifier.weight(1f), enabled = f != null) {
@@ -479,6 +535,11 @@ private fun MapTab(vm: GashtViewModel) {
             }
         }
 
+        if (vm.zones.isNotEmpty()) {
+            Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ChoiceChip(if (vm.showZones) "مرز مناطق: روشن" else "مرز مناطق: خاموش", vm.showZones, Modifier.weight(1f)) { vm.showZones = !vm.showZones }
+            }
+        }
         // ---- base map choice ----
         Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             ChoiceChip("بدون نقشه", vm.activeMap == null, Modifier.weight(1f)) { vm.selectMap(null) }
@@ -516,6 +577,8 @@ private fun MapTab(vm: GashtViewModel) {
             labels = vm.labels,
             attribution = vm.activeMap?.attribution.orEmpty(),
             initialCenter = vm.activeMap?.center,
+            zones = if (vm.showZones) vm.mapZones else emptyList(),
+            fitPoints = vm.fitPoints,
         )
         if (vm.shown.isEmpty() && target == null && !record.active) {
             Text(
@@ -742,6 +805,9 @@ private fun MapsDialog(vm: GashtViewModel, onDismiss: () -> Unit) {
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) vm.importMap(uri) { message = it }
     }
+    val zonePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) vm.importZones(uri) { message = it }
+    }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = ir.mohitban.app.ui.components.Clay.Surface,
@@ -761,6 +827,17 @@ private fun MapsDialog(vm: GashtViewModel, onDismiss: () -> Unit) {
                     { picker.launch(arrayOf("*/*")) }, Modifier.padding(top = 10.dp), loading = vm.mapBusy,
                 )
                 message?.let { Text(it, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = MColors.Green, modifier = Modifier.padding(top = 6.dp)) }
+                // ---- protected-area boundaries ----
+                Text("مرز مناطق چهارگانه", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), modifier = Modifier.padding(top = 16.dp))
+                Text(
+                    if (vm.zones.isEmpty()) "فایل مرز مناطق (GeoJSON) را وارد کنید. فقط روی همین گوشی نگه داشته می‌شود."
+                    else "${vm.zones.size.fa()} منطقه وارد شده است.",
+                    style = MaterialTheme.typography.labelSmall, color = MColors.Muted,
+                )
+                Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SmallAction(Icons.Outlined.Layers, if (vm.zones.isEmpty()) "وارد کردن مرز مناطق" else "جایگزینی فایل", Modifier.weight(1.4f)) { zonePicker.launch(arrayOf("*/*")) }
+                    if (vm.zones.isNotEmpty()) SmallAction(Icons.Outlined.Close, "حذف", Modifier.weight(1f), color = MColors.Error) { vm.deleteZones() }
+                }
                 vm.maps.forEach { f ->
                     Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {

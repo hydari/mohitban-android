@@ -6,6 +6,9 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.net.Uri
 import android.os.Build
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -66,6 +69,7 @@ fun ToolsTab(vm: GashtViewModel) {
     val compass by vm.compass.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         EmergencyCard(fix)
+        if (vm.zones.isNotEmpty()) ZonesCard(vm, fix?.point)
         CompassCard(trueHeading(compass, fix), compass != null)
         AreaCard(fix?.point, fix?.accuracy)
         ConverterCard(fix?.point)
@@ -304,5 +308,42 @@ private fun TorchCard() {
             }
             Text("علامت SOS نوری در شب از فاصله‌ی دور دیده می‌شود.", style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 6.dp))
         }
+    }
+}
+
+// ---------------------------------------------------------------- protected areas
+
+@Composable
+private fun ZonesCard(vm: GashtViewModel, here: GeoPoint?) {
+    ToolCard(Icons.Outlined.Explore, Color(0xFF1B7F3B), "مناطق تحت مدیریت (${vm.zones.size.fa()})") {
+        val rows = androidx.compose.runtime.remember(vm.zones, here?.let { (it.lat * 200).toInt() to (it.lon * 200).toInt() }) {
+            vm.zones.map { z -> z to (here?.let { p -> if (z.contains(p)) 0.0 else z.roughDistance(p) }) }
+                .sortedBy { it.second ?: Double.MAX_VALUE }
+        }
+        rows.forEach { (z, d) ->
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                    .clickable { vm.showZone(z) },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                androidx.compose.foundation.layout.Box(
+                    Modifier.size(12.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color(ir.mohitban.app.gasht.ZoneTypes.color(z.type))),
+                )
+                Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                    Text(z.name, style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        z.type + (z.hectares?.let { " | ${String.format(java.util.Locale.US, "%,.0f", it).fa()} هکتار" } ?: ""),
+                        style = MaterialTheme.typography.labelSmall, color = MColors.Muted,
+                    )
+                }
+                Text(
+                    when { d == null -> ""; d == 0.0 -> "داخل منطقه"; else -> CoordFormat.meters(d).fa() },
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = if (d == 0.0) Color(0xFF1B7F3B) else MColors.Muted,
+                )
+            }
+        }
+        Text("با زدن روی هر منطقه، مرز آن روی نقشه نشان داده می‌شود.", style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 4.dp))
     }
 }
