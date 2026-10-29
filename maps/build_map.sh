@@ -14,22 +14,25 @@ cd "$WORK"
 RES=19.1092570713     # metres per pixel of web-map zoom 13 (≈15 m on the ground at 38°N)
 
 echo "::group::Copernicus DEM"
+mkdir -p dem30 dem90
 for lat in $(seq "${S%.*}" "${N%.*}"); do
   for lon in $(seq "${W%.*}" "${E%.*}"); do
-    name=$(printf "Copernicus_DSM_COG_10_N%02d_00_E%03d_00_DEM" "$lat" "$lon")
-    [ -s "dem/$name.tif" ] && continue
-    if ! curl -fsSL --retry 3 -o "dem/$name.tif" "https://copernicus-dem-30m.s3.amazonaws.com/$name/$name.tif"; then
-      rm -f "dem/$name.tif"
-      # some border tiles are only published at 90 m
-      n90=$(printf "Copernicus_DSM_COG_30_N%02d_00_E%03d_00_DEM" "$lat" "$lon")
-      curl -fsSL --retry 3 -o "dem/$n90.tif" "https://copernicus-dem-90m.s3.amazonaws.com/$n90/$n90.tif" && echo "90 m: $n90" || { rm -f "dem/$n90.tif"; echo "no DEM: $name"; }
-    fi
+    n30=$(printf "Copernicus_DSM_COG_10_N%02d_00_E%03d_00_DEM" "$lat" "$lon")
+    n90=$(printf "Copernicus_DSM_COG_30_N%02d_00_E%03d_00_DEM" "$lat" "$lon")
+    # 90 m everywhere as a seamless base; 30 m where it is published (border tiles are 90 m only)
+    [ -s "dem90/$n90.tif" ] || curl -fsSL --retry 3 -o "dem90/$n90.tif" "https://copernicus-dem-90m.s3.amazonaws.com/$n90/$n90.tif" || { rm -f "dem90/$n90.tif"; echo "no 90 m: $n90"; }
+    [ -s "dem30/$n30.tif" ] || curl -fsSL --retry 3 -o "dem30/$n30.tif" "https://copernicus-dem-30m.s3.amazonaws.com/$n30/$n30.tif" || { rm -f "dem30/$n30.tif"; echo "90 m only: $n30"; }
   done
 done
-ls -la dem
-gdalbuildvrt -q -resolution highest dem.vrt dem/*.tif
+ls dem30 dem90 | wc -l
+gdalbuildvrt -q dem90.vrt dem90/*.tif
+gdalbuildvrt -q dem30.vrt dem30/*.tif
+# later inputs are painted over earlier ones: 90 m base first, then 30 m detail
 gdalwarp -q -overwrite -t_srs EPSG:3857 -te_srs EPSG:4326 -te "$W" "$S" "$E" "$N" -tr $RES $RES -tap -r bilinear \
-  -co TILED=YES -co COMPRESS=DEFLATE -co PREDICTOR=3 -co BIGTIFF=YES -multi -wo NUM_THREADS=ALL_CPUS dem.vrt dem.tif
+  -srcnodata -32767 -dstnodata -32767 -wo SOURCE_EXTRA=4 \
+  -co TILED=YES -co COMPRESS=DEFLATE -co PREDICTOR=3 -co BIGTIFF=YES -multi -wo NUM_THREADS=ALL_CPUS dem90.vrt dem30.vrt dem.tif
+gdal_fillnodata.py -q -md 20 dem.tif dem_filled.tif -co TILED=YES -co COMPRESS=DEFLATE -co BIGTIFF=YES && mv dem_filled.tif dem.tif
+gdal_edit.py -unsetnodata dem.tif
 gdalinfo dem.tif | grep -E "Size is|Origin|Pixel Size"
 echo "::endgroup::"
 
