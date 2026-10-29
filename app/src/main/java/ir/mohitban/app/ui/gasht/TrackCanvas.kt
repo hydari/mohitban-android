@@ -121,6 +121,9 @@ fun TrackCanvas(
     modifier: Modifier = Modifier,
     background: MapBackground = GridBackground,
     fitKey: Any? = null,
+    labels: List<ir.mohitban.app.gasht.MapLabel> = emptyList(),
+    attribution: String = "",
+    initialCenter: GeoPoint? = null,
 ) {
     var cx by remember { mutableDoubleStateOf(Double.NaN) }
     var cy by remember { mutableDoubleStateOf(Double.NaN) }
@@ -144,6 +147,11 @@ fun TrackCanvas(
     LaunchedEffect(fitKey, size) {
         if (size == Size.Zero) return@LaunchedEffect
         if (tracks.isNotEmpty() || places.isNotEmpty()) fitAll()
+    }
+    // with a map but no GPS fix yet, open on the map's area
+    LaunchedEffect(initialCenter) {
+        val c = initialCenter ?: return@LaunchedEffect
+        if (cx.isNaN() && fix == null) { cx = Geo.mercatorX(c.lon); cy = Geo.mercatorY(c.lat); mpp = 150.0; follow = false }
     }
     LaunchedEffect(fix, follow) {
         val f = fix ?: return@LaunchedEffect
@@ -229,7 +237,43 @@ fun TrackCanvas(
                 drawCircle(Color(0xFF1E6FD9), 9f, p)
             }
 
+            // named places from the map file (towns first; villages, peaks, springs when zoomed in)
+            if (labels.isNotEmpty()) {
+                val z = zoomOf(v.metersPerPx)
+                var shownLabels = 0
+                for (l in labels) {
+                    val (color, minZ) = labelStyle(l.kind) ?: continue
+                    if (z < minZ) continue
+                    val p = v.toScreen(Geo.mercatorX(l.point.lon), Geo.mercatorY(l.point.lat))
+                    if (p.x < -40 || p.y < -20 || p.x > this.size.width + 40 || p.y > this.size.height + 20) continue
+                    if (++shownLabels > 160) break
+                    when (l.kind) {
+                        "peak" -> {
+                            val tri = Path().apply { moveTo(p.x, p.y - 6); lineTo(p.x + 6, p.y + 4); lineTo(p.x - 6, p.y + 4); close() }
+                            drawPath(tri, color)
+                        }
+                        "spring" -> { drawCircle(Color.White, 6f, p); drawCircle(color, 4.5f, p) }
+                        else -> { drawCircle(Color.White, if (l.kind == "town") 6f else 4.5f, p); drawCircle(color, if (l.kind == "town") 4.5f else 3f, p) }
+                    }
+                    val text = if (l.kind == "peak" && l.ele != null) "${l.name} ${l.ele.toInt()}".trim() else l.name
+                    if (text.isBlank()) continue
+                    val layout = measurer.measure(
+                        text,
+                        TextStyle(
+                            fontSize = if (l.kind == "town") 12.sp else 10.sp, fontFamily = AppFonts.family(), fontWeight = FontWeight.Bold, color = color,
+                            shadow = androidx.compose.ui.graphics.Shadow(Color.White, Offset(0f, 0f), 6f),
+                        ),
+                    )
+                    drawText(layout, topLeft = Offset(p.x - layout.size.width / 2, p.y + 5))
+                }
+            }
+
             drawScale(v, measurer)
+            if (attribution.isNotBlank()) {
+                val layout = measurer.measure(attribution, TextStyle(fontSize = 7.sp, color = Color(0xCC3D4A42), fontFamily = AppFonts.family()), constraints = androidx.compose.ui.unit.Constraints(maxWidth = (this.size.width * 0.62f).toInt()))
+                drawRect(Color(0xB3FFFFFF), topLeft = Offset(0f, 0f), size = Size(layout.size.width + 8f, layout.size.height + 4f))
+                drawText(layout, topLeft = Offset(4f, 2f))
+            }
             drawNorth(measurer)
         }
 

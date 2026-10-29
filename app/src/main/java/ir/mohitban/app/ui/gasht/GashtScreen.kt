@@ -37,6 +37,7 @@ import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.FiberManualRecord
 import androidx.compose.material.icons.outlined.GpsFixed
 import androidx.compose.material.icons.outlined.GpsOff
+import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.LocationOff
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -145,6 +146,63 @@ class GashtViewModel(private val c: AppContainer) : ViewModel() {
     var backwards by mutableStateOf(false)
     var shown by mutableStateOf(setOf<Long>())
     var fitKey by mutableLongStateOf(0L)
+
+    // ---- offline maps ----
+    var maps by mutableStateOf(ir.mohitban.app.gasht.MapStore.list(ctx))
+    var activeMap by mutableStateOf<ir.mohitban.app.gasht.OfflineMap?>(null)
+    var background by mutableStateOf<MapBackground>(GridBackground)
+    var labels by mutableStateOf<List<ir.mohitban.app.gasht.MapLabel>>(emptyList())
+    var mapBusy by mutableStateOf(false)
+
+    init { ir.mohitban.app.gasht.MapStore.active(ctx)?.let { openMap(it) } }
+
+    private fun openMap(file: java.io.File?) {
+        viewModelScope.launch {
+            val old = activeMap
+            val opened = withContext(Dispatchers.IO) {
+                file?.let { f -> runCatching { ir.mohitban.app.gasht.OfflineMap(f) }.getOrNull()?.let { m -> m to m.labels() } }
+            }
+            activeMap = opened?.first
+            labels = opened?.second.orEmpty()
+            background = opened?.first?.let { TileBackground(it, viewModelScope) } ?: GridBackground
+            ir.mohitban.app.gasht.MapStore.setActive(ctx, opened?.first?.file)
+            fitKey++
+            if (old != null && old !== opened?.first) withContext(Dispatchers.IO) { runCatching { old.close() } }
+        }
+    }
+
+    fun selectMap(file: java.io.File?) = openMap(file)
+
+    fun importMap(uri: Uri, onDone: (String) -> Unit) {
+        mapBusy = true
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val name = ctx.contentResolver.query(uri, null, null, null, null)?.use { cur ->
+                        val i = cur.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                        if (cur.moveToFirst() && i >= 0) cur.getString(i) else null
+                    } ?: "map.mbtiles"
+                    ir.mohitban.app.gasht.MapStore.import(ctx, uri, name)
+                }
+            }
+            mapBusy = false
+            maps = ir.mohitban.app.gasht.MapStore.list(ctx)
+            result.onSuccess { openMap(it); onDone("نقشه وارد شد و نمایش داده می‌شود") }
+                .onFailure { onDone("این فایل نقشه‌ی معتبر MBTiles نیست") }
+        }
+    }
+
+    fun deleteMap(file: java.io.File) {
+        viewModelScope.launch {
+            if (activeMap?.file?.path == file.path) openMap(null)
+            withContext(Dispatchers.IO) { ir.mohitban.app.gasht.MapStore.delete(ctx, file) }
+            maps = ir.mohitban.app.gasht.MapStore.list(ctx)
+        }
+    }
+
+    override fun onCleared() {
+        runCatching { activeMap?.close() }
+    }
     val trackPoints = mutableStateMapOf<Long, List<GeoPoint>>()
 
     private suspend fun load(id: Long): List<GeoPoint> =
@@ -361,6 +419,7 @@ private fun MapTab(vm: GashtViewModel) {
     val heading = trueHeading(compass, fix)
     val name = rememberRangerName()
     var addPlace by remember { mutableStateOf(false) }
+    var mapsDialog by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         if (!GpsLocation.isGpsOn(context)) {
@@ -420,6 +479,21 @@ private fun MapTab(vm: GashtViewModel) {
             }
         }
 
+        // ---- base map choice ----
+        Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ChoiceChip("بدون نقشه", vm.activeMap == null, Modifier.weight(1f)) { vm.selectMap(null) }
+            vm.maps.take(2).forEach { f ->
+                val on = vm.activeMap?.file?.path == f.path
+                ChoiceChip(if (on) vm.activeMap?.title?.substringBefore(" —")?.ifBlank { null } ?: f.nameWithoutExtension else f.nameWithoutExtension, on, Modifier.weight(1.3f)) { vm.selectMap(f) }
+            }
+            SmallAction(Icons.Outlined.Layers, "نقشه‌ها", Modifier.weight(0.9f)) { mapsDialog = true }
+        }
+        val am = vm.activeMap
+        val fx = fix
+        if (am != null && fx != null && !am.contains(fx.point)) {
+            Text("شما خارج از محدوده‌ی این نقشه هستید.", style = MaterialTheme.typography.labelSmall, color = MColors.Amber, modifier = Modifier.padding(top = 4.dp))
+        }
+
         // ---- canvas ----
         val target = guide.target
         val mapTracks = buildList {
@@ -438,6 +512,10 @@ private fun MapTab(vm: GashtViewModel) {
             mapTracks, mapPlaces, fix, heading,
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(360.dp),
             fitKey = vm.fitKey,
+            background = vm.background,
+            labels = vm.labels,
+            attribution = vm.activeMap?.attribution.orEmpty(),
+            initialCenter = vm.activeMap?.center,
         )
         if (vm.shown.isEmpty() && target == null && !record.active) {
             Text(
@@ -451,6 +529,7 @@ private fun MapTab(vm: GashtViewModel) {
         Spacer(Modifier.height(30.dp))
     }
 
+    if (mapsDialog) MapsDialog(vm, onDismiss = { mapsDialog = false })
     if (addPlace) {
         fix?.let { f -> AddPlaceDialog(vm, f.point, onDismiss = { addPlace = false }) } ?: run { addPlace = false }
     }
@@ -652,4 +731,53 @@ fun rememberRangerName(): String {
         name = withContext(Dispatchers.IO) { context.container.profileRepository.getProfile()?.fullName.orEmpty() }
     }
     return name
+}
+
+/** Offline map files: import an .mbtiles file, open the download page, delete. */
+@Composable
+private fun MapsDialog(vm: GashtViewModel, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    var message by remember { mutableStateOf<String?>(null) }
+    var deleting by remember { mutableStateOf<java.io.File?>(null) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) vm.importMap(uri) { message = it }
+    }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = ir.mohitban.app.ui.components.Clay.Surface,
+        title = { Text("نقشه‌های آفلاین") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    "نقشه‌ی توپوگرافی (پستی‌وبلندی، خطوط تراز، رودخانه، جنگل، جاده و روستاها) بدون اینترنت نمایش داده می‌شود. فایل را یک بار دانلود کنید و اینجا وارد کنید.",
+                    style = MaterialTheme.typography.bodySmall, color = MColors.Ink,
+                )
+                SmallAction(Icons.Outlined.Share, "دانلود نقشه آذربایجان شرقی", Modifier.fillMaxWidth().padding(top = 10.dp), color = Color(0xFF2F7FC1)) {
+                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ir.mohitban.app.gasht.MapStore.DOWNLOAD_URL)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                }
+                Text("دانلود با مرورگر گوشی انجام می‌شود؛ خود برنامه به اینترنت وصل نمی‌شود.", style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 4.dp))
+                PillButton(
+                    if (vm.mapBusy) "در حال وارد کردن…" else "وارد کردن فایل نقشه (MBTiles)",
+                    { picker.launch(arrayOf("*/*")) }, Modifier.padding(top = 10.dp), loading = vm.mapBusy,
+                )
+                message?.let { Text(it, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = MColors.Green, modifier = Modifier.padding(top = 6.dp)) }
+                vm.maps.forEach { f ->
+                    Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(f.nameWithoutExtension, style = MaterialTheme.typography.titleSmall)
+                            Text("${(f.length() / (1024 * 1024)).fa()} مگابایت", style = MaterialTheme.typography.labelSmall, color = MColors.Muted)
+                        }
+                        SmallAction(Icons.Outlined.Close, "حذف", color = MColors.Error) { deleting = f }
+                    }
+                }
+            }
+        },
+        confirmButton = { androidx.compose.material3.TextButton(onDismiss) { Text("بستن") } },
+    )
+    deleting?.let { f ->
+        ConfirmDialog(
+            title = "حذف نقشه", text = "فایل نقشه‌ی «${f.nameWithoutExtension}» از گوشی حذف شود؟", confirm = "حذف", danger = true,
+            onConfirm = { vm.deleteMap(f); deleting = null }, onDismiss = { deleting = null },
+        )
+    }
 }
