@@ -1,0 +1,43 @@
+name: ساخت داده‌های مکان (استان، شهرستان، روستا)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'maps/geodata/**'
+      - '.github/workflows/build-geodata.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  geodata:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q gdal-bin python3-gdal osmium-tool
+      - name: Build
+        run: |
+          set -o pipefail
+          bash maps/geodata/build_geodata.sh 2>&1 | tee geodata.log
+      - name: Commit data into the app
+        run: |
+          cp geodata.log maps/geodata/last-build.log
+          git config user.name "geodata-bot"
+          git config user.email "geodata-bot@users.noreply.github.com"
+          git add app/src/main/assets/geo maps/geodata/last-build.log
+          git commit -m "Location data from OpenStreetMap (run ${{ github.run_number }})" || echo "no changes"
+          git push
+      - name: Log on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/l && cp geodata.log /tmp/l/ 2>/dev/null || true; cd /tmp/l
+          git init -q -b geodata-log; git config user.name bot; git config user.email bot@users.noreply.github.com
+          git add -A; git commit -q -m log; git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" geodata-log
