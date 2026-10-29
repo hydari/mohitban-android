@@ -1,0 +1,18 @@
+-rw-r--r-- 1 runner runner 229961758 Oct 29 12:32 iran.osm.pbf
+::group::admin boundaries
+0...10...20...30...40...50...60...70...80...90...100 - done.
+/usr/lib/python3/dist-packages/osgeo/ogr.py:593: FutureWarning: Neither ogr.UseExceptions() nor ogr.DontUseExceptions() has been explicitly called. In GDAL 4.0, exceptions will be enabled by default.
+  warnings.warn(
+levels: {'4': 30, '5': 480, '6': 1133}
+level 4: ['استان آذربایجان شرقی', 'استان آذربایجان غربی', 'استان اردبیل', 'استان اصفهان', 'استان البرز', 'استان ایلام', 'استان تهران', 'استان خراسان جنوبی', 'استان خراسان رضوی', 'استان خراسان شمالی', 'استان خوزستان', 'استان زنجان', 'استان سمنان', 'استان سیستان و بلوچستان', 'استان فارس', 'استان قزوین', 'استان قم', 'استان لرستان', 'استان مازندران', 'استان مرکزی', 'استان هرمزگان', 'استان همدان', 'استان چهارمحال و بختیاری', 'استان کردستان', 'استان کرمان', 'استان کرمانشاه', 'استان کهگیلویه و بویر احمد', 'استان گلستان', 'استان گیلان', 'استان یزد']
+admin features: 510
+::endgroup::
+::group::places
+0...10...20...30...40...50...60...70...80...90...100 - done.
+places: 46285
+::endgroup::
+total 1380
+drwxr-xr-x 2 runner runner   4096 Oct 29 12:32 .
+drwxr-xr-x 3 runner runner   4096 Oct 29 12:31 ..
+-rw-r--r-- 1 runner runner 778408 Oct 29 12:32 admin.geojson.gz
+-rw-r--r-- 1 runner runner 620011 Oct 29 12:32 places.tsv.gz
