@@ -73,9 +73,6 @@ object MapStore {
     private const val PREFS = "gasht_maps"
     private const val KEY_ACTIVE = "active"
 
-    /** Where the East Azerbaijan topographic map can be downloaded (opened in the browser, not by the app). */
-    const val DOWNLOAD_URL = "https://github.com/hydari/mohitban-android/releases/download/map-azarbaijan-sharghi/azarbaijan-sharghi.mbtiles"
-
     fun dir(context: Context): File = File(context.filesDir, "maps").apply { mkdirs() }
 
     fun list(context: Context): List<File> = dir(context).listFiles { f -> f.name.endsWith(".mbtiles") }?.sortedBy { it.name }.orEmpty()

@@ -113,6 +113,23 @@ fun FuelFormScreen(
     val vm = appViewModel(key = "fuel_$entryId") { c, _ ->
         FuelFormViewModel(entryId, c.profileRepository, c.settingsRepository, c.fuelRepository, c.files)
     }
+    // a fuel record needs a vehicle: the first time, register one before anything else
+    if (vm.loaded && vm.vehicles.isEmpty() && newVehicleId == null) {
+        AlertDialog(
+            onDismissRequest = onBack,
+            containerColor = ir.mohitban.app.ui.components.Clay.Surface,
+            icon = { CircleIcon(Icons.Outlined.DirectionsCar, MColors.Green, Color.White, size = 56.dp, iconSize = 28.dp) },
+            title = { Text("ابتدا وسیله‌ی نقلیه را ثبت کنید", style = MaterialTheme.typography.titleMedium) },
+            text = {
+                Text(
+                    "برای ثبت سند هزینه سوخت، اول خودرو یا موتورسیکلت سازمانی خود را با پلاک ثبت کنید.",
+                    style = MaterialTheme.typography.bodyMedium, color = MColors.Muted,
+                )
+            },
+            confirmButton = { GreenButton("ثبت خودرو یا موتورسیکلت", onClick = onAddVehicle, modifier = Modifier.fillMaxWidth().height(50.dp)) },
+            dismissButton = { TextButton(onBack) { Text("بازگشت") } },
+        )
+    }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val driverSig = rememberSignatureFieldState()

@@ -16,7 +16,7 @@ interface ProfileRepository {
     suspend fun getVehicle(id: Long): Vehicle?
     suspend fun isRegistered(): Boolean
     /** First registration: profile + first vehicle (becomes the default). */
-    suspend fun register(profile: RangerProfile, vehicle: Vehicle)
+    suspend fun register(profile: RangerProfile, vehicle: Vehicle? = null)
     suspend fun saveProfile(profile: RangerProfile)
     /** Inserts (id = 0) or updates a vehicle and returns its id. */
     suspend fun saveVehicle(vehicle: Vehicle): Long

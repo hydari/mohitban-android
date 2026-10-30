@@ -849,13 +849,9 @@ private fun MapsDialog(vm: GashtViewModel, onDismiss: () -> Unit) {
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
-                    "نقشه‌ی توپوگرافی (پستی‌وبلندی، خطوط تراز، رودخانه، جنگل، جاده و روستاها) بدون اینترنت نمایش داده می‌شود. فایل را یک بار دانلود کنید و اینجا وارد کنید.",
+                    "نقشه‌ی توپوگرافی (پستی‌وبلندی، خطوط تراز، رودخانه، جنگل، جاده و روستاها) بدون اینترنت نمایش داده می‌شود. فایل نقشه (MBTiles) را اینجا وارد کنید.",
                     style = MaterialTheme.typography.bodySmall, color = MColors.Ink,
                 )
-                SmallAction(Icons.Outlined.Share, "دانلود نقشه آذربایجان شرقی", Modifier.fillMaxWidth().padding(top = 10.dp), color = Color(0xFF2F7FC1)) {
-                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ir.mohitban.app.gasht.MapStore.DOWNLOAD_URL)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-                }
-                Text("دانلود با مرورگر گوشی انجام می‌شود؛ خود برنامه به اینترنت وصل نمی‌شود.", style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 4.dp))
                 PillButton(
                     if (vm.mapBusy) "در حال وارد کردن…" else "وارد کردن فایل نقشه (MBTiles)",
                     { picker.launch(arrayOf("*/*")) }, Modifier.padding(top = 10.dp), loading = vm.mapBusy,

@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ir.mohitban.app.ui.theme.Corners
@@ -39,40 +40,53 @@ object Clay {
     val Shadow = Color(0xFF6F8A76)
 }
 
-/** Raised clay surface. Put clickable/padding after it. */
+/**
+ * Raised clay surface. Put clickable/padding after it.
+ * Light from above: a soft top band and rim, a soft shadow below. On saturated colours (green
+ * buttons, red warnings) the light is kept faint so no white patch or halo appears.
+ */
 fun Modifier.clay(
     radius: Dp = Corners.R,
     color: Color = Clay.Surface,
     depth: Dp = 9.dp,
-): Modifier = this
-    .drawBehind {
-        // white glow up-left (Android 9+ draws shadow layers for shapes; older phones simply skip it)
-        if (Build.VERSION.SDK_INT >= 28) {
-            val r = radius.toPx()
-            drawIntoCanvas { c ->
-                val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                    this.color = color.toArgb()
-                    setShadowLayer(depth.toPx() * 1.1f, -depth.toPx() * 0.45f, -depth.toPx() * 0.45f, Color.White.copy(alpha = 0.95f).toArgb())
+): Modifier {
+    val light = color.luminance() > 0.5f
+    val sheen = if (light) 0.55f else 0.16f
+    return this
+        .drawBehind {
+            // faint white glow above light surfaces only (Android 9+; older phones simply skip it)
+            if (light && Build.VERSION.SDK_INT >= 28) {
+                val r = radius.toPx()
+                drawIntoCanvas { c ->
+                    val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                        this.color = color.toArgb()
+                        setShadowLayer(depth.toPx() * 0.9f, 0f, -depth.toPx() * 0.3f, Color.White.copy(alpha = 0.75f).toArgb())
+                    }
+                    c.nativeCanvas.drawRoundRect(0f, 0f, size.width, size.height, r, r, p)
                 }
-                c.nativeCanvas.drawRoundRect(0f, 0f, size.width, size.height, r, r, p)
             }
         }
-    }
-    .shadow(depth, RoundedCornerShape(radius), ambientColor = Clay.Shadow, spotColor = Clay.Shadow)
-    .clip(RoundedCornerShape(radius))
-    .drawBehind {
-        val r = radius.toPx()
-        drawRect(Brush.linearGradient(listOf(lerpColor(color, Color.White, 0.55f), color, lerpColor(color, Color.Black, 0.035f)), start = Offset.Zero, end = Offset(size.width, size.height)))
-        // inner highlight top-left and inner shade bottom-right: the "puffy" clay volume
-        drawRect(Brush.linearGradient(0f to Color.White.copy(alpha = 0.7f), 0.38f to Color.Transparent, start = Offset.Zero, end = Offset(size.width * 0.5f, size.height * 0.9f)))
-        drawRect(Brush.linearGradient(0.6f to Color.Transparent, 1f to Color(0xFF1F3B28).copy(alpha = 0.07f), start = Offset.Zero, end = Offset(size.width, size.height)))
-        val s = 2.5.dp.toPx()
-        drawRoundRect(
-            Brush.linearGradient(listOf(Color.White.copy(alpha = 0.95f), Color.White.copy(alpha = 0f), Color(0xFF1F3B28).copy(alpha = 0.06f)), start = Offset.Zero, end = Offset(size.width, size.height)),
-            topLeft = Offset(s / 2, s / 2), size = Size(size.width - s, size.height - s),
-            cornerRadius = CornerRadius(r - s / 2), style = Stroke(s),
-        )
-    }
+        .shadow(depth, RoundedCornerShape(radius), ambientColor = Clay.Shadow, spotColor = Clay.Shadow)
+        .clip(RoundedCornerShape(radius))
+        .drawBehind {
+            val r = radius.toPx()
+            val h = size.height
+            // even top-to-bottom volume, the same on narrow chips and wide buttons
+            drawRect(Brush.verticalGradient(listOf(lerpColor(color, Color.White, if (light) 0.35f else 0.12f), color, lerpColor(color, Color.Black, if (light) 0.04f else 0.10f))))
+            drawRect(Brush.verticalGradient(0f to Color.White.copy(alpha = sheen), 0.45f to Color.Transparent, endY = h))
+            val s = 1.5.dp.toPx()
+            drawRoundRect(
+                Brush.verticalGradient(
+                    0f to Color.White.copy(alpha = if (light) 0.9f else 0.35f),
+                    0.5f to Color.White.copy(alpha = 0f),
+                    1f to Color(0xFF1F3B28).copy(alpha = if (light) 0.07f else 0.15f),
+                    endY = h,
+                ),
+                topLeft = Offset(s / 2, s / 2), size = Size(size.width - s, h - s),
+                cornerRadius = CornerRadius(r - s / 2), style = Stroke(s),
+            )
+        }
+}
 
 /** Pressed-in clay well, for text fields and selected states. */
 fun Modifier.clayInset(radius: Dp = Corners.R, color: Color = Clay.Inset): Modifier = this

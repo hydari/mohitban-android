@@ -243,7 +243,8 @@ fun DashboardScreen(
                             if (p != null) {
                                 Image(p, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
                             } else {
-                                Text(initials(profile?.fullName), style = MaterialTheme.typography.titleLarge, color = Color(0xFF4B3517))
+                                // no photo yet: the app's ranger badge
+                                Image(painterResource(R.drawable.avatar_default), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
                             }
                         }
                     }

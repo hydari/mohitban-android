@@ -27,14 +27,17 @@ class ProfileRepositoryImpl(private val db: AppDatabase, private val files: File
     override suspend fun getProfile() = db.profileDao().get()?.toDomain()
     override suspend fun getVehicles() = db.vehicleDao().getAll().map { it.toDomain() }
     override suspend fun getVehicle(id: Long) = db.vehicleDao().get(id)?.toDomain()
-    override suspend fun isRegistered() = db.profileDao().get() != null && db.vehicleDao().count() > 0
+    override suspend fun isRegistered() = db.profileDao().get() != null
 
-    override suspend fun register(profile: RangerProfile, vehicle: Vehicle) {
+    override suspend fun register(profile: RangerProfile, vehicle: Vehicle?) {
         db.withTransaction {
             db.profileDao().upsert(profile.toEntity())
-            val id = db.vehicleDao().insert(vehicle.copy(id = 0).toEntity())
-            val s = db.settingsDao().get() ?: SettingsEntity()
-            db.settingsDao().upsert(s.copy(defaultVehicleId = id))
+            // the vehicle is now added later, before the first fuel record
+            if (vehicle != null) {
+                val id = db.vehicleDao().insert(vehicle.copy(id = 0).toEntity())
+                val s = db.settingsDao().get() ?: SettingsEntity()
+                db.settingsDao().upsert(s.copy(defaultVehicleId = id))
+            }
         }
     }
 

@@ -76,7 +76,7 @@ fun PersonalSection(form: ProfileForm, errors: Map<String, String>, onChange: (P
             ) {
                 val p = photo
                 if (p != null) Image(p, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                else Icon(Icons.Outlined.Person, null, tint = MColors.Green2, modifier = Modifier.size(42.dp))
+                else Image(androidx.compose.ui.res.painterResource(ir.mohitban.app.R.drawable.avatar_default), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             }
             Box(
                 Modifier
@@ -88,7 +88,16 @@ fun PersonalSection(form: ProfileForm, errors: Map<String, String>, onChange: (P
                 contentAlignment = Alignment.Center,
             ) { Icon(Icons.Outlined.PhotoCamera, null, tint = Color.White, modifier = Modifier.size(16.dp)) }
         }
-        Text("عکس پروفایل (اختیاری)", style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 6.dp))
+        if (photo == null) {
+            Text(
+                "لطفاً حتماً عکس پرسنلی خود را انتخاب کنید",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                color = MColors.Amber, modifier = Modifier.padding(top = 6.dp),
+            )
+            Text("تا آن زمان این تصویر پیش‌فرض نمایش داده می‌شود.", style = MaterialTheme.typography.labelSmall, color = MColors.Muted)
+        } else {
+            Text("عکس پرسنلی — برای تغییر بزنید", style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 6.dp))
+        }
     }
     MField(form.fullName, { onChange(form.copy(fullName = it)) }, label = "نام و نام خانوادگی", leadingIcon = Icons.Outlined.Person, placeholder = "محمدرضا حیدری", error = errors["fullName"])
     MField(form.fatherName, { onChange(form.copy(fatherName = it)) }, label = "نام پدر", leadingIcon = Icons.Outlined.Person, placeholder = "سعید", error = errors["fatherName"])

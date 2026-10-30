@@ -206,10 +206,6 @@ fun SettingsScreen(
                 AppCard(Modifier.fillMaxWidth()) {
                     Column {
                         SettingRow(Icons.Outlined.Info, "محیط‌یار — نسخه ${ir.mohitban.app.BuildConfigCompat.versionName(ctx).fa()}", "طراح و برنامه‌نویس: ${Developer.NAME}") { showDev = true }
-                        Divider()
-                        SettingRow(Icons.Outlined.Call, "تلفن تماس", Developer.PHONE.fa()) { Developer.call(ctx) }
-                        Divider()
-                        SettingRow(Icons.Outlined.Email, "ایمیل", Developer.EMAIL) { Developer.mail(ctx) }
                     }
                 }
                 if (showDev) DeveloperDialog(onDismiss = { showDev = false })
