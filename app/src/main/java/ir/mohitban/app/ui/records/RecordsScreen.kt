@@ -31,6 +31,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import ir.mohitban.app.ui.components.staggerIn
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -199,6 +201,8 @@ fun RecordsScreen(onEdit: (Long) -> Unit, onTab: (MainTab) -> Unit, onBack: (() 
                                 )
                             }
                             items(monthEntries, key = { it.id }) { e ->
+                                val idx = list.indexOf(e)
+                                SwipeToDelete(onDelete = { toDelete = e }, modifier = Modifier.animateItem().staggerIn(idx, "records${filter.first}-${filter.second}")) {
                                 EntryCard(
                                     e,
                                     onOpen = { preview = e },
@@ -217,6 +221,7 @@ fun RecordsScreen(onEdit: (Long) -> Unit, onTab: (MainTab) -> Unit, onBack: (() 
                                     onEdit = { onEdit(e.id) },
                                     onDelete = { toDelete = e },
                                 )
+                                }
                             }
                         }
                     }
@@ -378,4 +383,48 @@ private fun FormPreviewDialog(e: FuelEntry, onDismiss: () -> Unit) {
             }
         }
     }
+}
+
+/**
+ * Swipe a record sideways to ask for its deletion: a red well with a bin opens under the card,
+ * the card springs back and the usual confirmation appears (nothing is deleted by the swipe).
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeToDelete(onDelete: () -> Unit, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val view = androidx.compose.ui.platform.LocalView.current
+    val state = androidx.compose.material3.rememberSwipeToDismissBoxState(
+        confirmValueChange = { v ->
+            if (v != androidx.compose.material3.SwipeToDismissBoxValue.Settled) {
+                view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                onDelete()
+            }
+            false
+        },
+        positionalThreshold = { it * 0.35f },
+    )
+    androidx.compose.material3.SwipeToDismissBox(
+        state = state,
+        modifier = modifier,
+        backgroundContent = {
+            val toStart = state.dismissDirection == androidx.compose.material3.SwipeToDismissBoxValue.EndToStart
+            val f = state.progress.coerceIn(0f, 1f)
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(ir.mohitban.app.ui.theme.Corners.R))
+                    .background(androidx.compose.ui.graphics.Color(0xFFC62828).copy(alpha = 0.25f + 0.75f * f))
+                    .padding(horizontal = 24.dp),
+                contentAlignment = if (toStart) Alignment.CenterEnd else Alignment.CenterStart, // the side the card uncovers
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Outlined.Delete, null, tint = androidx.compose.ui.graphics.Color.White,
+                        modifier = Modifier.size(24.dp).graphicsLayer { val sc = 0.8f + 0.4f * f; scaleX = sc; scaleY = sc },
+                    )
+                    Text("  حذف", color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.labelLarge)
+                }
+            }
+        },
+    ) { content() }
 }

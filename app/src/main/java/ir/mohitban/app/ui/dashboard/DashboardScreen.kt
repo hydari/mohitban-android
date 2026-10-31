@@ -127,6 +127,12 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import ir.mohitban.app.ui.alerts.AlertSeen
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.outlined.Explore
+import ir.mohitban.app.ui.components.PulseDot
+import ir.mohitban.app.ui.components.ShiftCycleRing
+import ir.mohitban.app.ui.components.SkyHeader
+import ir.mohitban.app.ui.components.rememberCountUp
+import ir.mohitban.app.ui.components.staggerIn
+import androidx.compose.ui.layout.layout
 
 data class DashboardState(
     val profile: RangerProfile? = null,
@@ -212,28 +218,28 @@ fun DashboardScreen(
             Column(
                 Modifier
                     .fillMaxSize()
-                    .statusBarsPadding()
                     .verticalScroll(scroll)
                     .padding(horizontal = 18.dp),
             ) {
                 // ---------- organisation: DoE logo + name plates, no background ----------
                 val province = profile?.province.orEmpty().trim().removePrefix("استان").trim()
-                Column(
-                    Modifier.fillMaxWidth().padding(top = 14.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    ShimmerLogo(size = 66.dp, modifier = Modifier.padding(bottom = 4.dp))
-                    OrgPlate("سازمان حفاظت محیط زیست", 10.5.sp)
-                    if (province.isNotEmpty()) OrgPlate("اداره کل حفاظت محیط زیست استان $province", 9.5.sp)
+                // the living sky of this moment behind the logo, edge to edge
+                SkyHeader(Modifier.fullBleed(18.dp), parallax = { scroll.value }) {
+                    Column(
+                        Modifier.fillMaxWidth().statusBarsPadding().padding(top = 14.dp, bottom = 40.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        ShimmerLogo(size = 66.dp, modifier = Modifier.padding(bottom = 4.dp).staggerIn(0, "dash"))
+                        OrgPlate("سازمان حفاظت محیط زیست", 10.5.sp, Modifier.staggerIn(1, "dash"))
+                        if (province.isNotEmpty()) OrgPlate("اداره کل حفاظت محیط زیست استان $province", 9.5.sp, Modifier.staggerIn(2, "dash"))
+                    }
                 }
 
                 // ---------- personal card (liquid glass): photo | name, rank · station | bell ----------
-                GlassCard(Modifier.fillMaxWidth().padding(top = 14.dp), dark = true) {
-                    GlassRing(
-                        70.dp, Modifier.padding(start = 12.dp, top = 12.dp, bottom = 12.dp), onClick = onProfile,
-                        rim = shiftStatus?.let { if (it is ShiftStatus.OnDuty) ShiftColors.On else ShiftColors.Off },
-                    ) {
+                GlassCard(Modifier.fillMaxWidth().padding(top = 2.dp).staggerIn(3, "dash"), dark = true) {
+                    // photo inside the ring of the whole shift cycle (today's day breathes)
+                    ShiftCycleRing(76.dp, state.shift, vm.today.jdn, Modifier.padding(start = 10.dp, top = 10.dp, bottom = 10.dp), onClick = onProfile) {
                         Box(
                             Modifier.fillMaxSize().clip(CircleShape)
                                 .background(Brush.linearGradient(listOf(Color(0xFFD9CFB4), Color(0xFFA68A5F)))),
@@ -285,7 +291,7 @@ fun DashboardScreen(
 
                 // ---------- today's shift ----------
                 val onDuty = shiftStatus is ShiftStatus.OnDuty
-                GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).height(DashH), dark = true, onClick = onShift) {
+                GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).height(DashH).staggerIn(4, "dash"), dark = true, onClick = onShift) {
                     CircleIcon(
                         when {
                             shiftStatus == null -> Icons.Outlined.EventRepeat
@@ -327,7 +333,7 @@ fun DashboardScreen(
 
                 // ---------- گشت‌یار ----------
                 val rec by ir.mohitban.app.gasht.GashtSession.record.collectAsStateWithLifecycle()
-                GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).height(DashH), dark = true, onClick = onGasht) {
+                GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).height(DashH).staggerIn(5, "dash"), dark = true, onClick = onGasht) {
                     CircleIcon(
                         Icons.Outlined.Explore, Color(0xFF2F7FC1), Color.White,
                         size = DashIcon, iconSize = 23.dp, modifier = Modifier.padding(start = 14.dp),
@@ -340,7 +346,7 @@ fun DashboardScreen(
                             modifier = Modifier.padding(top = 2.dp),
                         )
                     }
-                    if (rec.active) Box(Modifier.padding(end = 6.dp).size(10.dp).clip(CircleShape).background(Color(0xFFE5483B)))
+                    if (rec.active) PulseDot(Color(0xFFE5483B), Modifier.padding(end = 2.dp), size = 10.dp, active = !rec.paused)
                     Icon(
                         Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = MColors.Muted,
                         modifier = Modifier.padding(start = 6.dp, end = 14.dp).size(20.dp),
@@ -348,7 +354,7 @@ fun DashboardScreen(
                 }
 
                 // ---------- main action ----------
-                GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).height(DashH), radius = Corners.R, onClick = onFuel) {
+                GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).height(DashH).staggerIn(6, "dash"), radius = Corners.R, onClick = onFuel) {
                     CircleIcon(Icons.Outlined.LocalGasStation, Color(0xFF239B56), Color.White, size = DashIcon, iconSize = 23.dp, modifier = Modifier.padding(start = 14.dp))
                     Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                         Text("ثبت هزینه سوخت", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.GreenDark)
@@ -362,7 +368,7 @@ fun DashboardScreen(
 
                 // ---------- default vehicle ----------
                 state.vehicle?.let { v ->
-                    GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).height(DashH), dark = true, onClick = onVehicle) {
+                    GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).height(DashH).staggerIn(7, "dash"), dark = true, onClick = onVehicle) {
                         CircleIcon(
                             if (v.type == VehicleType.MOTORCYCLE) Icons.Outlined.TwoWheeler else Icons.Outlined.DirectionsCar,
                             Color(0xFF2F7FC1), Color.White, size = DashIcon, iconSize = 23.dp, modifier = Modifier.padding(start = 14.dp),
@@ -381,17 +387,18 @@ fun DashboardScreen(
                 }
 
                 // ---------- quick tiles ----------
-                Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    QuickTile(Icons.AutoMirrored.Outlined.FormatListBulleted, "سوابق سوخت", "${state.seasonEntries.size.fa()} ثبت در ${vm.season.title}", Modifier.weight(1f), onRecords, Color(0xFF2F7FC1))
+                val countShown = rememberCountUp(state.seasonEntries.size.toLong(), "dash.count")
+                Row(Modifier.fillMaxWidth().padding(top = 12.dp).staggerIn(8, "dash"), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    QuickTile(Icons.AutoMirrored.Outlined.FormatListBulleted, "سوابق سوخت", "${countShown.toInt().fa()} ثبت در ${vm.season.title}", Modifier.weight(1f), onRecords, Color(0xFF2F7FC1))
                     QuickTile(Icons.Outlined.Assessment, "گزارش فصلی", "${vm.season.title} ${vm.year.fa()}", Modifier.weight(1f), onReport, Color(0xFFE08A1E))
                 }
-                Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.fillMaxWidth().padding(top = 12.dp).staggerIn(9, "dash"), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     QuickTile(Icons.Outlined.DirectionsCar, "وسایل نقلیه", "${state.vehicleCount.fa()} وسیله | پلاک‌ها", Modifier.weight(1f), onVehicle, Color(0xFF1F9A8A))
                     QuickTile(Icons.Outlined.Settings, "تنظیمات", "نرخ‌ها و پشتیبان", Modifier.weight(1f), onSettings, Color(0xFF5F6F7A))
                 }
 
                 // ---------- alerts entry (details in their own page) ----------
-                GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).height(DashH), dark = true, onClick = onAlerts) {
+                GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).height(DashH).staggerIn(10, "dash"), dark = true, onClick = onAlerts) {
                     CircleIcon(
                         Icons.Outlined.NotificationsActive, Color(0xFFD99A1E), Color.White, size = DashIcon, iconSize = 23.dp,
                         modifier = Modifier.padding(start = 14.dp),
@@ -416,11 +423,12 @@ fun DashboardScreen(
                 // ---------- season summary ----------
                 val entries = state.seasonEntries
                 if (entries.isNotEmpty()) {
-                    GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).height(DashH), dark = true, onClick = onReport) {
+                    val totalShown = rememberCountUp(entries.sumOf { it.total }, "dash.total")
+                    GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).height(DashH).staggerIn(11, "dash"), dark = true, onClick = onReport) {
                         CircleIcon(Icons.Outlined.Assessment, Color(0xFF239B56), Color.White, size = DashIcon, iconSize = 23.dp, modifier = Modifier.padding(start = 14.dp))
                         Column(Modifier.padding(horizontal = 12.dp).weight(1f)) {
                             Text("جمع ${vm.season.title} ${vm.year.fa()}", style = MaterialTheme.typography.labelSmall, color = MColors.Muted)
-                            Text("${entries.sumOf { it.total }.rial()} ریال", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.GreenDark)
+                            Text("${totalShown.rial()} ریال", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.GreenDark)
                             val g = entries.filter { it.fuelType == FuelType.GASOLINE }.sumOf { it.amount }
                             val c = entries.filter { it.fuelType == FuelType.CNG }.sumOf { it.amount }
                             Text(
@@ -522,9 +530,9 @@ private fun VerifiedBadge(modifier: Modifier = Modifier) {
 
 /** White glossy plate with green text, used for the organisation names under the logo. */
 @Composable
-private fun OrgPlate(text: String, size: androidx.compose.ui.unit.TextUnit) {
+private fun OrgPlate(text: String, size: androidx.compose.ui.unit.TextUnit, modifier: Modifier = Modifier) {
     Box(
-        Modifier
+        modifier
             .shadow(4.dp, RoundedCornerShape(10.dp))
             .clip(RoundedCornerShape(10.dp))
             .background(Brush.verticalGradient(listOf(Color.White, Color(0xFFEFF6F1))))
@@ -570,8 +578,10 @@ private fun MinimalBell(ringing: Boolean, count: Int, onClick: () -> Unit, modif
                 },
         )
         if (count > 0) {
+            val pop = remember(count) { androidx.compose.animation.core.Animatable(0.3f) }
+            LaunchedEffect(count) { pop.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.38f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium)) }
             Box(
-                Modifier.align(Alignment.TopEnd).padding(top = 7.dp, end = 7.dp).size(15.dp).clip(CircleShape)
+                Modifier.align(Alignment.TopEnd).padding(top = 7.dp, end = 7.dp).graphicsLayer { scaleX = pop.value; scaleY = pop.value }.size(15.dp).clip(CircleShape)
                     .background(Color(0xFFE5483B)).border(1.dp, Color.White, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
@@ -590,3 +600,10 @@ private tailrec fun Context.findActivity(): android.app.Activity? = when (this) 
 /** One height and icon size for every dashboard card, so the page reads as a tidy grid. */
 private val DashH = 78.dp
 private val DashIcon = 46.dp
+
+/** Lets a child of a horizontally padded column reach both screen edges. */
+private fun Modifier.fullBleed(padding: androidx.compose.ui.unit.Dp): Modifier = layout { m, c ->
+    val extra = (padding * 2).roundToPx()
+    val p = m.measure(c.copy(minWidth = c.maxWidth + extra, maxWidth = c.maxWidth + extra))
+    layout(c.maxWidth, p.height) { p.place(-extra / 2, 0) }
+}

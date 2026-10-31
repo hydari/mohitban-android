@@ -6,6 +6,24 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseInCubic
+import androidx.compose.animation.core.EaseOutCubic
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
+import ir.mohitban.app.ui.theme.MColors
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -65,6 +83,12 @@ object Routes {
 private const val RECEIPT_KEY = "cropped_receipt"
 private const val VEHICLE_KEY = "new_vehicle"
 
+private val TAB_ROUTES = setOf(Routes.HOME, Routes.RECORDS, Routes.REPORTS, Routes.SETTINGS)
+
+/** Tab switches and the splash/registration hand-over only cross-fade. */
+private fun calm(from: String?, to: String?): Boolean =
+    (from in TAB_ROUTES && to in TAB_ROUTES) || from == Routes.START || from == Routes.ONBOARDING || to == Routes.START
+
 private fun NavHostController.openTab(tab: MainTab) {
     val route = when (tab) {
         MainTab.HOME -> Routes.HOME
@@ -99,14 +123,56 @@ fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0, openGasht
         if (openShiftRequest > 0 && started && nav.currentDestination?.route != Routes.SHIFT) nav.navigate(Routes.SHIFT)
     }
 
-    NavHost(navController = nav, startDestination = Routes.START) {
+    NavHost(
+        navController = nav,
+        startDestination = Routes.START,
+        // tabs cross-fade; deeper pages slide in from the reading side and back out the same way
+        enterTransition = {
+            if (calm(initialState.destination.route, targetState.destination.route)) fadeIn(tween(220, delayMillis = 60))
+            else slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(320, easing = EaseOutCubic)) { it / 4 } + fadeIn(tween(240))
+        },
+        exitTransition = {
+            if (calm(initialState.destination.route, targetState.destination.route)) fadeOut(tween(140))
+            else slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(320, easing = EaseOutCubic)) { it / 10 } + fadeOut(tween(220))
+        },
+        popEnterTransition = {
+            if (calm(initialState.destination.route, targetState.destination.route)) fadeIn(tween(220, delayMillis = 60))
+            else slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(300, easing = EaseOutCubic)) { it / 10 } + fadeIn(tween(220))
+        },
+        popExitTransition = {
+            if (calm(initialState.destination.route, targetState.destination.route)) fadeOut(tween(140))
+            else slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(260, easing = EaseInCubic)) { it / 4 } + fadeOut(tween(200))
+        },
+    ) {
         composable(Routes.START) {
-            // tiny splash while deciding between first-run registration and the dashboard
+            // short animated splash while deciding between first-run registration and the dashboard
+            val appear = remember { Animatable(0f) }
             Box(Modifier.fillMaxSize().background(Color.White), contentAlignment = Alignment.Center) {
-                Image(painterResource(R.drawable.doe_logo_full), null, modifier = Modifier.size(120.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Image(
+                        painterResource(R.drawable.doe_logo_full), null,
+                        modifier = Modifier.size(120.dp).graphicsLayer {
+                            alpha = appear.value.coerceIn(0f, 1f)
+                            val sc = 0.82f + 0.18f * appear.value
+                            scaleX = sc; scaleY = sc
+                        },
+                    )
+                    Text(
+                        "محیط‌یار", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black), color = MColors.Green,
+                        modifier = Modifier.padding(top = 14.dp).graphicsLayer {
+                            alpha = ((appear.value - 0.3f) / 0.7f).coerceIn(0f, 1f)
+                            translationY = (1f - appear.value) * 18.dp.toPx()
+                        },
+                    )
+                }
             }
             LaunchedEffect(Unit) {
+                val started0 = android.os.SystemClock.elapsedRealtime()
+                launch { appear.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow)) }
                 val registered = context.container.profileRepository.isRegistered()
+                // keep the splash just long enough to be seen (about 0.7 s)
+                val left = 700 - (android.os.SystemClock.elapsedRealtime() - started0)
+                if (left > 0) delay(left)
                 nav.navigate(if (registered) Routes.HOME else Routes.ONBOARDING) {
                     popUpTo(Routes.START) { inclusive = true }
                 }

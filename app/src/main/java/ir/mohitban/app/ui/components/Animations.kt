@@ -47,9 +47,13 @@ fun AnimatedCheck(size: Dp = 84.dp, color: Color = MColors.Green2) {
     val circle = remember { Animatable(0f) }
     val tick = remember { Animatable(0f) }
     val ring = remember { Animatable(0f) }
+    val view = androidx.compose.ui.platform.LocalView.current
     LaunchedEffect(Unit) {
+        view.performHapticFeedback(
+            if (android.os.Build.VERSION.SDK_INT >= 30) android.view.HapticFeedbackConstants.CONFIRM else android.view.HapticFeedbackConstants.VIRTUAL_KEY,
+        )
         launch { circle.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) }
-        launch { delay(120); ring.animateTo(1f, tween(700, easing = FastOutSlowInEasing)) }
+        launch { delay(120); ring.animateTo(1f, tween(800, easing = FastOutSlowInEasing)) }
         delay(220)
         tick.animateTo(1f, tween(380, easing = FastOutSlowInEasing))
     }
@@ -57,6 +61,17 @@ fun AnimatedCheck(size: Dp = 84.dp, color: Color = MColors.Green2) {
         Canvas(Modifier.size(size * 1.35f)) {
             val r = this.size.minDimension / 2
             drawCircle(color.copy(alpha = 0.25f * (1f - ring.value)), radius = r * (0.7f + 0.3f * ring.value))
+            // a small burst of leaves-coloured sparks flying out and fading
+            val v = ring.value
+            if (v in 0.01f..0.99f) {
+                val sparks = listOf(Color(0xFF2FA05A), Color(0xFF8FE0A8), Color(0xFFF2C94C), Color(0xFF239B56))
+                for (i in 0 until 10) {
+                    val a = Math.toRadians((i * 36 + 18).toDouble())
+                    val d = r * (0.62f + 0.42f * v)
+                    val c = androidx.compose.ui.geometry.Offset(center.x + (d * kotlin.math.cos(a)).toFloat(), center.y + (d * kotlin.math.sin(a)).toFloat())
+                    drawCircle(sparks[i % sparks.size].copy(alpha = (1f - v)), radius = r * 0.05f * (1f - v * 0.5f), center = c)
+                }
+            }
         }
         Canvas(Modifier.size(size).scale(circle.value)) {
             drawCircle(color)

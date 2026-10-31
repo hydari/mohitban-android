@@ -102,10 +102,22 @@ fun Modifier.clayInset(radius: Dp = Corners.R, color: Color = Clay.Inset): Modif
         drawRect(Brush.horizontalGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.7f)), startX = w - d, endX = w), topLeft = Offset(w - d, 0f), size = Size(d, h))
     }
 
-/** Soft clay press: the element sinks a little while touched. Pass the same source to clickable. */
+/**
+ * Soft clay press: the element sinks while touched and springs back with a tiny bounce; a short
+ * tick of the phone's touch feedback confirms the tap (follows the system haptics setting).
+ */
 fun Modifier.clayPress(source: MutableInteractionSource): Modifier = composed {
     val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.97f else 1f, tween(if (pressed) 90 else 200), label = "clayPress")
+    val view = androidx.compose.ui.platform.LocalView.current
+    androidx.compose.runtime.LaunchedEffect(pressed) {
+        if (pressed) view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+    }
+    val scale by animateFloatAsState(
+        if (pressed) 0.965f else 1f,
+        if (pressed) androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessHigh)
+        else androidx.compose.animation.core.spring(dampingRatio = 0.42f, stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow),
+        label = "clayPress",
+    )
     graphicsLayer { scaleX = scale; scaleY = scale }
 }
 

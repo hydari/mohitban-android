@@ -64,6 +64,9 @@ import androidx.lifecycle.viewModelScope
 import ir.mohitban.app.R
 import ir.mohitban.app.container
 import ir.mohitban.app.core.jalali.JalaliDate
+import ir.mohitban.app.core.jalali.Jalali
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import ir.mohitban.app.core.jalali.Season
 import ir.mohitban.app.core.text.amountText
 import ir.mohitban.app.core.text.fa
@@ -231,6 +234,8 @@ fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?) {
                         TableRow(listOf("کیلومتر ابتدای فصل", s.firstOdometer?.rial() ?: "—"))
                         TableRow(listOf("کیلومتر آخرین ثبت", s.lastOdometer?.rial() ?: "—"), last = true)
                     }
+                    SectionTitle("نمودار ماهانه هزینه")
+                    AppCard(Modifier.fillMaxWidth()) { MonthBars(s) }
                     SectionTitle("جزئیات هزینه‌های سوخت")
                     AppCard(Modifier.fillMaxWidth()) {
                         TableHeader(listOf("نوع سوخت", "مقدار", "مبلغ (ریال)"))
@@ -362,5 +367,79 @@ private fun ReceiptThumb(e: ir.mohitban.app.domain.model.FuelEntry, onClick: () 
         }
         Text(e.date.format().fa(), style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 4.dp))
         Text("${e.total.rial()} ریال", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Green)
+    }
+}
+
+/** Short money text for chart labels: «۱٫۲ میلیون». */
+private fun compactRial(v: Long): String = when {
+    v >= 1_000_000_000L -> "${"%.1f".format(java.util.Locale.US, v / 1e9).removeSuffix(".0")} میلیارد".fa()
+    v >= 1_000_000L -> "${"%.1f".format(java.util.Locale.US, v / 1e6).removeSuffix(".0")} میلیون".fa()
+    v >= 1_000L -> "${(v / 1000).toString()} هزار".fa()
+    else -> v.toString().fa()
+}
+
+/**
+ * Cost of each month of the season as stacked clay bars (petrol green, CNG blue) that grow in
+ * one after another; the amount sits on top and the legend names both colours.
+ */
+@Composable
+private fun MonthBars(s: QuarterSummary) {
+    val months = (0 until 3).map { s.season.firstMonth + it }
+    val gas = months.map { m -> s.entries.filter { it.date.month == m && it.fuelType == ir.mohitban.app.domain.model.FuelType.GASOLINE }.sumOf { it.total } }
+    val cng = months.map { m -> s.entries.filter { it.date.month == m && it.fuelType == ir.mohitban.app.domain.model.FuelType.CNG }.sumOf { it.total } }
+    val maxV = months.indices.maxOf { gas[it] + cng[it] }.coerceAtLeast(1L)
+    val motion = ir.mohitban.app.ui.components.rememberMotionOn()
+    val grow = months.indices.map { i -> remember(s.year, s.season) { androidx.compose.animation.core.Animatable(if (motion) 0f else 1f) } }
+    months.indices.forEach { i ->
+        LaunchedEffect(s.year, s.season, maxV) {
+            if (motion) {
+                kotlinx.coroutines.delay(120L * i)
+                grow[i].animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = androidx.compose.animation.core.Spring.StiffnessLow))
+            }
+        }
+    }
+    val petrol = Color(0xFF2E8B4E)
+    val gasC = Color(0xFF2F7FC1)
+    Column(Modifier.padding(16.dp)) {
+        Row(Modifier.fillMaxWidth().height(170.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.Bottom) {
+            months.indices.forEach { i ->
+                val total = gas[i] + cng[i]
+                val g = grow[i].value
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                    Text(
+                        if (total == 0L) "—" else compactRial(total),
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Ink,
+                        modifier = Modifier.graphicsLayer { alpha = g.coerceIn(0f, 1f) },
+                    )
+                    val fullH = 128.dp * (total.toFloat() / maxV) * g.coerceAtLeast(0f)
+                    Column(
+                        Modifier
+                            .padding(top = 4.dp)
+                            .width(34.dp)
+                            .height(fullH.coerceAtLeast(3.dp))
+                            .clip(RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp, bottomStart = 3.dp, bottomEnd = 3.dp))
+                            .background(MColors.Line),
+                    ) {
+                        if (total > 0) {
+                            if (cng[i] > 0) Box(Modifier.fillMaxWidth().weight(cng[i].toFloat()).background(Brush.verticalGradient(listOf(Color(0xFF6FB0E6), gasC))))
+                            if (gas[i] > 0) Box(Modifier.fillMaxWidth().weight(gas[i].toFloat()).background(Brush.verticalGradient(listOf(Color(0xFF5CC184), petrol))))
+                        }
+                    }
+                }
+            }
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(MColors.Line))
+        Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+            months.forEach { m ->
+                Text(Jalali.MONTH_NAMES[m - 1], style = MaterialTheme.typography.labelMedium, color = MColors.Muted, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+            }
+        }
+        Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(10.dp).clip(RoundedCornerShape(3.dp)).background(petrol))
+            Text("  بنزین", style = MaterialTheme.typography.labelSmall, color = MColors.Ink)
+            Spacer(Modifier.width(18.dp))
+            Box(Modifier.size(10.dp).clip(RoundedCornerShape(3.dp)).background(gasC))
+            Text("  گاز CNG", style = MaterialTheme.typography.labelSmall, color = MColors.Ink)
+        }
     }
 }

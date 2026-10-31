@@ -1,5 +1,8 @@
 package ir.mohitban.app.ui.gasht
 
+import ir.mohitban.app.ui.components.nightVision
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.LightMode
 import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -392,8 +395,32 @@ fun GashtScreen(onBack: () -> Unit) {
     }
     LaunchedEffect(Unit) { if (!permitted) requestPermission() }
 
-    Column(Modifier.fillMaxSize().background(MColors.Bg)) {
-        TopBar("گشت‌یار", onBack = onBack)
+    // night patrol view (red on black), remembered between visits
+    val prefs = remember { context.getSharedPreferences("gasht_view", android.content.Context.MODE_PRIVATE) }
+    var night by remember { mutableStateOf(prefs.getBoolean("night", false)) }
+    if (night) ir.mohitban.app.ui.components.StatusBarIcons(darkIcons = false)
+    Column(Modifier.fillMaxSize().nightVision(night).background(MColors.Bg)) {
+        TopBar("گشت‌یار", onBack = onBack, action = {
+            Box(
+                Modifier.size(44.dp).clip(CircleShape).clickable {
+                    night = !night
+                    prefs.edit().putBoolean("night", night).apply()
+                },
+                contentAlignment = Alignment.Center,
+            ) {
+                ir.mohitban.app.ui.components.CircleIcon(
+                    if (night) Icons.Outlined.LightMode else Icons.Outlined.DarkMode,
+                    if (night) Color(0xFFE08A1E) else Color(0xFF34406B), Color.White, size = 36.dp, iconSize = 19.dp,
+                )
+            }
+        })
+        if (night) {
+            Text(
+                "نمای شب گشت: صفحه قرمز و تیره است تا دید چشم در تاریکی حفظ شود.",
+                style = MaterialTheme.typography.labelSmall, color = MColors.Muted, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+            )
+        }
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf("نقشه", "مسیرها", "نقاط", "ابزارها").forEachIndexed { i, t ->
                 val on = vm.tab == i
@@ -782,7 +809,7 @@ private fun RecordPanel(vm: GashtViewModel, modifier: Modifier) {
     AppCard(modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(12.dp).clip(CircleShape).background(if (record.paused) MColors.Amber else MColors.Error))
+                ir.mohitban.app.ui.components.PulseDot(if (record.paused) MColors.Amber else MColors.Error, size = 12.dp, active = !record.paused)
                 Text(
                     if (record.paused) "  ضبط متوقف موقت" else "  در حال ضبط مسیر",
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),

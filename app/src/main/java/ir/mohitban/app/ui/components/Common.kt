@@ -21,6 +21,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -320,44 +323,68 @@ enum class MainTab(val title: String, val icon: ImageVector, val color: Color) {
     SETTINGS("تنظیمات", Icons.Outlined.Settings, Color(0xFF5F6F7A)),
 }
 
-/** Floating glass navigation bar (blurred photo behind it on the dashboard, frosted green elsewhere). */
+/** The last tab the bar showed, so the next screen's bar can slide its indicator from there. */
+private object BarMemory { var last: MainTab? = null }
+
+/**
+ * Clay navigation bar. The pressed-in well slides with a spring from the previous tab to the new
+ * one, and the chosen icon pops a little.
+ */
 @Composable
 fun BottomBar(current: MainTab, onSelect: (MainTab) -> Unit, modifier: Modifier = Modifier) {
-    val glass = false // every screen uses the clay bar now
-    Row(
+    val motion = rememberMotionOn()
+    val from = remember { BarMemory.last ?: current }
+    val slide = remember { androidx.compose.animation.core.Animatable(from.ordinal.toFloat()) }
+    val pop = remember { androidx.compose.animation.core.Animatable(if (motion && from != current) 0.75f else 1f) }
+    androidx.compose.runtime.LaunchedEffect(current) {
+        BarMemory.last = current
+        if (!motion) { slide.snapTo(current.ordinal.toFloat()); return@LaunchedEffect }
+        kotlinx.coroutines.coroutineScope {
+            launch { slide.animateTo(current.ordinal.toFloat(), androidx.compose.animation.core.spring(dampingRatio = 0.72f, stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow)) }
+            launch { pop.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.4f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium)) }
+        }
+    }
+    androidx.compose.foundation.layout.BoxWithConstraints(
         modifier = modifier
             .navigationBarsPadding()
             .padding(horizontal = 14.dp, vertical = 10.dp)
             .fillMaxWidth()
             .height(72.dp)
             .clay(depth = 12.dp)
-            .padding(horizontal = 6.dp),
-        horizontalArrangement = Arrangement.SpaceAround,
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = 6.dp, vertical = 5.dp),
     ) {
-        MainTab.entries.forEach { tab ->
-            val on = tab == current
-            Column(
-                Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .then(
-                        if (on) Modifier.clayInset(12.dp, Color(0xFFE2EEE5)) else Modifier,
+        val itemW = maxWidth / MainTab.entries.size
+        // the sliding well (offset follows the reading direction)
+        Box(
+            Modifier
+                .offset { IntOffset((itemW.toPx() * slide.value).roundToInt(), 0) }
+                .width(itemW)
+                .fillMaxHeight()
+                .clayInset(12.dp, Color(0xFFE2EEE5)),
+        )
+        Row(Modifier.fillMaxWidth().fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
+            MainTab.entries.forEach { tab ->
+                val on = tab == current
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onSelect(tab) },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
+                ) {
+                    CircleIcon(
+                        tab.icon, if (on) tab.color else lerpColor(tab.color, Color(0xFF9AA5A0), 0.55f), Color.White,
+                        size = if (on) 34.dp else 30.dp, iconSize = if (on) 19.dp else 17.dp,
+                        modifier = if (on) Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value } else Modifier,
                     )
-                    .clickable { onSelect(tab) }
-                    .padding(vertical = 5.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                CircleIcon(
-                    tab.icon, if (on) tab.color else lerpColor(tab.color, Color(0xFF9AA5A0), 0.55f), Color.White,
-                    size = if (on) 34.dp else 30.dp, iconSize = if (on) 19.dp else 17.dp,
-                )
-                Text(
-                    tab.title,
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = if (on) FontWeight.Bold else FontWeight.Normal),
-                    color = if (glass) (if (on) Color.White else Color(0xBFFFFFFF)) else (if (on) MColors.Green else MColors.Muted),
-                )
+                    Text(
+                        tab.title,
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = if (on) FontWeight.Bold else FontWeight.Normal),
+                        color = if (on) MColors.Green else MColors.Muted,
+                    )
+                }
             }
         }
     }

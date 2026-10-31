@@ -145,6 +145,19 @@ fun TrackCanvas(
     var follow by remember { mutableStateOf(true) }
     var size by remember { mutableStateOf(Size.Zero) }
     val measurer = rememberTextMeasurer()
+    val smoothHeading = heading?.let { ir.mohitban.app.ui.components.rememberSmoothAngle(it) }
+    val motion = ir.mohitban.app.ui.components.rememberMotionOn()
+    // a newly shown track draws itself along its way (the live recording is never hidden)
+    val shownIds = tracks.filter { it.id != -1L }.map { it.id }
+    val reveal = remember { androidx.compose.animation.core.Animatable(1f) }
+    LaunchedEffect(shownIds) {
+        if (motion && shownIds.isNotEmpty()) {
+            reveal.snapTo(0f)
+            reveal.animateTo(1f, androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+        }
+    }
+    val pulseT = androidx.compose.animation.core.rememberInfiniteTransition(label = "me")
+    val pulse = pulseT.animateFloat(0f, 1f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1800, easing = androidx.compose.animation.core.LinearEasing)), label = "mp")
 
     fun fitAll() {
         if (fitPoints.isNotEmpty() && size != Size.Zero) {
@@ -241,8 +254,13 @@ fun TrackCanvas(
                     val p = v.toScreen(t.xs[i], t.ys[i])
                     if (i == 0) path.moveTo(p.x, p.y) else path.lineTo(p.x, p.y)
                 }
-                if (t.highlight) drawPath(path, Color.White, style = Stroke(t.width + 5f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                drawPath(path, t.color, style = Stroke(t.width, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                val r = if (t.id == -1L) 1f else reveal.value
+                val drawn = if (r >= 1f) path else Path().also { out ->
+                    val pm = androidx.compose.ui.graphics.PathMeasure().apply { setPath(path, false) }
+                    pm.getSegment(0f, pm.length * r, out, true)
+                }
+                if (t.highlight) drawPath(drawn, Color.White, style = Stroke(t.width + 5f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                drawPath(drawn, t.color, style = Stroke(t.width, cap = StrokeCap.Round, join = StrokeJoin.Round))
                 val s = v.toScreen(t.xs.first(), t.ys.first())
                 drawCircle(Color.White, 9f, s); drawCircle(Color(0xFF239B56), 6.5f, s)
                 if (t.xs.size > 1) {
@@ -273,17 +291,18 @@ fun TrackCanvas(
                         drawCircle(Color(0x662F7FC1), rr, p, style = Stroke(1.5f))
                     }
                 }
-                heading?.let { h ->
+                smoothHeading?.let { h ->
                     rotate(h, p) {
                         val cone = Path().apply {
                             moveTo(p.x, p.y)
-                            lineTo(p.x - 22f, p.y - 54f)
-                            quadraticTo(p.x, p.y - 64f, p.x + 22f, p.y - 54f)
+                            lineTo(p.x - 26f, p.y - 62f)
+                            quadraticTo(p.x, p.y - 74f, p.x + 26f, p.y - 62f)
                             close()
                         }
-                        drawPath(cone, Color(0x552F7FC1))
+                        drawPath(cone, androidx.compose.ui.graphics.Brush.radialGradient(listOf(Color(0x882F7FC1), Color(0x002F7FC1)), center = p, radius = 74f))
                     }
                 }
+                drawCircle(Color(0x33000000), 14f, p + Offset(0f, 2f))
                 drawCircle(Color.White, 13f, p)
                 drawCircle(Color(0xFF1E6FD9), 9f, p)
             }
@@ -328,6 +347,18 @@ fun TrackCanvas(
             drawNorth(measurer)
         }
 
+        // the "you are here" pulse on its own layer, so the map itself is not redrawn every frame
+        if (motion && fix != null) {
+            Canvas(Modifier.fillMaxSize()) {
+                if (cx.isNaN()) return@Canvas
+                val f = fix
+                val v = Viewport(cx, cy, mpp, this.size)
+                val p = v.toScreen(Geo.mercatorX(f.point.lon), Geo.mercatorY(f.point.lat))
+                val k = pulse.value
+                drawCircle(Color(0xFF1E6FD9).copy(alpha = 0.35f * (1f - k)), 13f + 34f * k, p)
+                drawCircle(Color(0xFF1E6FD9).copy(alpha = 0.5f * (1f - k)), 13f + 34f * k, p, style = Stroke(2f))
+            }
+        }
         Column(Modifier.align(Alignment.BottomEnd).padding(8.dp)) {
             MapButton(Icons.Outlined.Add) { mpp = (mpp / 1.6).coerceAtLeast(0.2) }
             MapButton(Icons.Outlined.Remove) { mpp = (mpp * 1.6).coerceAtMost(5000.0) }
@@ -406,6 +437,8 @@ fun GuideArrow(angle: Float, color: Color, modifier: Modifier = Modifier) {
 @Composable
 fun CompassRose(heading: Float, modifier: Modifier = Modifier) {
     val measurer = rememberTextMeasurer()
+    // the card turns smoothly the short way round instead of jumping with every sensor reading
+    @Suppress("NAME_SHADOWING") val heading = ir.mohitban.app.ui.components.rememberSmoothAngle(heading)
     Canvas(modifier) {
         val c = center
         val r = min(size.width, size.height) / 2 - 4
