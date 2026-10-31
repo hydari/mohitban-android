@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- No internet permission: the app is 100% offline. -->
+    <!-- Internet is used for one thing only: downloading a county map file published with the app
+         (gasht/CountyMaps.kt, MapDownloader). Nothing about the phone or the ranger is ever sent;
+         every other feature works fully offline. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- گشت‌یار: satellite GPS only (no internet); foreground service keeps recording with the screen off -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -13,6 +16,7 @@
     <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
 
     <application
+        android:usesCleartextTraffic="false"
         android:name=".MohitbanApp"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"

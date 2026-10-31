@@ -194,7 +194,21 @@ class GashtViewModel(private val c: AppContainer) : ViewModel() {
         tab = 0
     }
 
-    init { ir.mohitban.app.gasht.MapStore.active(ctx)?.let { openMap(it) } }
+    /** County suggestions the ranger closed with «بعداً» (until the screen is left). */
+    var dismissedMaps by mutableStateOf(setOf<String>())
+
+    init {
+        ir.mohitban.app.gasht.MapStore.active(ctx)?.let { openMap(it) }
+        // a county map that finished downloading is listed and shown at once
+        viewModelScope.launch {
+            ir.mohitban.app.gasht.MapDownloader.finished.collect { f ->
+                maps = ir.mohitban.app.gasht.MapStore.list(ctx)
+                openMap(f)
+            }
+        }
+    }
+
+    fun refreshMaps() { maps = ir.mohitban.app.gasht.MapStore.list(ctx) }
 
     private fun openMap(file: java.io.File?) {
         viewModelScope.launch {
@@ -576,12 +590,15 @@ private fun MapTab(vm: GashtViewModel) {
                 ChoiceChip(if (vm.showZones) "مرز مناطق: روشن" else "مرز مناطق: خاموش", vm.showZones, Modifier.weight(1f)) { vm.showZones = !vm.showZones }
             }
         }
+        // ---- county map: suggest the download where the ranger is ----
+        CountyMapSuggestion(vm, fix)
         // ---- base map choice ----
         Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             ChoiceChip("بدون نقشه", vm.activeMap == null, Modifier.weight(1f)) { vm.selectMap(null) }
             vm.maps.take(2).forEach { f ->
                 val on = vm.activeMap?.file?.path == f.path
-                ChoiceChip(if (on) vm.activeMap?.title?.substringBefore(" —")?.ifBlank { null } ?: f.nameWithoutExtension else f.nameWithoutExtension, on, Modifier.weight(1.3f)) { vm.selectMap(f) }
+                val label = ir.mohitban.app.gasht.CountyMaps.label(context, f)
+                ChoiceChip(if (on) vm.activeMap?.title?.substringBefore(" —")?.ifBlank { null } ?: label else label, on, Modifier.weight(1.3f)) { vm.selectMap(f) }
             }
             SmallAction(Icons.Outlined.Layers, "نقشه‌ها", Modifier.weight(0.9f)) { mapsDialog = true }
         }
@@ -880,12 +897,13 @@ private fun MapsDialog(vm: GashtViewModel, onDismiss: () -> Unit) {
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
-                    "نقشه‌ی توپوگرافی (پستی‌وبلندی، خطوط تراز، رودخانه، جنگل، جاده و روستاها) بدون اینترنت نمایش داده می‌شود. فایل نقشه (MBTiles) را اینجا وارد کنید.",
+                    "نقشه‌ی توپوگرافی (پستی‌وبلندی، خطوط تراز، رودخانه، جنگل، جاده و روستاها) بعد از یک بار دانلود، بدون اینترنت نمایش داده می‌شود.",
                     style = MaterialTheme.typography.bodySmall, color = MColors.Ink,
                 )
-                PillButton(
-                    if (vm.mapBusy) "در حال وارد کردن…" else "وارد کردن فایل نقشه (MBTiles)",
-                    { picker.launch(arrayOf("*/*")) }, Modifier.padding(top = 10.dp), loading = vm.mapBusy,
+                CountyMapList(vm)
+                ir.mohitban.app.ui.components.OutlinePill(
+                    if (vm.mapBusy) "در حال وارد کردن…" else "وارد کردن فایل نقشه از گوشی (MBTiles)",
+                    { picker.launch(arrayOf("*/*")) }, Modifier.fillMaxWidth().padding(top = 12.dp),
                 )
                 message?.let { Text(it, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = MColors.Green, modifier = Modifier.padding(top = 6.dp)) }
                 // ---- protected-area boundaries ----
@@ -906,7 +924,7 @@ private fun MapsDialog(vm: GashtViewModel, onDismiss: () -> Unit) {
                 vm.maps.forEach { f ->
                     Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text(f.nameWithoutExtension, style = MaterialTheme.typography.titleSmall)
+                            Text(ir.mohitban.app.gasht.CountyMaps.label(context, f), style = MaterialTheme.typography.titleSmall)
                             Text("${(f.length() / (1024 * 1024)).fa()} مگابایت", style = MaterialTheme.typography.labelSmall, color = MColors.Muted)
                         }
                         SmallAction(Icons.Outlined.Close, "حذف", color = MColors.Error) { deleting = f }
@@ -918,7 +936,7 @@ private fun MapsDialog(vm: GashtViewModel, onDismiss: () -> Unit) {
     )
     deleting?.let { f ->
         ConfirmDialog(
-            title = "حذف نقشه", text = "فایل نقشه‌ی «${f.nameWithoutExtension}» از گوشی حذف شود؟", confirm = "حذف", danger = true,
+            title = "حذف نقشه", text = "نقشه‌ی «${ir.mohitban.app.gasht.CountyMaps.label(context, f)}» از گوشی حذف شود؟ هر وقت بخواهید دوباره دانلود می‌شود.", confirm = "حذف", danger = true,
             onConfirm = { vm.deleteMap(f); deleting = null }, onDismiss = { deleting = null },
         )
     }
