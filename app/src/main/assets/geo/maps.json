@@ -1,0 +1,299 @@
+{
+ "version": 1,
+ "maps": [
+  {
+   "name": "آذرشهر",
+   "province": "آذربایجان شرقی",
+   "file": "county-55f5c48d3d.mbtiles",
+   "size": 2080768,
+   "sha256": "4f83d16299f2d632e7cdc724c883e3cc0f4d482a2f46a54f5ef80c8634de252a",
+   "bounds": [
+    45.43814,
+    37.53446,
+    46.19601,
+    37.92841
+   ],
+   "tiles": 257
+  },
+  {
+   "name": "اسکو",
+   "province": "آذربایجان شرقی",
+   "file": "county-a024563e1c.mbtiles",
+   "size": 2646016,
+   "sha256": "f377dfb2a3c218dec4d08ce0f4b376ca647721d67cf20cee8d4dc33948392d52",
+   "bounds": [
+    45.28093,
+    37.63262,
+    46.38188,
+    38.07728
+   ],
+   "tiles": 356
+  },
+  {
+   "name": "اهر",
+   "province": "آذربایجان شرقی",
+   "file": "county-ce7b93c6ab.mbtiles",
+   "size": 4907008,
+   "sha256": "5bd492112ae273326bb09dc1a5c06bde2ab6bb1dab1f6216154d13d86e4fbb5f",
+   "bounds": [
+    46.71437,
+    38.27448,
+    47.59996,
+    38.78061
+   ],
+   "tiles": 358
+  },
+  {
+   "name": "بستان آباد",
+   "province": "آذربایجان شرقی",
+   "file": "county-7e399d573a.mbtiles",
+   "size": 5046272,
+   "sha256": "be45abadd502e1aea0c899174996416ea68283af180250cdda802e93968ffbec",
+   "bounds": [
+    46.44442,
+    37.50919,
+    47.27217,
+    38.11288
+   ],
+   "tiles": 417
+  },
+  {
+   "name": "بناب",
+   "province": "آذربایجان شرقی",
+   "file": "county-cc4d05edaa.mbtiles",
+   "size": 1515520,
+   "sha256": "4c20bd65962106c5b6c2b445d51cd68df2a5af3d8d4e97717aa74775364e1cb1",
+   "bounds": [
+    45.61212,
+    37.13917,
+    46.22375,
+    37.56223
+   ],
+   "tiles": 202
+  },
+  {
+   "name": "تبریز",
+   "province": "آذربایجان شرقی",
+   "file": "county-629293ceaf.mbtiles",
+   "size": 4812800,
+   "sha256": "5c4959c10bd6dfb1f1b547854ae889c9c62b2b218e968847f6600643c1cc5840",
+   "bounds": [
+    45.82459,
+    37.68719,
+    46.72361,
+    38.5167
+   ],
+   "tiles": 411
+  },
+  {
+   "name": "جلفا",
+   "province": "آذربایجان شرقی",
+   "file": "county-a2844169b8.mbtiles",
+   "size": 4612096,
+   "sha256": "a703a38b78758d8b1ed68581e1a6535402b19e51284102c077efa8d05d796ad1",
+   "bounds": [
+    45.25152,
+    38.61801,
+    46.55438,
+    39.023
+   ],
+   "tiles": 345
+  },
+  {
+   "name": "خداآفرین",
+   "province": "آذربایجان شرقی",
+   "file": "county-5489d22866.mbtiles",
+   "size": 4075520,
+   "sha256": "29c5c9fa762e0fb6300270198e37493c8ea00608347dd81b324d07ad82a35f97",
+   "bounds": [
+    46.39889,
+    38.71197,
+    47.53493,
+    39.45173
+   ],
+   "tiles": 339
+  },
+  {
+   "name": "سراب",
+   "province": "آذربایجان شرقی",
+   "file": "county-7e5c1a1fce.mbtiles",
+   "size": 5824512,
+   "sha256": "d9f23bee86da74d6d2510cfa310c369e24f4e58b7114ab693e812af40331cc09",
+   "bounds": [
+    46.96549,
+    37.70891,
+    47.96776,
+    38.28282
+   ],
+   "tiles": 501
+  },
+  {
+   "name": "شبستر",
+   "province": "آذربایجان شرقی",
+   "file": "county-13a3a82c83.mbtiles",
+   "size": 3923968,
+   "sha256": "5cd36891f8874293fba445bc51ad3fab8d1d2eb9a5c7b5125d293d533d83add2",
+   "bounds": [
+    45.06345,
+    37.97058,
+    46.37435,
+    38.51337
+   ],
+   "tiles": 491
+  },
+  {
+   "name": "عجب شیر",
+   "province": "آذربایجان شرقی",
+   "file": "county-25d787e761.mbtiles",
+   "size": 2228224,
+   "sha256": "3e3007ffa95af94019ba1372b21d4c11b873fa391764337df8813bbe4d6c9cfc",
+   "bounds": [
+    45.42886,
+    37.27335,
+    46.3637,
+    37.73797
+   ],
+   "tiles": 277
+  },
+  {
+   "name": "مرند",
+   "province": "آذربایجان شرقی",
+   "file": "county-282aefb030.mbtiles",
+   "size": 5492736,
+   "sha256": "ed11aaa54a5952d582db5d05af27eff5e530cefa54af3d16efff4e39739de886",
+   "bounds": [
+    45.19573,
+    38.25668,
+    46.2294,
+    38.9126
+   ],
+   "tiles": 490
+  },
+  {
+   "name": "ملکان",
+   "province": "آذربایجان شرقی",
+   "file": "county-2fed95440c.mbtiles",
+   "size": 1814528,
+   "sha256": "bb1dde9a4ae0dc3a2de06995053d0c3c4ee95671b727f042d2c3d8eb644275c8",
+   "bounds": [
+    45.88544,
+    36.91137,
+    46.47039,
+    37.31446
+   ],
+   "tiles": 177
+  },
+  {
+   "name": "میانه",
+   "province": "آذربایجان شرقی",
+   "file": "county-a1bb1bfaba.mbtiles",
+   "size": 10199040,
+   "sha256": "4c0034c30a4c8957589be6119a0119815284923ced1dce6f4955e54d59aafdd1",
+   "bounds": [
+    47.17689,
+    37.01904,
+    48.37582,
+    37.92496
+   ],
+   "tiles": 740
+  },
+  {
+   "name": "هریس",
+   "province": "آذربایجان شرقی",
+   "file": "county-31f548f8c0.mbtiles",
+   "size": 4308992,
+   "sha256": "2d726e7376a02a38f72f984c2d1f7139c8bd5fe0789d0c58ef1bc36de772abcf",
+   "bounds": [
+    46.34249,
+    38.02586,
+    47.40495,
+    38.43449
+   ],
+   "tiles": 366
+  },
+  {
+   "name": "هشترود",
+   "province": "آذربایجان شرقی",
+   "file": "county-108bffe23d.mbtiles",
+   "size": 4845568,
+   "sha256": "d63d4e092e630746276bdee82d9f10fa45d316e3f6b19f973c0bad61a7d935cb",
+   "bounds": [
+    46.43919,
+    37.11868,
+    47.34746,
+    37.67642
+   ],
+   "tiles": 385
+  },
+  {
+   "name": "هوراند",
+   "province": "آذربایجان شرقی",
+   "file": "county-27e038593a.mbtiles",
+   "size": 3297280,
+   "sha256": "8a4c8481cc3871452128228fc508be11db18775ed5fe61ae7d3eddd5485509e2",
+   "bounds": [
+    47.12217,
+    38.56393,
+    47.60079,
+    39.11464
+   ],
+   "tiles": 217
+  },
+  {
+   "name": "ورزقان",
+   "province": "آذربایجان شرقی",
+   "file": "county-131d7bdabf.mbtiles",
+   "size": 4734976,
+   "sha256": "6c534a9785d635eb8c3ba20e6e13557210e45e762ce4ce33489e6d8569b6bb41",
+   "bounds": [
+    46.00288,
+    38.34365,
+    46.89243,
+    38.82172
+   ],
+   "tiles": 363
+  },
+  {
+   "name": "ویژه مراغه",
+   "province": "آذربایجان شرقی",
+   "file": "county-5576e7385e.mbtiles",
+   "size": 4620288,
+   "sha256": "48dd8fbd29914af4267e5dd01ea4972f035bd7db28018973b0fc025c80466d50",
+   "bounds": [
+    46.08065,
+    36.98587,
+    46.75187,
+    37.77338
+   ],
+   "tiles": 371
+  },
+  {
+   "name": "چاراویماق",
+   "province": "آذربایجان شرقی",
+   "file": "county-4a0f535ddd.mbtiles",
+   "size": 6184960,
+   "sha256": "4951b5500f05851ac31308d43d4b3a18d097e4bdac67ba878668ec90b0ed22a0",
+   "bounds": [
+    46.62409,
+    36.71528,
+    47.6757,
+    37.39502
+   ],
+   "tiles": 447
+  },
+  {
+   "name": "کلیبر",
+   "province": "آذربایجان شرقی",
+   "file": "county-c1c2a1ebb5.mbtiles",
+   "size": 5193728,
+   "sha256": "94926b9d8f5d40089790fe60ff8006ba9789f273d9abda4b92ee60468da1a0b6",
+   "bounds": [
+    46.65464,
+    38.58433,
+    47.56647,
+    39.31661
+   ],
+   "tiles": 384
+  }
+ ]
+}
