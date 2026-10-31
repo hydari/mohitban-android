@@ -244,7 +244,7 @@ fun DashboardScreen(
                 }
 
                 // ---------- personal card (liquid glass): photo | name, rank · station | bell ----------
-                GlassCard(Modifier.fillMaxWidth().padding(top = 2.dp).staggerIn(3, "dash"), dark = true) {
+                GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).staggerIn(3, "dash"), dark = true) {
                     GlassRing(
                         70.dp, Modifier.padding(start = 12.dp, top = 12.dp, bottom = 12.dp), onClick = onProfile,
                         rim = shiftStatus?.let { if (it is ShiftStatus.OnDuty) ShiftColors.On else ShiftColors.Off },

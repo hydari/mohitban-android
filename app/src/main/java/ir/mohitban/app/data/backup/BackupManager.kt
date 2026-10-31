@@ -62,6 +62,7 @@ class BackupManager(
             }
         })
 
+        json.put("patrolZones", JSONArray().apply { ir.mohitban.app.gasht.MyZones.list(context).forEach { put(it) } })
         json.put("patrols", JSONArray().apply {
             gd.getPatrols().forEach { p ->
                 put(JSONObject().apply {
@@ -177,6 +178,7 @@ class BackupManager(
                 })
             }
         }
+        json.optJSONArray("patrolZones")?.let { arr -> ir.mohitban.app.gasht.MyZones.save(context, (0 until arr.length()).map { arr.getString(it) }) }
         // track statistics are derived; recompute after restore
         if (tracks != null) db.gashtDao().getTracks().forEach { ir.mohitban.app.gasht.GashtRepository(db, files).refreshStats(it.id) }
         // replace pictures

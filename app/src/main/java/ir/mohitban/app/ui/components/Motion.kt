@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
@@ -263,10 +264,32 @@ fun SkyHeader(
     val breathe = t.animateFloat(0f, 1f, infiniteRepeatable(tween(28_000, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "kb")
     val appear = remember { Animatable(if (motion) 0f else 1f) }
     LaunchedEffect(Unit) { appear.animateTo(1f, tween(1100, easing = FastOutSlowInEasing)) }
+    // the season of the Jalali calendar decides the landscape: green spring, golden summer,
+    // autumn colours with falling leaves, snowy winter with snowfall and blizzard gusts
+    val season = remember(now / 3_600_000) { (ir.mohitban.app.core.jalali.JalaliDate.today().month - 1) / 3 }
+    val photo = when (season) {
+        0 -> ir.mohitban.app.R.drawable.sky_spring
+        1 -> ir.mohitban.app.R.drawable.sky_summer
+        2 -> ir.mohitban.app.R.drawable.sky_autumn
+        else -> ir.mohitban.app.R.drawable.sky_winter
+    }
+    val weather = remember { Weather() }
+    if (motion && season != 1) {
+        LaunchedEffect(season) {
+            var last = 0L
+            while (true) {
+                androidx.compose.runtime.withFrameNanos { ns ->
+                    val dt = if (last == 0L) 0f else ((ns - last) / 1e9f).coerceAtMost(0.05f)
+                    last = ns
+                    weather.step(dt, season)
+                }
+            }
+        }
+    }
 
-    Box(modifier.clipToBounds()) {
+    Box(modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp))) {
         androidx.compose.foundation.Image(
-            androidx.compose.ui.res.painterResource(ir.mohitban.app.R.drawable.sky_header), null,
+            androidx.compose.ui.res.painterResource(photo), null,
             contentScale = androidx.compose.ui.layout.ContentScale.Crop,
             alignment = Alignment.TopCenter,
             colorFilter = filter,
@@ -288,10 +311,94 @@ fun SkyHeader(
                     drawCircle(Color.White.copy(alpha = (0.75f * k * tw).coerceIn(0f, 1f)), s.r.dp.toPx(), Offset(s.x * w, s.y * h))
                 }
             }
-            // a soft shade under the status bar and the fade into the page
+            // a soft shade under the status bar only; the photo is otherwise shown whole
             drawRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.30f), Color.Transparent), endY = h * 0.25f))
-            drawRect(Brush.verticalGradient(0.84f to Color.Transparent, 0.95f to Clay.Bg.copy(alpha = 0.7f), 1f to Clay.Bg, startY = 0f, endY = h))
+        }
+        if (motion && season != 1) {
+            Canvas(Modifier.matchParentSize()) { drawWeather(weather, season, appear.value) }
         }
         content()
+    }
+}
+
+/* ------------------------------ seasonal weather ------------------------------ */
+
+/** Time and wind for the falling particles (advanced every frame, read only while drawing). */
+private class Weather {
+    var t by androidx.compose.runtime.mutableFloatStateOf(0f)
+    var windX = 0f
+    var gust = 0f
+
+    fun step(dt: Float, season: Int) {
+        t += dt
+        // winter: calm snowfall broken by blizzard gusts every half minute or so
+        gust = if (season == 3) {
+            val g = sin(t * 0.21f) * 0.6f + sin(t * 0.53f + 1.3f) * 0.4f
+            ((g - 0.35f) / 0.65f).coerceIn(0f, 1f).let { it * it }
+        } else 0f
+        val base = when (season) { 3 -> 18f; 2 -> 14f; else -> 6f }
+        windX += dt * (base + gust * 340f)
+    }
+}
+
+private fun hash(i: Int, k: Int): Float {
+    var x = i * 374761393 + k * 668265263
+    x = (x xor (x ushr 13)) * 1274126177
+    return ((x xor (x ushr 16)) and 0xFFFFFF) / 16777215f
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawWeather(w: Weather, season: Int, alpha: Float) {
+    val W = size.width; val H = size.height
+    val t = w.t
+    val dp = density
+    fun wrap(v: Float, m: Float) = ((v % m) + m) % m
+    when (season) {
+        3 -> { // snow, with streaks and white-out during gusts
+            val gust = w.gust
+            if (gust > 0.02f) drawRect(Color.White.copy(alpha = 0.22f * gust * alpha))
+            for (i in 0 until 110) {
+                val depth = 0.35f + 0.65f * hash(i, 1)
+                val fall = (22f + 34f * depth) * dp
+                val y = wrap(hash(i, 2) * H + t * fall, H + 10f) - 5f
+                val x = wrap(hash(i, 3) * W + w.windX * depth * dp + sin(t * (0.6f + hash(i, 4)) + i) * 6f * dp, W + 20f) - 10f
+                val r = (0.7f + 1.5f * depth) * dp
+                val a = (0.45f + 0.5f * depth) * alpha
+                if (gust > 0.15f) {
+                    val len = gust * 14f * depth * dp
+                    drawLine(Color.White.copy(alpha = a), Offset(x - len, y - len * 0.25f), Offset(x, y), r * 1.3f, cap = StrokeCap.Round)
+                } else {
+                    drawCircle(Color.White.copy(alpha = a), r, Offset(x, y))
+                }
+            }
+        }
+        2 -> { // autumn leaves drifting down and turning
+            val colors = listOf(Color(0xFFD9822B), Color(0xFFB8471E), Color(0xFFE8B23A), Color(0xFF9C3A17))
+            for (i in 0 until 16) {
+                val depth = 0.5f + 0.5f * hash(i, 1)
+                val fall = (14f + 18f * depth) * dp
+                val y = wrap(hash(i, 2) * H + t * fall, H + 30f) - 15f
+                val x = wrap(hash(i, 3) * W + w.windX * depth * dp + sin(t * (0.7f + hash(i, 4) * 0.6f) + i) * 18f * dp, W + 30f) - 15f
+                val len = (5f + 4f * depth) * dp
+                val spin = t * (60f + 90f * hash(i, 5)) + i * 40f
+                val flip = kotlin.math.abs(sin(t * (1.2f + hash(i, 6)) + i))
+                rotate(spin, Offset(x, y)) {
+                    val leaf = Path().apply {
+                        moveTo(x - len, y)
+                        quadraticTo(x, y - len * 0.6f * (0.3f + flip), x + len, y)
+                        quadraticTo(x, y + len * 0.6f * (0.3f + flip), x - len, y)
+                        close()
+                    }
+                    drawPath(leaf, colors[i % colors.size].copy(alpha = 0.9f * alpha))
+                }
+            }
+        }
+        0 -> { // spring: a few pale petals and pollen floating in the light
+            for (i in 0 until 14) {
+                val depth = 0.4f + 0.6f * hash(i, 1)
+                val y = wrap(hash(i, 2) * H + t * 6f * dp * depth + sin(t * 0.8f + i) * 8f * dp, H + 10f) - 5f
+                val x = wrap(hash(i, 3) * W + w.windX * depth * dp, W + 10f) - 5f
+                drawCircle(Color(0xFFFFF4F6).copy(alpha = (0.35f + 0.4f * depth) * alpha), (1.2f + 1.6f * depth) * dp, Offset(x, y))
+            }
+        }
     }
 }

@@ -70,6 +70,9 @@ import ir.mohitban.app.core.jalali.JalaliDate
 import ir.mohitban.app.core.text.fa
 import ir.mohitban.app.data.local.PatrolLogEntity
 import ir.mohitban.app.gasht.Finding
+import ir.mohitban.app.gasht.MyZones
+import ir.mohitban.app.gasht.Sighting
+import ir.mohitban.app.gasht.Sightings
 import ir.mohitban.app.gasht.PatrolModes
 import ir.mohitban.app.gasht.PatrolPeriod
 import ir.mohitban.app.gasht.PatrolStats
@@ -136,9 +139,12 @@ fun PatrolLogTab(g: GashtViewModel) {
     val fix by g.fix.collectAsStateWithLifecycle()
     val today = remember { JalaliDate.today() }
     var period by remember { mutableStateOf(PatrolPeriod(today.year, today.month)) }
-    val known = remember(g.zones) { g.zones.map { it.title }.distinct().sorted() }
     val all = logs.orEmpty()
-    val stats = remember(all, period, known) { PatrolStats.of(all, period, known) }
+    // the ranger's own list of areas (plus any area already written in the logbook)
+    var myZones by remember { mutableStateOf(MyZones.list(context)) }
+    val known = remember(myZones, all) { (myZones + all.map { it.zone.trim() }).filter { it.isNotEmpty() }.distinct() }
+    val stats = remember(all, period) { PatrolStats.of(all, period, emptyList()) }
+    val species = remember(stats) { Sightings.totals(stats.logs) }
     var editing by remember { mutableStateOf<PatrolLogEntity?>(null) }
     var saved by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -174,9 +180,8 @@ fun PatrolLogTab(g: GashtViewModel) {
 
         // ---- add ----
         PillButton("ثبت گشت جدید", icon = Icons.Outlined.Add, onClick = {
-            val here = fix?.point?.let { p -> ZoneStore.status(g.zones, p).inside?.title }
             editing = PatrolLogEntity(
-                jdn = today.jdn, startMin = minuteOfDay(System.currentTimeMillis()), zone = here.orEmpty(),
+                jdn = today.jdn, startMin = minuteOfDay(System.currentTimeMillis()), zone = all.firstOrNull()?.zone.orEmpty(),
                 mode = PatrolModes.ALL[1], createdAt = 0L,
             )
         })
@@ -188,12 +193,11 @@ fun PatrolLogTab(g: GashtViewModel) {
                 {
                     scope.launch {
                         val pts = withContext(Dispatchers.IO) { context.container.gasht.points(lastRec.id) }
-                        val zone = dominantZone(pts, g.zones)?.title
                         val start = pts.firstOrNull()?.time ?: lastRec.createdAt
                         val end = pts.lastOrNull()?.time ?: (lastRec.createdAt + lastRec.duration)
                         editing = PatrolLogEntity(
                             jdn = jalaliFromMillis(start).jdn, startMin = minuteOfDay(start), endMin = minuteOfDay(end),
-                            zone = zone ?: OUTSIDE_ZONES, mode = PatrolModes.ALL[0],
+                            zone = all.firstOrNull()?.zone.orEmpty(), mode = PatrolModes.ALL[0],
                             distanceKm = (lastRec.distance / 100.0).toInt() / 10.0, trackId = lastRec.id, createdAt = 0L,
                         )
                     }
@@ -201,9 +205,35 @@ fun PatrolLogTab(g: GashtViewModel) {
                 Modifier.fillMaxWidth().padding(top = 8.dp), Icons.Outlined.Route,
             )
             Text(
-                "تاریخ، ساعت، مسافت و منطقه از مسیر ضبط‌شده پر می‌شود؛ فقط موارد مشاهده‌شده را اضافه کنید.",
+                "تاریخ، ساعت و مسافت از مسیر ضبط‌شده پر می‌شود؛ منطقه و موارد مشاهده‌شده را وارد کنید.",
                 style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 4.dp, start = 4.dp),
             )
+        }
+
+        // ---- the ranger's areas ----
+        SectionHead("مناطق من")
+        AppCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(14.dp)) {
+                var newZone by remember { mutableStateOf("") }
+                if (myZones.isEmpty()) {
+                    Text("مناطق و محدوده‌هایی را که گشت می‌زنید اینجا وارد کنید تا هنگام ثبت گشت فقط انتخاب شوند.", style = MaterialTheme.typography.labelSmall, color = MColors.Muted)
+                }
+                myZones.forEach { z ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(8.dp).clip(CircleShape).background(MColors.Green2))
+                        Text("  $z", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = MColors.Ink, modifier = Modifier.weight(1f))
+                        Box(Modifier.size(34.dp).clip(CircleShape).clickable { MyZones.remove(context, z); myZones = MyZones.list(context) }, contentAlignment = Alignment.Center) {
+                            Icon(Icons.Outlined.Close, "حذف $z", tint = MColors.Muted, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+                Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MField(newZone, { newZone = it }, Modifier.weight(1f), placeholder = "نام منطقه یا محدوده", maxLength = 60)
+                    SmallAction(Icons.Outlined.Add, "افزودن", enabled = newZone.isNotBlank()) {
+                        MyZones.add(context, newZone); myZones = MyZones.list(context); newZone = ""
+                    }
+                }
+            }
         }
 
         // ---- period ----
@@ -253,18 +283,19 @@ fun PatrolLogTab(g: GashtViewModel) {
                 }
             }
         }
-        if (stats.unvisited.isNotEmpty()) {
-            SectionHead("مناطق بدون گشت در این دوره (${stats.unvisited.size.fa()})", MColors.Error)
+        if (species.isNotEmpty()) {
+            SectionHead("حیات‌وحش مشاهده‌شده")
             AppCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(14.dp)) {
-                    stats.unvisited.forEach { z ->
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 3.dp)) {
-                            Icon(Icons.Outlined.WarningAmber, null, tint = MColors.Error, modifier = Modifier.size(16.dp))
-                            Text("  $z", style = MaterialTheme.typography.bodySmall, color = MColors.Ink)
+                    species.forEach { (sp, n, times) ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF8A6A2E)))
+                            Text("  $sp", style = MaterialTheme.typography.bodySmall, color = MColors.Ink, modifier = Modifier.weight(1f))
+                            Text("${n.fa()} فرد | ${times.fa()} گشت", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = Color(0xFF6E5322))
                         }
                     }
                     Text(
-                        "برای پوشش متعادل، در گشت‌های بعدی به این مناطق هم سر بزنید.",
+                        "جمع ${species.size.fa()} گونه و ${species.sumOf { it.second }.fa()} فرد در ${period.title.fa()}",
                         style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 6.dp),
                     )
                 }
@@ -311,7 +342,7 @@ fun PatrolLogTab(g: GashtViewModel) {
         PatrolEditor(
             draft, zones = known,
             onDismiss = { editing = null },
-            onSave = { p -> pv.save(p) { editing = null; saved = true } },
+            onSave = { p -> MyZones.add(context, p.zone); myZones = MyZones.list(context); pv.save(p) { editing = null; saved = true } },
             onDelete = { pv.delete(draft.id); editing = null },
         )
     }
@@ -377,6 +408,13 @@ private fun PatrolCard(p: PatrolLogEntity, modifier: Modifier, onOpen: () -> Uni
             p.spot.takeIf { it.isNotBlank() },
         )
         Text(parts.joinToString(" • "), style = MaterialTheme.typography.labelMedium, color = MColors.Ink, modifier = Modifier.padding(top = 8.dp))
+        val seen = Sightings.parse(p.wildlife).first
+        if (seen.isNotEmpty()) {
+            Text(
+                "حیات‌وحش: " + seen.joinToString("، ") { "${it.species} ${it.count.fa()}" },
+                style = MaterialTheme.typography.labelSmall, color = Color(0xFF6E5322), modifier = Modifier.padding(top = 4.dp),
+            )
+        }
         val f = Finding.parse(p.findings)
         if (f.isNotEmpty() || p.violations > 0) {
             Text(
@@ -407,7 +445,9 @@ private fun PatrolEditor(
     var dist by remember { mutableStateOf(draft.distanceKm?.let { String.format(java.util.Locale.US, "%.1f", it).removeSuffix(".0") }.orEmpty()) }
     var findings by remember { mutableStateOf(Finding.parse(draft.findings)) }
     var violations by remember { mutableStateOf(if (draft.violations > 0) draft.violations.toString() else "") }
-    var wildlife by remember { mutableStateOf(draft.wildlife) }
+    val parsedWildlife = remember { Sightings.parse(draft.wildlife) }
+    var sightings by remember { mutableStateOf(parsedWildlife.first.ifEmpty { listOf(Sighting("", 0)) }) }
+    val wildlifeNote = parsedWildlife.second
     var companions by remember { mutableStateOf(draft.companions) }
     var notes by remember { mutableStateOf(draft.notes) }
     var pickDate by remember { mutableStateOf(false) }
@@ -438,7 +478,7 @@ private fun PatrolEditor(
                     MField(clockText(start).fa(), {}, Modifier.weight(1f), label = "ساعت شروع", leadingIcon = Icons.Outlined.Schedule, onClick = { pickTime(start) { start = it } })
                     MField(clockText(end).fa(), {}, Modifier.weight(1f), label = "ساعت پایان", leadingIcon = Icons.Outlined.Schedule, onClick = { pickTime(end ?: start) { end = it } })
                 }
-                ComboField(zone, { zone = it; error = null }, zones + OUTSIDE_ZONES, label = "منطقه‌ی گشت", placeholder = "منطقه را انتخاب یا بنویسید", error = error)
+                ComboField(zone, { zone = it; error = null }, zones, label = "منطقه‌ی گشت", placeholder = "از «مناطق من» انتخاب کنید یا بنویسید", error = error)
                 MField(spot, { spot = it }, label = "محدوده / نام محل (اختیاری)", placeholder = "مثلاً دره‌ی …، چشمه‌ی …")
                 Text("نوع گشت", style = MaterialTheme.typography.labelLarge, color = MColors.Ink)
                 PatrolModes.ALL.chunked(2).forEach { row ->
@@ -463,7 +503,26 @@ private fun PatrolEditor(
                     }
                 }
                 MField(violations, { violations = it }, label = "تعداد تخلف / متخلف برخوردشده", numeric = NumericMode.Digits, maxLength = 3)
-                MField(wildlife, { wildlife = it }, label = "حیات‌وحش مشاهده‌شده (گونه و تعداد)", placeholder = "مثلاً ۱۲ رأس کل و بز", maxLength = 200)
+                Text("حیات‌وحش مشاهده‌شده", style = MaterialTheme.typography.labelLarge, color = MColors.Ink)
+                sightings.forEachIndexed { i, sg ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        ComboField(
+                            sg.species, { v -> sightings = sightings.toMutableList().also { it[i] = sg.copy(species = v) } },
+                            Sightings.COMMON, Modifier.weight(1f), placeholder = "گونه",
+                        )
+                        MField(
+                            if (sg.count > 0) sg.count.toString() else "", { v -> sightings = sightings.toMutableList().also { it[i] = sg.copy(count = v.toIntOrNull() ?: 0) } },
+                            Modifier.width(84.dp), placeholder = "تعداد", numeric = NumericMode.Digits, maxLength = 5,
+                        )
+                        Box(
+                            Modifier.size(36.dp).clip(CircleShape).clickable {
+                                sightings = (sightings.toMutableList().also { it.removeAt(i) }).ifEmpty { listOf(Sighting("", 0)) }
+                            },
+                            contentAlignment = Alignment.Center,
+                        ) { Icon(Icons.Outlined.Close, "حذف گونه", tint = MColors.Muted, modifier = Modifier.size(18.dp)) }
+                    }
+                }
+                SmallAction(Icons.Outlined.Add, "افزودن گونه") { sightings = sightings + Sighting("", 0) }
                 MField(companions, { companions = it }, label = "همراهان گشت", maxLength = 120)
                 MField(notes, { notes = it }, label = "شرح و توضیحات", maxLength = 600)
                 Spacer(Modifier.height(4.dp))
@@ -473,7 +532,7 @@ private fun PatrolEditor(
                         draft.copy(
                             jdn = date.jdn, startMin = start, endMin = end, zone = zone.trim(), spot = spot.trim(), mode = mode,
                             distanceKm = dist.replace('٫', '.').toDoubleOrNull(), findings = Finding.encode(findings),
-                            violations = violations.toIntOrNull() ?: 0, wildlife = wildlife.trim(), companions = companions.trim(), notes = notes.trim(),
+                            violations = violations.toIntOrNull() ?: 0, wildlife = Sightings.encode(sightings, wildlifeNote), companions = companions.trim(), notes = notes.trim(),
                         ),
                     )
                 })

@@ -125,3 +125,70 @@ fun minuteOfDay(ms: Long): Int {
     val c = java.util.Calendar.getInstance().apply { timeInMillis = ms }
     return c.get(java.util.Calendar.HOUR_OF_DAY) * 60 + c.get(java.util.Calendar.MINUTE)
 }
+
+/** The protected areas the ranger patrols, entered by the ranger (kept on the phone and in backups). */
+object MyZones {
+    private const val PREFS = "patrol"
+    private const val KEY = "zones"
+
+    fun list(context: android.content.Context): List<String> =
+        context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE).getString(KEY, null)
+            ?.split('\n')?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
+
+    fun save(context: android.content.Context, zones: List<String>) {
+        context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE).edit()
+            .putString(KEY, zones.map { it.trim() }.filter { it.isNotEmpty() }.distinct().joinToString("\n")).apply()
+    }
+
+    fun add(context: android.content.Context, zone: String) {
+        val z = zone.trim()
+        if (z.isEmpty()) return
+        val l = list(context)
+        if (z !in l) save(context, l + z)
+    }
+
+    fun remove(context: android.content.Context, zone: String) = save(context, list(context) - zone)
+}
+
+/** One species seen on a patrol and how many. */
+data class Sighting(val species: String, val count: Int)
+
+/**
+ * Wildlife seen on a patrol, stored in the log's wildlife text as one "species<TAB>count" per
+ * line; older free-text notes are kept as a note.
+ */
+object Sightings {
+    val COMMON = listOf(
+        "کل و بز", "قوچ و میش", "آهو", "جبیر", "مرال", "شوکا", "گراز", "خرس قهوه‌ای", "پلنگ", "گرگ", "کفتار", "سیاه‌گوش",
+        "گربه وحشی", "شغال", "روباه", "خرگوش", "تشی", "کبک", "تیهو", "باقرقره", "هوبره", "عقاب طلایی", "کرکس", "دال",
+        "شاهین", "بالابان", "جغد", "لک‌لک", "فلامینگو", "پلیکان", "قو", "غاز وحشی", "اردک", "حواصیل", "سمور آبی",
+    )
+
+    fun parse(text: String): Pair<List<Sighting>, String> {
+        val list = mutableListOf<Sighting>()
+        val notes = mutableListOf<String>()
+        text.lines().forEach { line ->
+            val parts = line.split('\t')
+            val n = parts.getOrNull(1)?.trim()?.toIntOrNull()
+            if (parts.size == 2 && n != null && parts[0].isNotBlank()) list += Sighting(parts[0].trim(), n)
+            else if (line.isNotBlank()) notes += line.trim()
+        }
+        return list to notes.joinToString(" ")
+    }
+
+    fun encode(list: List<Sighting>, note: String = ""): String =
+        (list.filter { it.species.isNotBlank() && it.count > 0 }.map { "${it.species.trim()}\t${it.count}" } + listOfNotNull(note.trim().ifEmpty { null }))
+            .joinToString("\n")
+
+    /** Species → (total animals, number of patrols that saw it), most seen first. */
+    fun totals(logs: List<PatrolLogEntity>): List<Triple<String, Int, Int>> {
+        val sum = LinkedHashMap<String, Pair<Int, Int>>()
+        logs.forEach { p ->
+            parse(p.wildlife).first.groupBy { it.species }.forEach { (sp, l) ->
+                val (a, b) = sum[sp] ?: (0 to 0)
+                sum[sp] = (a + l.sumOf { it.count }) to (b + 1)
+            }
+        }
+        return sum.map { Triple(it.key, it.value.first, it.value.second) }.sortedByDescending { it.second }
+    }
+}

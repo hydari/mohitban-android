@@ -190,6 +190,12 @@ class PatrolReportRenderer(private val context: Context, private val files: File
             w.row(listOf("مورد" to 0f, "تعداد گشت‌ها" to 90f), head = true)
             s.findings.forEachIndexed { i, (f, n) -> w.row(listOf(f.title to 0f, n.fa() to 90f), shade = i % 2 == 1, color = if (f.problem) Color.rgb(160, 40, 34) else PdfKit.INK) }
         }
+        val species = ir.mohitban.app.gasht.Sightings.totals(s.logs)
+        if (species.isNotEmpty()) {
+            w.section("حیات‌وحش مشاهده‌شده (${species.size.fa()} گونه)")
+            w.row(listOf("گونه" to 0f, "تعداد فرد" to 90f, "دفعات مشاهده" to 90f), head = true)
+            species.forEachIndexed { i, (sp, n, times) -> w.row(listOf(sp to 0f, n.fa() to 90f, times.fa() to 90f), shade = i % 2 == 1) }
+        }
         if (s.modes.isNotEmpty()) {
             w.section("نوع گشت")
             w.row(listOf("نوع" to 0f, "تعداد" to 90f), head = true)
