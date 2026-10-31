@@ -234,7 +234,7 @@ fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?) {
                         TableRow(listOf("کیلومتر ابتدای فصل", s.firstOdometer?.rial() ?: "—"))
                         TableRow(listOf("کیلومتر آخرین ثبت", s.lastOdometer?.rial() ?: "—"), last = true)
                     }
-                    SectionTitle("نمودار ماهانه هزینه")
+                    SectionTitle("نمودار ماهانه هزینه (ریال)")
                     AppCard(Modifier.fillMaxWidth()) { MonthBars(s) }
                     SectionTitle("جزئیات هزینه‌های سوخت")
                     AppCard(Modifier.fillMaxWidth()) {
@@ -370,12 +370,12 @@ private fun ReceiptThumb(e: ir.mohitban.app.domain.model.FuelEntry, onClick: () 
     }
 }
 
-/** Short money text for chart labels: «۱٫۲ میلیون». */
+/** Money text for chart labels with its unit: «۱٫۲ میلیون ریال». */
 private fun compactRial(v: Long): String = when {
-    v >= 1_000_000_000L -> "${"%.1f".format(java.util.Locale.US, v / 1e9).removeSuffix(".0")} میلیارد".fa()
-    v >= 1_000_000L -> "${"%.1f".format(java.util.Locale.US, v / 1e6).removeSuffix(".0")} میلیون".fa()
-    v >= 1_000L -> "${(v / 1000).toString()} هزار".fa()
-    else -> v.toString().fa()
+    v >= 1_000_000_000L -> "${"%.1f".format(java.util.Locale.US, v / 1e9).removeSuffix(".0")} میلیارد ریال".fa()
+    v >= 1_000_000L -> "${"%.1f".format(java.util.Locale.US, v / 1e6).removeSuffix(".0")} میلیون ریال".fa()
+    v >= 1_000L -> "${v / 1000} هزار ریال".fa()
+    else -> "$v ریال".fa()
 }
 
 /**
@@ -441,5 +441,10 @@ private fun MonthBars(s: QuarterSummary) {
             Box(Modifier.size(10.dp).clip(RoundedCornerShape(3.dp)).background(gasC))
             Text("  گاز CNG", style = MaterialTheme.typography.labelSmall, color = MColors.Ink)
         }
+        Text(
+            "مبالغ به ریال | جمع فصل: ${s.total.rial()} ریال",
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Muted,
+            textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+        )
     }
 }

@@ -290,7 +290,7 @@ fun SkyHeader(
             }
             // a soft shade under the status bar and the fade into the page
             drawRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.30f), Color.Transparent), endY = h * 0.25f))
-            drawRect(Brush.verticalGradient(0.55f to Color.Transparent, 0.86f to Clay.Bg.copy(alpha = 0.85f), 1f to Clay.Bg, startY = 0f, endY = h))
+            drawRect(Brush.verticalGradient(0.84f to Color.Transparent, 0.95f to Clay.Bg.copy(alpha = 0.7f), 1f to Clay.Bg, startY = 0f, endY = h))
         }
         content()
     }

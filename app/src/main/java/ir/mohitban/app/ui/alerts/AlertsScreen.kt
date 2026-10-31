@@ -49,7 +49,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
-enum class AlertTarget { REPORTS, SETTINGS, SHIFT }
+enum class AlertTarget { REPORTS, SETTINGS, SHIFT, PATROL }
 
 class AlertItem(
     val icon: ImageVector,
@@ -88,6 +88,16 @@ object Alerts {
                 Icons.Outlined.Event, "مهلت گزارش ${today.season.title} ${today.year.fa()}",
                 "تا ${end.day.fa()} ${Jalali.MONTH_NAMES[end.month - 1]} | ${left.fa()} روز مانده است",
                 MColors.Green2, urgent = false, target = AlertTarget.REPORTS,
+            )
+        }
+        // the last three days of a Jalali month: send the monthly patrol report
+        val monthLeft = Jalali.monthLength(today.year, today.month) - today.day
+        if (monthLeft <= 2) {
+            list += AlertItem(
+                Icons.Outlined.Event, "گزارش ماهانه گشت ${Jalali.MONTH_NAMES[today.month - 1]}",
+                if (monthLeft == 0) "امروز آخرین روز ماه است؛ گزارش گشت و کنترل مناطق را از «دفتر گشت» ارسال کنید"
+                else "${monthLeft.fa()} روز تا پایان ماه | گزارش گشت و کنترل مناطق را از «دفتر گشت» آماده کنید",
+                Color(0xFF1F9A8A), urgent = false, target = AlertTarget.PATROL,
             )
         }
         if (lastBackupAt == null || System.currentTimeMillis() - lastBackupAt > 14L * 24 * 3600 * 1000) {

@@ -436,7 +436,7 @@ fun GuideArrow(angle: Float, color: Color, modifier: Modifier = Modifier) {
 
 /** A compass rose turning with the phone. */
 @Composable
-fun CompassRose(heading: Float, modifier: Modifier = Modifier) {
+fun CompassRose(heading: Float, modifier: Modifier = Modifier, qibla: Float? = null) {
     val measurer = rememberTextMeasurer()
     // the card turns smoothly the short way round instead of jumping with every sensor reading
     @Suppress("NAME_SHADOWING") val heading = ir.mohitban.app.ui.components.rememberSmoothAngle(heading)
@@ -466,6 +466,18 @@ fun CompassRose(heading: Float, modifier: Modifier = Modifier) {
             drawPath(needle, Color(0xFFC62828))
             val tail = Path().apply { moveTo(c.x, c.y + r * 0.5f); lineTo(c.x + 10, c.y); lineTo(c.x - 10, c.y); close() }
             drawPath(tail, MColors.Muted)
+            // qibla: a green line to the Kaaba mark at its bearing from north
+            qibla?.let { q ->
+                rotate(q, c) {
+                    val green = Color(0xFF1F7A4A)
+                    drawLine(green.copy(alpha = 0.85f), c, Offset(c.x, c.y - r * 0.62f), 5f, cap = StrokeCap.Round)
+                    val k = r * 0.11f
+                    val kc = Offset(c.x, c.y - r * 0.74f)
+                    drawCircle(green, k * 1.25f, kc)
+                    drawRect(Color(0xFF151515), Offset(kc.x - k * 0.62f, kc.y - k * 0.62f), Size(k * 1.24f, k * 1.24f))
+                    drawRect(Color(0xFFE2B54A), Offset(kc.x - k * 0.62f, kc.y - k * 0.32f), Size(k * 1.24f, k * 0.2f))
+                }
+            }
         }
         // fixed index at the top = the direction the phone points
         val idx = Path().apply { moveTo(c.x, c.y - r - 2); lineTo(c.x - 9, c.y - r - 16); lineTo(c.x + 9, c.y - r - 16); close() }

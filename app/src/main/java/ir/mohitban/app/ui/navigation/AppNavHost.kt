@@ -72,7 +72,8 @@ object Routes {
     const val VEHICLES = "vehicles"
     const val ALERTS = "alerts"
     const val SHIFT = "shift"
-    const val GASHT = "gasht"
+    const val GASHT = "gasht?tab={tab}"
+    fun gasht(tab: Int = 0) = "gasht?tab=$tab"
     const val VEHICLE = "vehicle/{id}"
 
     fun fuel(id: Long = 0L) = "fuel?entryId=$id"
@@ -116,7 +117,7 @@ fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0, openGasht
     }
     // a tap on the گشت‌یار notification (recording / off-route) opens it
     LaunchedEffect(openGashtRequest, started) {
-        if (openGashtRequest > 0 && started && nav.currentDestination?.route != Routes.GASHT) nav.navigate(Routes.GASHT)
+        if (openGashtRequest > 0 && started && nav.currentDestination?.route != Routes.GASHT) nav.navigate(Routes.gasht())
     }
     // a tap on the shift reminder opens the shift calendar
     LaunchedEffect(openShiftRequest, started) {
@@ -195,7 +196,7 @@ fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0, openGasht
                 onSettings = { nav.openTab(MainTab.SETTINGS) },
                 onAlerts = { nav.navigate(Routes.ALERTS) },
                 onShift = { nav.navigate(Routes.SHIFT) },
-                onGasht = { nav.navigate(Routes.GASHT) },
+                onGasht = { nav.navigate(Routes.gasht()) },
                 onTab = { nav.openTab(it) },
             )
         }
@@ -264,12 +265,13 @@ fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0, openGasht
                         AlertTarget.REPORTS -> nav.openTab(MainTab.REPORTS)
                         AlertTarget.SETTINGS -> nav.openTab(MainTab.SETTINGS)
                         AlertTarget.SHIFT -> nav.navigate(Routes.SHIFT)
+                        AlertTarget.PATROL -> nav.navigate(Routes.gasht(3))
                     }
                 },
             )
         }
-        composable(Routes.GASHT) {
-            ir.mohitban.app.ui.gasht.GashtScreen(onBack = { nav.popBackStack() })
+        composable(Routes.GASHT, arguments = listOf(navArgument("tab") { type = NavType.IntType; defaultValue = 0 })) { entry ->
+            ir.mohitban.app.ui.gasht.GashtScreen(onBack = { nav.popBackStack() }, initialTab = entry.arguments?.getInt("tab") ?: 0)
         }
         composable(Routes.SHIFT) {
             ir.mohitban.app.ui.shift.ShiftScreen(onBack = { nav.popBackStack() })

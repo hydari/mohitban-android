@@ -380,7 +380,7 @@ fun LtrText(text: String, modifier: Modifier = Modifier, style: androidx.compose
 // ============================================================================ screen
 
 @Composable
-fun GashtScreen(onBack: () -> Unit) {
+fun GashtScreen(onBack: () -> Unit, initialTab: Int = 0) {
     val vm = appViewModel(key = "gasht") { c, _ -> GashtViewModel(c) }
     val context = LocalContext.current
     val permitted by vm.hasPermission.collectAsStateWithLifecycle()
@@ -391,11 +391,12 @@ fun GashtScreen(onBack: () -> Unit) {
         askPermission.launch(list.toTypedArray())
     }
     LaunchedEffect(Unit) { if (!permitted) requestPermission() }
+    LaunchedEffect(initialTab) { if (initialTab > 0) vm.tab = initialTab }
 
     Column(Modifier.fillMaxSize().background(MColors.Bg)) {
         TopBar("گشت‌یار", onBack = onBack)
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf("نقشه", "مسیرها", "نقاط", "ابزارها").forEachIndexed { i, t ->
+            listOf("نقشه", "مسیرها", "نقاط", "دفتر گشت", "ابزارها").forEachIndexed { i, t ->
                 val on = vm.tab == i
                 Box(
                     Modifier.weight(1f).height(40.dp)
@@ -403,7 +404,7 @@ fun GashtScreen(onBack: () -> Unit) {
                         .clickable { vm.tab = i },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(t, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = if (on) Color.White else MColors.Ink)
+                    Text(t, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = if (on) Color.White else MColors.Ink, maxLines = 1)
                 }
             }
         }
@@ -419,6 +420,7 @@ fun GashtScreen(onBack: () -> Unit) {
             0 -> MapTab(vm)
             1 -> TracksTab(vm)
             2 -> PlacesTab(vm)
+            3 -> PatrolLogTab(vm)
             else -> ToolsTab(vm)
         }
     }
@@ -832,9 +834,9 @@ private fun RecordPanel(vm: GashtViewModel, modifier: Modifier) {
     if (confirmStop) {
         ConfirmDialog(
             title = "پایان ضبط مسیر",
-            text = "مسیر ذخیره می‌شود و در زبانه‌ی «مسیرها» قابل مشاهده و ارسال است.",
+            text = "مسیر ذخیره می‌شود و در زبانه‌ی «مسیرها» قابل مشاهده و ارسال است. سپس «دفتر گشت» باز می‌شود تا این گشت را با یک لمس ثبت کنید.",
             confirm = "پایان و ذخیره",
-            onConfirm = { GashtSession.stopRecording(context); confirmStop = false },
+            onConfirm = { GashtSession.stopRecording(context); confirmStop = false; vm.tab = 3 },
             onDismiss = { confirmStop = false },
         )
     }

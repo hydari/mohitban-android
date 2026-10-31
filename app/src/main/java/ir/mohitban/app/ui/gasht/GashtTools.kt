@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -73,7 +74,7 @@ fun ToolsTab(vm: GashtViewModel) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         EmergencyCard(fix)
         if (vm.zones.isNotEmpty()) ZonesCard(vm, fix?.point)
-        CompassCard(trueHeading(compass, fix), compass != null)
+        CompassCard(trueHeading(compass, fix), compass != null, fix?.point)
         AreaCard(fix?.point, fix?.accuracy)
         ConverterCard(fix?.point)
         SunCard(fix?.point)
@@ -137,20 +138,64 @@ private fun EmergencyCard(fix: ir.mohitban.app.gasht.Fix?) {
 
 // ---------------------------------------------------------------- compass
 
+/** The middle of the county chosen at registration, with its name (for when there is no GPS fix). */
 @Composable
-private fun CompassCard(heading: Float?, available: Boolean) {
-    ToolCard(Icons.Outlined.Explore, Color(0xFF2F7FC1), "قطب‌نما") {
+private fun rememberHomePlace(): Pair<GeoPoint, String>? {
+    val context = LocalContext.current
+    var home by remember { mutableStateOf<Pair<GeoPoint, String>?>(null) }
+    LaunchedEffect(Unit) {
+        home = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val p = context.container.profileRepository.getProfile() ?: return@withContext null
+            ir.mohitban.app.gasht.Whereabouts.countyCenter(context, p.city, p.province)?.let { it to "شهرستان ${p.city.trim().removePrefix("شهرستان").trim()}" }
+        }
+    }
+    return home
+}
+
+private val KAABA = GeoPoint(21.422487, 39.826206)
+
+@Composable
+private fun CompassCard(heading: Float?, available: Boolean, here: GeoPoint?) {
+    val home = rememberHomePlace()
+    val from = here ?: home?.first
+    val qibla = from?.let { Geo.bearing(it, KAABA).toFloat() }
+    ToolCard(Icons.Outlined.Explore, Color(0xFF2F7FC1), "قطب‌نما و قبله‌نما") {
         if (!available || heading == null) {
             Text("حسگر قطب‌نما در این گوشی در دسترس نیست.", style = MaterialTheme.typography.bodySmall, color = MColors.Muted)
+            qibla?.let {
+                Text(
+                    "جهت قبله: ${it.toInt().fa()}° از شمال (${Geo.direction(it.toDouble())})",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = Color(0xFF1F7A4A), modifier = Modifier.padding(top = 6.dp),
+                )
+            }
         } else {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                CompassRose(heading, Modifier.size(230.dp))
+                CompassRose(heading, Modifier.size(240.dp), qibla = qibla)
                 Text(
                     "${heading.toInt().fa()}° ${Geo.direction(heading.toDouble())}",
                     style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black), modifier = Modifier.padding(top = 8.dp),
                 )
+                if (qibla != null) {
+                    val off = ((qibla - heading) % 360f + 540f) % 360f - 180f
+                    val facing = kotlin.math.abs(off) <= 4f
+                    Row(
+                        Modifier.padding(top = 6.dp).clip(RoundedCornerShape(10.dp))
+                            .background(if (facing) Color(0xFF1F7A4A) else Color(0xFFE6F2E9)).padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            if (facing) "رو به قبله هستید"
+                            else "قبله: ${qibla.toInt().fa()}° — ${kotlin.math.abs(off).toInt().fa()}° به ${if (off > 0) "راست" else "چپ"} بچرخید",
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = if (facing) Color.White else Color(0xFF1F7A4A),
+                        )
+                    }
+                    Text(
+                        if (here != null) "قبله برای موقعیت فعلی شما حساب شده است." else "قبله برای مرکز ${home?.second.orEmpty()} حساب شده؛ با روشن شدن GPS دقیق‌تر می‌شود.",
+                        style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
                 Text(
-                    "جهت شمال جغرافیایی (اصلاح‌شده با انحراف مغناطیسی). گوشی را صاف نگه دارید و دور از فلز و خودرو. اگر خطا دارد، گوشی را چند بار به شکل ۸ بچرخانید.",
+                    "عقربه‌ی قرمز شمال جغرافیایی (اصلاح‌شده با انحراف مغناطیسی) و علامت سبز کعبه جهت قبله است. گوشی را صاف و دور از فلز و خودرو نگه دارید؛ اگر خطا دارد، گوشی را چند بار به شکل ۸ بچرخانید.",
                     style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 4.dp),
                 )
             }

@@ -10,9 +10,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 @Database(
     entities = [
         ProfileEntity::class, VehicleEntity::class, SettingsEntity::class, FuelEntryEntity::class,
-        TrackEntity::class, TrackPointEntity::class, WaypointEntity::class,
+        TrackEntity::class, TrackPointEntity::class, WaypointEntity::class, PatrolLogEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -84,9 +84,21 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v6 adds the patrol logbook (دفتر گشت). */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `patrol_logs` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `jdn` INTEGER NOT NULL, " +
+                        "`startMin` INTEGER, `endMin` INTEGER, `zone` TEXT NOT NULL, `spot` TEXT NOT NULL, `mode` TEXT NOT NULL, " +
+                        "`distanceKm` REAL, `findings` TEXT NOT NULL, `violations` INTEGER NOT NULL, `wildlife` TEXT NOT NULL, " +
+                        "`companions` TEXT NOT NULL, `notes` TEXT NOT NULL, `trackId` INTEGER, `createdAt` INTEGER NOT NULL)",
+                )
+            }
+        }
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .build()
     }
 }

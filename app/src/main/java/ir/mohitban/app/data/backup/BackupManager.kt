@@ -62,6 +62,17 @@ class BackupManager(
             }
         })
 
+        json.put("patrols", JSONArray().apply {
+            gd.getPatrols().forEach { p ->
+                put(JSONObject().apply {
+                    put("jdn", p.jdn); put("startMin", p.startMin ?: JSONObject.NULL); put("endMin", p.endMin ?: JSONObject.NULL)
+                    put("zone", p.zone); put("spot", p.spot); put("mode", p.mode); put("distanceKm", p.distanceKm ?: JSONObject.NULL)
+                    put("findings", p.findings); put("violations", p.violations); put("wildlife", p.wildlife)
+                    put("companions", p.companions); put("notes", p.notes); put("createdAt", p.createdAt)
+                })
+            }
+        })
+
         val out = context.contentResolver.openOutputStream(target) ?: error("cannot open target")
         ZipOutputStream(out.buffered()).use { zip ->
             zip.putNextEntry(ZipEntry(DATA))
@@ -104,6 +115,7 @@ class BackupManager(
         val entries = json.optJSONArray("entries")?.let { arr -> (0 until arr.length()).map { arr.getJSONObject(it).toEntry() } }.orEmpty()
         val tracks = json.optJSONArray("tracks")
         val places = json.optJSONArray("waypoints")
+        val patrols = json.optJSONArray("patrols")
 
         db.withTransaction {
             db.fuelEntryDao().clear()
@@ -146,6 +158,23 @@ class BackupManager(
                         )
                     })
                 }
+            }
+            // patrol logbook (older backups have none: keep the phone's)
+            if (patrols != null) {
+                val gd = db.gashtDao()
+                gd.clearPatrols()
+                gd.insertPatrols((0 until patrols.length()).map { k ->
+                    val o = patrols.getJSONObject(k)
+                    ir.mohitban.app.data.local.PatrolLogEntity(
+                        jdn = o.getInt("jdn"),
+                        startMin = if (o.isNull("startMin")) null else o.optInt("startMin"),
+                        endMin = if (o.isNull("endMin")) null else o.optInt("endMin"),
+                        zone = o.optString("zone"), spot = o.optString("spot"), mode = o.optString("mode"),
+                        distanceKm = if (o.isNull("distanceKm")) null else o.optDouble("distanceKm"),
+                        findings = o.optString("findings"), violations = o.optInt("violations"), wildlife = o.optString("wildlife"),
+                        companions = o.optString("companions"), notes = o.optString("notes"), createdAt = o.optLong("createdAt"),
+                    )
+                })
             }
         }
         // track statistics are derived; recompute after restore

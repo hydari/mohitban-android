@@ -165,4 +165,27 @@ interface GashtDao {
 
     @Query("DELETE FROM waypoints")
     suspend fun clearWaypoints()
+
+    // ---------------------------------------------------------------- patrol logbook
+
+    @Query("SELECT * FROM patrol_logs ORDER BY jdn DESC, startMin DESC, id DESC")
+    fun observePatrols(): Flow<List<PatrolLogEntity>>
+
+    @Query("SELECT * FROM patrol_logs ORDER BY jdn ASC, startMin ASC, id ASC")
+    suspend fun getPatrols(): List<PatrolLogEntity>
+
+    @Insert
+    suspend fun insertPatrol(p: PatrolLogEntity): Long
+
+    @Insert
+    suspend fun insertPatrols(p: List<PatrolLogEntity>)
+
+    @Update
+    suspend fun updatePatrol(p: PatrolLogEntity)
+
+    @Query("DELETE FROM patrol_logs WHERE id = :id")
+    suspend fun deletePatrol(id: Long)
+
+    @Query("DELETE FROM patrol_logs")
+    suspend fun clearPatrols()
 }

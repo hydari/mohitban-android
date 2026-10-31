@@ -120,3 +120,26 @@ data class WaypointEntity(
     val createdAt: Long,
     val source: String = "MANUAL",
 )
+
+/**
+ * One patrol in the ranger's logbook (دفتر گشت): when, where (protected area + spot), how,
+ * what was seen and done. [findings] = comma-separated finding keys.
+ */
+@Entity(tableName = "patrol_logs")
+data class PatrolLogEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val jdn: Int,
+    val startMin: Int? = null,
+    val endMin: Int? = null,
+    val zone: String,
+    val spot: String = "",
+    val mode: String,
+    val distanceKm: Double? = null,
+    val findings: String = "",
+    val violations: Int = 0,
+    val wildlife: String = "",
+    val companions: String = "",
+    val notes: String = "",
+    val trackId: Long? = null,
+    val createdAt: Long,
+)
