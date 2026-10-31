@@ -1,5 +1,6 @@
 package ir.mohitban.app.ui.gasht
 
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -157,7 +158,7 @@ fun TrackCanvas(
         }
     }
     val pulseT = androidx.compose.animation.core.rememberInfiniteTransition(label = "me")
-    val pulse = pulseT.animateFloat(0f, 1f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1800, easing = androidx.compose.animation.core.LinearEasing)), label = "mp")
+    val pulse = pulseT.animateFloat(0f, 1f, androidx.compose.animation.core.infiniteRepeatable<Float>(androidx.compose.animation.core.tween(1800, easing = androidx.compose.animation.core.LinearEasing)), label = "mp")
 
     fun fitAll() {
         if (fitPoints.isNotEmpty() && size != Size.Zero) {
