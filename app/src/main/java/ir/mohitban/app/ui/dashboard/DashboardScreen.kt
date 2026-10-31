@@ -128,7 +128,6 @@ import ir.mohitban.app.ui.alerts.AlertSeen
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.outlined.Explore
 import ir.mohitban.app.ui.components.PulseDot
-import ir.mohitban.app.ui.components.ShiftCycleRing
 import ir.mohitban.app.ui.components.SkyHeader
 import ir.mohitban.app.ui.components.rememberCountUp
 import ir.mohitban.app.ui.components.staggerIn
@@ -224,7 +223,15 @@ fun DashboardScreen(
                 // ---------- organisation: DoE logo + name plates, no background ----------
                 val province = profile?.province.orEmpty().trim().removePrefix("استان").trim()
                 // the living sky of this moment behind the logo, edge to edge
-                SkyHeader(Modifier.fullBleed(18.dp), parallax = { scroll.value }) {
+                // sun times fall back to the county chosen at registration when the phone has no position
+                var home by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+                LaunchedEffect(profile?.city, profile?.province) {
+                    val p = profile ?: return@LaunchedEffect
+                    home = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        ir.mohitban.app.gasht.Whereabouts.countyCenter(context, p.city, p.province)?.let { it.lat to it.lon }
+                    }
+                }
+                SkyHeader(Modifier.fullBleed(18.dp), parallax = { scroll.value }, fallback = home) {
                     Column(
                         Modifier.fillMaxWidth().statusBarsPadding().padding(top = 14.dp, bottom = 40.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -238,8 +245,10 @@ fun DashboardScreen(
 
                 // ---------- personal card (liquid glass): photo | name, rank · station | bell ----------
                 GlassCard(Modifier.fillMaxWidth().padding(top = 2.dp).staggerIn(3, "dash"), dark = true) {
-                    // photo inside the ring of the whole shift cycle (today's day breathes)
-                    ShiftCycleRing(76.dp, state.shift, vm.today.jdn, Modifier.padding(start = 10.dp, top = 10.dp, bottom = 10.dp), onClick = onProfile) {
+                    GlassRing(
+                        70.dp, Modifier.padding(start = 12.dp, top = 12.dp, bottom = 12.dp), onClick = onProfile,
+                        rim = shiftStatus?.let { if (it is ShiftStatus.OnDuty) ShiftColors.On else ShiftColors.Off },
+                    ) {
                         Box(
                             Modifier.fillMaxSize().clip(CircleShape)
                                 .background(Brush.linearGradient(listOf(Color(0xFFD9CFB4), Color(0xFFA68A5F)))),

@@ -96,6 +96,29 @@ object Whereabouts {
 
     private fun clean(name: String, prefix: String) = name.trim().removePrefix(prefix).trim()
 
+    /**
+     * Middle of a county by its name (the county chosen at registration), preferring one inside
+     * [province]. Call off the main thread. Null when the name is not in the built-in data.
+     */
+    fun countyCenter(context: Context, county: String, province: String? = null): GeoPoint? {
+        load(context)
+        val want = norm(clean(county, "شهرستان"))
+        if (want.isEmpty()) return null
+        val a = areas.orEmpty()
+        val matches = a.filter { it.level == 5 && norm(clean(it.name, "شهرستان")) == want }
+        if (matches.isEmpty()) return null
+        val prov = province?.let { p -> a.firstOrNull { it.level == 4 && norm(clean(it.name, "استان")) == norm(clean(p, "استان")) } }
+        val pick = prov?.let { pv -> matches.firstOrNull { m -> pv.contains((m.south + m.north) / 2, (m.west + m.east) / 2) } } ?: matches.first()
+        // the average of the outer ring's points sits well inside most counties
+        val r = pick.rings.maxByOrNull { it.size } ?: return null
+        var lat = 0.0; var lon = 0.0
+        for (i in r.indices step 2) { lat += r[i]; lon += r[i + 1] }
+        val n = r.size / 2
+        return GeoPoint(lat / n, lon / n)
+    }
+
+    private fun norm(s: String) = s.replace('ي', 'ی').replace('ك', 'ک').replace("\u200c", "").replace(" ", "").trim()
+
     /** Call off the main thread (first call reads the data, about a second). */
     fun locate(context: Context, p: GeoPoint): Result {
         load(context)

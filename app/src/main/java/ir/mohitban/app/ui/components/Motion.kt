@@ -56,8 +56,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
-import ir.mohitban.app.core.jalali.fmod
-import ir.mohitban.app.domain.model.ShiftPattern
 import ir.mohitban.app.gasht.SunTimes
 import kotlinx.coroutines.delay
 import java.util.Calendar
@@ -150,33 +148,6 @@ fun PulseDot(color: Color, modifier: Modifier = Modifier, size: Dp = 12.dp, acti
     }
 }
 
-/* ------------------------------ haptics-free night vision ------------------------------ */
-
-/**
- * Night patrol view: everything is drawn in dim red on black (dark adaptation of the eyes is
- * kept, as with a red torch). Light colours turn dark and dark text turns red.
- */
-fun Modifier.nightVision(on: Boolean): Modifier = if (!on) this else this.drawWithContent {
-    val k = 0.9f
-    val paint = Paint().apply {
-        colorFilter = ColorFilter.colorMatrix(
-            ColorMatrix(
-                floatArrayOf(
-                    -0.30f * k, -0.59f * k, -0.11f * k, 0f, 255f * k,
-                    0f, 0f, 0f, 0f, 0f,
-                    0f, 0f, 0f, 0f, 0f,
-                    0f, 0f, 0f, 1f, 0f,
-                ),
-            ),
-        )
-    }
-    drawIntoCanvas { c ->
-        c.saveLayer(Rect(Offset.Zero, size), paint)
-        drawContent()
-        c.restore()
-    }
-}
-
 /** Light or dark status-bar icons while this screen is shown (restored when it leaves). */
 @Composable
 fun StatusBarIcons(darkIcons: Boolean) {
@@ -197,83 +168,10 @@ private tailrec fun Context.findActivityCompat(): android.app.Activity? = when (
     else -> null
 }
 
-/* ------------------------------ shift cycle ring ------------------------------ */
-
-/**
- * The photo inside a ring of the whole shift cycle: one segment per day (green = shift,
- * grey = rest). Past days are solid, coming days faint, and today's segment breathes.
- */
-@Composable
-fun ShiftCycleRing(
-    size: Dp,
-    pattern: ShiftPattern?,
-    todayJdn: Int,
-    modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null,
-    content: @Composable BoxScope.() -> Unit,
-) {
-    val motion = rememberMotionOn()
-    val t = rememberInfiniteTransition(label = "breath")
-    val breath = t.animateFloat(0f, 1f, infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "b")
-    val grow = remember { Animatable(if (motion) 0f else 1f) }
-    LaunchedEffect(pattern?.cycle) { if (motion) { grow.snapTo(0f); grow.animateTo(1f, tween(900, delayMillis = 200, easing = FastOutSlowInEasing)) } }
-    val on = Color(0xFF239B56)
-    val off = Color(0xFFAEB8B2)
-    Box(
-        modifier
-            .size(size)
-            .clip(CircleShape)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(Modifier.fillMaxSize()) {
-            val stroke = 4.2.dp.toPx()
-            val r = this.size.minDimension / 2 - stroke / 2 - 1.dp.toPx()
-            val tl = Offset(center.x - r, center.y - r)
-            val box = Size(r * 2, r * 2)
-            if (pattern == null) {
-                drawCircle(Color.White, r, style = Stroke(stroke))
-                return@Canvas
-            }
-            val n = pattern.cycle.coerceIn(1, 60)
-            val first = todayJdn - fmod(todayJdn - pattern.startJdn, n)
-            val gap = if (n > 20) 2f else 5f
-            val seg = 360f / n
-            val visible = 360f * grow.value
-            for (i in 0 until n) {
-                val day = first + i
-                val start = -90f + i * seg + gap / 2
-                if (i * seg > visible) break
-                val sweep = (seg - gap).coerceAtMost(visible - i * seg)
-                val c = if (pattern.isShift(day)) on else off
-                when {
-                    day < todayJdn -> drawArc(c.copy(alpha = 0.75f), start, sweep, false, tl, box, style = Stroke(stroke, cap = StrokeCap.Butt))
-                    day > todayJdn -> drawArc(c.copy(alpha = 0.28f), start, sweep, false, tl, box, style = Stroke(stroke, cap = StrokeCap.Butt))
-                    else -> {
-                        val b = if (motion) breath.value else 0.5f
-                        drawArc(c.copy(alpha = 0.22f + 0.25f * b), start - 1f, sweep + 2f, false, tl, box, style = Stroke(stroke * (1.6f + 0.6f * b)))
-                        drawArc(c, start, sweep, false, tl, box, style = Stroke(stroke * 1.15f))
-                    }
-                }
-            }
-        }
-        Box(
-            Modifier
-                .padding(7.dp)
-                .fillMaxSize()
-                .clip(CircleShape)
-                .background(Color.White)
-                .padding(1.5.dp),
-            contentAlignment = Alignment.Center,
-            content = content,
-        )
-    }
-}
-
 /* ------------------------------ living sky ------------------------------ */
 
-/** Where the sun is computed for: the phone's last known position, else central Iran. */
-private fun skyLocation(context: Context): Pair<Double, Double> {
+/** Where the sun is computed for: the phone's last known position, else [fallback], else central Iran. */
+private fun skyLocation(context: Context, fallback: Pair<Double, Double>?): Pair<Double, Double> {
     val ok = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
         ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     if (ok) {
@@ -283,140 +181,117 @@ private fun skyLocation(context: Context): Pair<Double, Double> {
         }.getOrNull()
         if (best != null) return best.latitude to best.longitude
     }
-    return 35.7 to 51.4
+    return fallback ?: (35.7 to 51.4)
 }
 
-private class SkyKey(val minute: Float, val top: Color, val bottom: Color, val stars: Float, val glow: Color)
-
-/** Sky colours for the current time between sunrise and sunset. */
-private class SkyLook(val top: Color, val bottom: Color, val stars: Float, val glow: Color, val sun: Float?, val dark: Boolean)
-
-private fun skyLook(minute: Float, sunrise: Float, sunset: Float): SkyLook {
-    val night = SkyKey(0f, Color(0xFF0D1A33), Color(0xFF2C4266), 1f, Color(0x00000000))
-    val dawn = SkyKey(0f, Color(0xFF3A4A7A), Color(0xFFF0A86E), 0.25f, Color(0x66FFB36B))
-    val day = SkyKey(0f, Color(0xFF4FA3DD), Color(0xFFCFE9F6), 0f, Color(0x33FFFFFF))
-    val golden = SkyKey(0f, Color(0xFF5E92C8), Color(0xFFF7C77E), 0f, Color(0x66FFC46B))
-    val dusk = SkyKey(0f, Color(0xFF2A2D5E), Color(0xFFE2785E), 0.35f, Color(0x55FF8A5C))
-    val keys = listOf(
-        sunrise - 80f to night, sunrise - 10f to dawn, sunrise + 50f to day,
-        sunset - 80f to day, sunset - 8f to golden, sunset + 30f to dusk, sunset + 85f to night,
+/**
+ * A photographic colour grade for one moment of the day: per-channel gain and lift, plus how
+ * much night (stars, darkness) there is.
+ */
+private class Grade(val r: Float, val g: Float, val b: Float, val sat: Float, val lift: Float, val night: Float) {
+    fun mix(o: Grade, f: Float) = Grade(
+        r + (o.r - r) * f, g + (o.g - g) * f, b + (o.b - b) * f, sat + (o.sat - sat) * f, lift + (o.lift - lift) * f, night + (o.night - night) * f,
     )
-    fun mix(a: SkyKey, b: SkyKey, f: Float) = SkyLook(
-        lerpColor(a.top, b.top, f), lerpColor(a.bottom, b.bottom, f), a.stars + (b.stars - a.stars) * f,
-        lerpColor(a.glow, b.glow, f), null, false,
-    )
-    val look = when {
-        minute <= keys.first().first || minute >= keys.last().first -> mix(night, night, 0f)
-        else -> {
-            val i = keys.indexOfLast { it.first <= minute }
-            val (m0, k0) = keys[i]; val (m1, k1) = keys[i + 1]
-            mix(k0, k1, ((minute - m0) / (m1 - m0)).coerceIn(0f, 1f))
-        }
+
+    /** Saturation, then channel gains, then lift — one colour matrix for the photo. */
+    fun matrix(): ColorMatrix {
+        val lr = 0.2126f; val lg = 0.7152f; val lb = 0.0722f
+        val sr = (1 - sat) * lr; val sg = (1 - sat) * lg; val sb = (1 - sat) * lb
+        val l = lift * 255f
+        return ColorMatrix(
+            floatArrayOf(
+                (sr + sat) * r, sg * r, sb * r, 0f, l,
+                sr * g, (sg + sat) * g, sb * g, 0f, l,
+                sr * b, sg * b, (sb + sat) * b, 0f, l * 1.4f,
+                0f, 0f, 0f, 1f, 0f,
+            ),
+        )
     }
-    val sun = if (minute in sunrise..sunset) (minute - sunrise) / (sunset - sunrise) else null
-    return SkyLook(look.top, look.bottom, look.stars, look.glow, sun, look.top.luminanceApprox() < 0.32f)
 }
 
-private fun Color.luminanceApprox() = 0.2126f * red + 0.7152f * green + 0.0722f * blue
+// the photo itself is a golden-hour scene; the other moments are graded from it
+private val NIGHT = Grade(0.30f, 0.40f, 0.68f, 0.25f, 0.0f, 1f)
+private val BLUE_HOUR = Grade(0.62f, 0.66f, 0.90f, 0.55f, 0.01f, 0.45f)
+private val GOLDEN = Grade(1.0f, 1.0f, 1.0f, 1.0f, 0f, 0f)
+private val DAY = Grade(0.94f, 1.02f, 1.12f, 0.88f, 0.02f, 0f)
+private val DUSK = Grade(0.95f, 0.70f, 0.78f, 0.9f, 0f, 0.25f)
+
+private fun gradeAt(minute: Float, sunrise: Float, sunset: Float): Grade {
+    val keys = listOf(
+        sunrise - 90f to NIGHT, sunrise - 30f to BLUE_HOUR, sunrise + 15f to GOLDEN, sunrise + 90f to DAY,
+        sunset - 90f to DAY, sunset - 10f to GOLDEN, sunset + 20f to DUSK, sunset + 50f to BLUE_HOUR, sunset + 100f to NIGHT,
+    )
+    if (minute <= keys.first().first || minute >= keys.last().first) return NIGHT
+    val i = keys.indexOfLast { it.first <= minute }
+    val (m0, k0) = keys[i]; val (m1, k1) = keys[i + 1]
+    return k0.mix(k1, ((minute - m0) / (m1 - m0)).coerceIn(0f, 1f))
+}
 
 private class Star(val x: Float, val y: Float, val r: Float, val phase: Float)
 
 /**
- * The dashboard's header: the real sky of this moment (dawn, day, golden hour, dusk, night with
- * stars) from today's sunrise and sunset, the sun on its arc, drifting clouds and layered
- * mountains melting into the page. [parallax] = scroll offset in pixels.
+ * The dashboard's header: a real mountain photograph whose light follows the actual time of day
+ * (cool daylight, golden sunrise and sunset, rosy dusk, blue night with faint stars), computed
+ * from today's sunrise and sunset. It breathes with a very slow zoom and melts into the page.
+ * [parallax] = scroll offset in pixels; [fallback] = place used when the phone has no position.
  */
 @Composable
-fun SkyHeader(modifier: Modifier = Modifier, parallax: () -> Int = { 0 }, content: @Composable BoxScope.() -> Unit) {
+fun SkyHeader(
+    modifier: Modifier = Modifier,
+    parallax: () -> Int = { 0 },
+    fallback: Pair<Double, Double>? = null,
+    content: @Composable BoxScope.() -> Unit,
+) {
     val context = LocalContext.current
     val motion = rememberMotionOn()
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) { while (true) { delay(60_000); now = System.currentTimeMillis() } }
-    val place = remember { skyLocation(context) }
-    val look = remember(now / 60_000) {
+    val place = remember(fallback) { skyLocation(context, fallback) }
+    val grade = remember(now / 60_000, place) {
         val cal = Calendar.getInstance().apply { timeInMillis = now }
         val offset = TimeZone.getDefault().getOffset(now) / 60_000
         val sun = SunTimes.compute(cal.get(Calendar.DAY_OF_YEAR), place.first, place.second, offset)
         val minute = cal.get(Calendar.HOUR_OF_DAY) * 60f + cal.get(Calendar.MINUTE)
-        skyLook(minute, (sun.sunrise ?: 360).toFloat(), (sun.sunset ?: 1080).toFloat())
+        gradeAt(minute, (sun.sunrise ?: 360).toFloat(), (sun.sunset ?: 1080).toFloat())
     }
-    StatusBarIcons(darkIcons = !look.dark)
-    val stars = remember { val r = Random(7); List(42) { Star(r.nextFloat(), r.nextFloat() * 0.62f, 0.6f + r.nextFloat() * 1.3f, r.nextFloat()) } }
+    // white status-bar icons over the photo (a soft shade at the top keeps them readable)
+    StatusBarIcons(darkIcons = false)
+    val filter = remember(grade) { ColorFilter.colorMatrix(grade.matrix()) }
+    val stars = remember { val r = Random(7); List(60) { Star(r.nextFloat(), r.nextFloat() * 0.34f, 0.4f + r.nextFloat() * 0.8f, r.nextFloat()) } }
     val t = rememberInfiniteTransition(label = "sky")
-    val twinkle = t.animateFloat(0f, 1f, infiniteRepeatable(tween(3800, easing = LinearEasing)), label = "tw")
-    val drift = t.animateFloat(0f, 1f, infiniteRepeatable(tween(70_000, easing = LinearEasing)), label = "dr")
+    val twinkle = t.animateFloat(0f, 1f, infiniteRepeatable(tween(5000, easing = LinearEasing)), label = "tw")
+    val breathe = t.animateFloat(0f, 1f, infiniteRepeatable(tween(28_000, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "kb")
     val appear = remember { Animatable(if (motion) 0f else 1f) }
-    LaunchedEffect(Unit) { appear.animateTo(1f, tween(900, easing = FastOutSlowInEasing)) }
+    LaunchedEffect(Unit) { appear.animateTo(1f, tween(1100, easing = FastOutSlowInEasing)) }
 
     Box(modifier.clipToBounds()) {
-        Canvas(Modifier.matchParentSize().graphicsLayer { translationY = parallax() * 0.35f }) {
+        androidx.compose.foundation.Image(
+            androidx.compose.ui.res.painterResource(ir.mohitban.app.R.drawable.sky_header), null,
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            alignment = Alignment.TopCenter,
+            colorFilter = filter,
+            modifier = Modifier.matchParentSize().graphicsLayer {
+                translationY = parallax() * 0.35f
+                val z = 1.04f + (if (motion) 0.05f * breathe.value else 0f)
+                scaleX = z; scaleY = z
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.62f, 0.3f)
+                alpha = appear.value
+            },
+        )
+        Canvas(Modifier.matchParentSize()) {
             val w = size.width; val h = size.height
-            drawRect(Brush.verticalGradient(listOf(look.top, look.bottom), endY = h * 0.85f))
-            // stars
-            if (look.stars > 0.02f) {
+            // faint stars only high in a dark sky
+            if (grade.night > 0.3f) {
+                val k = ((grade.night - 0.3f) / 0.7f) * appear.value
                 for (s in stars) {
-                    val tw = if (motion) 0.55f + 0.45f * sin(((twinkle.value + s.phase) * 2 * PI).toFloat()) else 0.8f
-                    drawCircle(Color.White.copy(alpha = (look.stars * tw * appear.value).coerceIn(0f, 1f)), s.r.dp.toPx(), Offset(s.x * w, s.y * h))
+                    val tw = if (motion) 0.6f + 0.4f * sin(((twinkle.value + s.phase) * 2 * PI).toFloat()) else 0.8f
+                    drawCircle(Color.White.copy(alpha = (0.75f * k * tw).coerceIn(0f, 1f)), s.r.dp.toPx(), Offset(s.x * w, s.y * h))
                 }
-                // a quiet crescent moon
-                val mc = Offset(w * 0.8f, h * 0.24f); val mr = 11.dp.toPx()
-                drawCircle(Color(0xFFFFF4D6).copy(alpha = look.stars * 0.25f), mr * 2.2f, mc)
-                drawCircle(Color(0xFFFFF4D6).copy(alpha = look.stars), mr, mc)
-                drawCircle(look.top.copy(alpha = look.stars), mr * 0.86f, Offset(mc.x + mr * 0.45f, mc.y - mr * 0.25f))
             }
-            // the sun on its arc, east (left) to west (right)
-            look.sun?.let { f ->
-                val sx = w * (0.1f + 0.8f * f)
-                val sy = h * 0.68f - sin((f * PI).toFloat()) * h * 0.5f
-                val sr = 13.dp.toPx()
-                drawCircle(Brush.radialGradient(listOf(Color(0x99FFE7A3), Color(0x00FFE7A3)), Offset(sx, sy), sr * 4f), sr * 4f, Offset(sx, sy))
-                drawCircle(Brush.radialGradient(listOf(Color(0xFFFFF6D8), Color(0xFFFFCF5C)), Offset(sx, sy), sr), sr, Offset(sx, sy))
-            }
-            // horizon glow
-            drawRect(Brush.verticalGradient(listOf(Color.Transparent, look.glow, Color.Transparent), startY = h * 0.45f, endY = h * 0.85f))
-            // drifting clouds (daylight only)
-            if (look.stars < 0.5f) {
-                val a = (1f - look.stars * 2f) * 0.55f * appear.value
-                val d = if (motion) drift.value else 0.3f
-                cloud(w * ((d * 1.4f + 0.05f) % 1.4f - 0.2f), h * 0.22f, 26.dp.toPx(), Color.White.copy(alpha = a))
-                cloud(w * ((d * 1.4f + 0.75f) % 1.4f - 0.2f), h * 0.38f, 19.dp.toPx(), Color.White.copy(alpha = a * 0.8f))
-            }
-            // mountains: far, middle, near (the near one is the page colour)
-            val nightMix = look.stars.coerceIn(0f, 1f)
-            val far = lerpColor(lerpColor(look.bottom, Color(0xFF6E8F7C), 0.55f), Color(0xFF243447), nightMix * 0.7f)
-            val mid = lerpColor(Color(0xFF3F7454), Color(0xFF1C2E2A), nightMix * 0.75f)
-            ridge(h * 0.62f, h * 0.10f, 1.3f, 0.2f, far.copy(alpha = appear.value))
-            ridge(h * 0.74f, h * 0.08f, 2.1f, 1.7f, mid.copy(alpha = appear.value))
-            ridge(h * 0.88f, h * 0.05f, 3.0f, 3.1f, Clay.Bg)
-            drawRect(Clay.Bg, topLeft = Offset(0f, h * 0.97f), size = Size(w, h * 0.03f + 1f))
+            // a soft shade under the status bar and the fade into the page
+            drawRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.30f), Color.Transparent), endY = h * 0.25f))
+            drawRect(Brush.verticalGradient(0.55f to Color.Transparent, 0.86f to Clay.Bg.copy(alpha = 0.85f), 1f to Clay.Bg, startY = 0f, endY = h))
         }
         content()
     }
-}
-
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.ridge(base: Float, amp: Float, freq: Float, phase: Float, color: Color) {
-    val w = size.width; val h = size.height
-    val path = Path().apply {
-        moveTo(0f, h)
-        var x = 0f
-        while (x <= w + 8f) {
-            val u = x / w * 2 * PI.toFloat()
-            val y = base - amp * (0.6f * sin(u * freq + phase) + 0.3f * sin(u * freq * 2.3f + phase * 1.7f) + 0.1f * sin(u * freq * 5.1f))
-            lineTo(x, y)
-            x += 6f
-        }
-        lineTo(w, h); close()
-    }
-    drawPath(path, color)
-}
-
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.cloud(x: Float, y: Float, r: Float, color: Color) {
-    // one path for the whole cloud, so overlapping puffs keep a single even transparency
-    val p = Path().apply {
-        addOval(Rect(Offset(x, y), r))
-        addOval(Rect(Offset(x - r * 0.95f, y + r * 0.25f), r * 0.75f))
-        addOval(Rect(Offset(x + r * 1.0f, y + r * 0.2f), r * 0.8f))
-        addRoundRect(androidx.compose.ui.geometry.RoundRect(Rect(Offset(x - r * 1.6f, y + r * 0.1f), Size(r * 3.3f, r * 0.85f)), androidx.compose.ui.geometry.CornerRadius(r * 0.45f)))
-    }
-    drawPath(p, color)
 }

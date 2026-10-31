@@ -67,7 +67,8 @@ object GashtSession {
     internal fun setRecord(f: (RecordState) -> RecordState) = _record.update(f)
     internal fun setGuide(f: (GuideState) -> GuideState) = _guide.update(f)
 
-    fun startRecording(context: Context) = command(context, GashtService.ACTION_RECORD)
+    /** Starts recording only while the phone's location (GPS) is switched on. */
+    fun startRecording(context: Context) { if (GpsLocation.isGpsOn(context)) command(context, GashtService.ACTION_RECORD) }
     fun pauseRecording(context: Context) = command(context, GashtService.ACTION_PAUSE)
     fun resumeRecording(context: Context) = command(context, GashtService.ACTION_RESUME)
     fun stopRecording(context: Context) = command(context, GashtService.ACTION_STOP_RECORD)

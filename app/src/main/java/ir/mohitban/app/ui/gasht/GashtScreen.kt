@@ -1,8 +1,5 @@
 package ir.mohitban.app.ui.gasht
 
-import ir.mohitban.app.ui.components.nightVision
-import androidx.compose.material.icons.outlined.DarkMode
-import androidx.compose.material.icons.outlined.LightMode
 import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -395,32 +392,8 @@ fun GashtScreen(onBack: () -> Unit) {
     }
     LaunchedEffect(Unit) { if (!permitted) requestPermission() }
 
-    // night patrol view (red on black), remembered between visits
-    val prefs = remember { context.getSharedPreferences("gasht_view", android.content.Context.MODE_PRIVATE) }
-    var night by remember { mutableStateOf(prefs.getBoolean("night", false)) }
-    if (night) ir.mohitban.app.ui.components.StatusBarIcons(darkIcons = false)
-    Column(Modifier.fillMaxSize().nightVision(night).background(MColors.Bg)) {
-        TopBar("گشت‌یار", onBack = onBack, action = {
-            Box(
-                Modifier.size(44.dp).clip(CircleShape).clickable {
-                    night = !night
-                    prefs.edit().putBoolean("night", night).apply()
-                },
-                contentAlignment = Alignment.Center,
-            ) {
-                ir.mohitban.app.ui.components.CircleIcon(
-                    if (night) Icons.Outlined.LightMode else Icons.Outlined.DarkMode,
-                    if (night) Color(0xFFE08A1E) else Color(0xFF34406B), Color.White, size = 36.dp, iconSize = 19.dp,
-                )
-            }
-        })
-        if (night) {
-            Text(
-                "نمای شب گشت: صفحه قرمز و تیره است تا دید چشم در تاریکی حفظ شود.",
-                style = MaterialTheme.typography.labelSmall, color = MColors.Muted, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
-            )
-        }
+    Column(Modifier.fillMaxSize().background(MColors.Bg)) {
+        TopBar("گشت‌یار", onBack = onBack)
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf("نقشه", "مسیرها", "نقاط", "ابزارها").forEachIndexed { i, t ->
                 val on = vm.tab == i
@@ -794,10 +767,39 @@ private fun RecordPanel(vm: GashtViewModel, modifier: Modifier) {
     val permitted by vm.hasPermission.collectAsStateWithLifecycle()
     var confirmStop by remember { mutableStateOf(false) }
     if (!record.active) {
+        // recording needs the phone's location (GPS) switched on first
+        var gpsOn by remember { mutableStateOf(GpsLocation.isGpsOn(context)) }
+        LaunchedEffect(Unit) { while (true) { gpsOn = GpsLocation.isGpsOn(context); delay(1500) } }
         PillButton(
-            "شروع ضبط مسیر گشت", { GashtSession.startRecording(context) }, modifier,
-            icon = Icons.Outlined.FiberManualRecord, enabled = permitted,
+            "شروع ضبط مسیر گشت", { if (GpsLocation.isGpsOn(context)) GashtSession.startRecording(context) else gpsOn = false }, modifier,
+            icon = Icons.Outlined.FiberManualRecord, enabled = permitted && gpsOn,
         )
+        if (permitted && !gpsOn) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .clip(RoundedCornerShape(ir.mohitban.app.ui.theme.Corners.R))
+                    .background(MColors.ErrorBg)
+                    .clickable {
+                        runCatching { context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) }
+                    }
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Outlined.LocationOff, null, tint = MColors.Error, modifier = Modifier.size(22.dp))
+                Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                    Text(
+                        "برای ضبط مسیر، ابتدا موقعیت مکانی (GPS) گوشی را روشن کنید.",
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = MColors.Error,
+                    )
+                    Text(
+                        "برای باز کردن تنظیمات موقعیت مکانی اینجا را بزنید. بعد از روشن کردن، دکمه‌ی ضبط فعال می‌شود.",
+                        style = MaterialTheme.typography.labelSmall, color = MColors.Ink, modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+            }
+        }
         Text(
             "ضبط با خاموش شدن صفحه هم ادامه پیدا می‌کند. برای مصرف کمتر باتری، بعد از گشت آن را پایان دهید.",
             style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 6.dp),

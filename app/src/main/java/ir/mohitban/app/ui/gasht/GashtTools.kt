@@ -18,6 +18,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material3.Icon
+import ir.mohitban.app.container
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -245,13 +248,50 @@ private fun ConverterCard(here: GeoPoint?) {
 
 @Composable
 private fun SunCard(here: GeoPoint?) {
+    val context = LocalContext.current
+    // the place the times are for: the phone's position (named from the built-in data), or else
+    // the county chosen at registration
+    var home by remember { mutableStateOf<Pair<GeoPoint, String>?>(null) }
+    LaunchedEffect(Unit) {
+        home = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val p = context.container.profileRepository.getProfile() ?: return@withContext null
+            ir.mohitban.app.gasht.Whereabouts.countyCenter(context, p.city, p.province)?.let { it to "شهرستان ${p.city.trim().removePrefix("شهرستان").trim()}" }
+        }
+    }
+    var hereName by remember { mutableStateOf<String?>(null) }
+    // re-name only after moving about a kilometre
+    val key = here?.let { (it.lat * 100).toInt() to (it.lon * 100).toInt() }
+    LaunchedEffect(key) {
+        val p = here ?: return@LaunchedEffect
+        hereName = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                val w = ir.mohitban.app.gasht.Whereabouts.locate(context, p)
+                listOfNotNull(
+                    w.place?.takeIf { (w.placeDistance ?: 1e9) < 15_000 }?.label,
+                    w.county?.let { "شهرستان $it" },
+                ).joinToString("، ").ifBlank { null }
+            }.getOrNull()
+        }
+    }
+    val point = here ?: home?.first
+    val title = when {
+        here != null -> hereName ?: "موقعیت فعلی شما"
+        home != null -> home!!.second
+        else -> null
+    }
     ToolCard(Icons.Outlined.LightMode, Color(0xFFE0A21E), "طلوع و غروب آفتاب") {
-        if (here == null) {
+        if (point == null) {
             Text("بعد از پیدا شدن موقعیت GPS محاسبه می‌شود.", style = MaterialTheme.typography.bodySmall, color = MColors.Muted)
         } else {
+            title?.let {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
+                    Icon(Icons.Outlined.LocationOn, null, tint = Color(0xFFE5483B), modifier = Modifier.size(18.dp))
+                    Text(" $it", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Ink)
+                }
+            }
             val cal = java.util.Calendar.getInstance()
             val offset = java.util.TimeZone.getDefault().getOffset(cal.timeInMillis) / 60_000
-            val s = SunTimes.compute(cal.get(java.util.Calendar.DAY_OF_YEAR), here.lat, here.lon, offset)
+            val s = SunTimes.compute(cal.get(java.util.Calendar.DAY_OF_YEAR), point.lat, point.lon, offset)
             fun hm(m: Int?) = m?.let { String.format(java.util.Locale.US, "%02d:%02d", (it / 60) % 24, it % 60).fa() } ?: "—"
             Row(Modifier.fillMaxWidth()) {
                 Result("طلوع", hm(s.sunrise), Modifier.weight(1f))
@@ -259,7 +299,8 @@ private fun SunCard(here: GeoPoint?) {
                 Result("غروب", hm(s.sunset), Modifier.weight(1f))
             }
             Text(
-                "${JalaliDate.today().formatLong().fa()} — برای همین نقطه، بدون اینترنت (با تقریب حدود ۲ دقیقه).",
+                if (here != null) "${JalaliDate.today().formatLong().fa()} — برای موقعیت فعلی شما، بدون اینترنت (با تقریب حدود ۲ دقیقه)."
+                else "${JalaliDate.today().formatLong().fa()} — برای مرکز شهرستان محل خدمت (ثبت‌نام). با روشن شدن GPS برای موقعیت دقیق شما حساب می‌شود.",
                 style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 6.dp),
             )
         }
