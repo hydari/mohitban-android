@@ -205,17 +205,12 @@ class FuelFormRenderer(private val context: Context, private val files: FileStor
             PdfKit.line(c, "—", leftCenter, 298f, PdfKit.text(10f, false, PdfKit.MUTED), Align.CENTER)
         }
 
-        // ---------- stamp box & POS slip box ----------
+        // ---------- the POS slip (the station's own record) across the width ----------
         val top = 328f
         val bottom = 404f
-        val boxGap = 8f
-        val boxW = (W - 2 * M - boxGap) / 2
-        val stampBox = RectF(W - M - boxW, top, W - M, bottom)
-        val slipBox = RectF(M, top, M + boxW, bottom)
+        val slipBox = RectF(M, top, W - M, bottom)
         val dash = PdfKit.dashed(0.9f, Color.rgb(120, 135, 118), 3.5f, 2.5f)
-        c.drawRoundRect(stampBox, 6f, 6f, dash)
         c.drawRoundRect(slipBox, 6f, 6f, dash)
-        PdfKit.paragraph(c, "مهر و امضاء فروشنده شرکت نفت", stampBox.right - 4f, top + 5f, boxW - 8f, PdfKit.text(8.2f, true), Align.CENTER)
         val receipt = files.loadBitmap(e.receiptPath, 1400)
         if (receipt != null) {
             // the POS slip itself, placed inside its box on the same page

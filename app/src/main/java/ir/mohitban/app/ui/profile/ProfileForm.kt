@@ -39,7 +39,9 @@ data class ProfileForm(
     fun locationErrors(): Map<String, String> = buildMap {
         Validators.required(province, "استان")?.let { put("province", it) }
         Validators.required(city, "شهرستان")?.let { put("city", it) }
-        Validators.required(protectedArea, "منطقه")?.let { put("protectedArea", it) }
+        val (areaType, areaName) = ir.mohitban.app.domain.model.AreaTypes.split(protectedArea)
+        if (areaType.isBlank()) put("areaType", "نوع منطقه را انتخاب کنید")
+        Validators.required(areaName, "نام منطقه")?.let { put("protectedArea", it) }
         Validators.required(station, "پاسگاه")?.let { put("station", it) }
     }
 

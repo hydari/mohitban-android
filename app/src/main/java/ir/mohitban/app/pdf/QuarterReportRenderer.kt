@@ -173,7 +173,7 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
         pair(colR, 142f, "نام پدر", p.fatherName)
         pair(colL, 142f, "درجه / سمت", p.rank)
         pair(colR, 160f, "شهرستان", p.city)
-        pair(colL, 160f, "منطقه حفاظت‌شده", p.protectedArea)
+        pair(colL, 160f, "منطقه", ir.mohitban.app.domain.model.AreaTypes.title(p.protectedArea).removePrefix("منطقه‌ی "))
         pair(colR, 178f, "پاسگاه محیط‌بانی", p.station)
         val vehiclesText = s.entries.map { "${it.snapshot.vehicleModel} ${it.snapshot.plate.displayText().fa()}" }.distinct().joinToString(" ، ")
         if (vehiclesText.isNotBlank()) pair(colL, 178f, "وسیله", vehiclesText)
@@ -311,7 +311,7 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
         var x = W - M
         titles.forEachIndexed { i, t ->
             val rr = RectF(x - bw, y, x, y + bh)
-            if (i == 2) c.drawRoundRect(rr, 6f, 6f, PdfKit.dashed(0.9f, Color.rgb(140, 155, 138)))
+            if (i >= 1) c.drawRoundRect(rr, 6f, 6f, PdfKit.dashed(0.9f, Color.rgb(140, 155, 138)))
             else c.drawRoundRect(rr, 6f, 6f, PdfKit.stroke(0.7f, Color.rgb(200, 209, 195)))
             PdfKit.fitLine(c, t, rr.centerX(), rr.top + 16f, PdfKit.text(8.5f, true), bw - 10f, Align.CENTER)
             val (img, name) = when (i) { 0 -> sig to p.fullName; 1 -> stationSig to stationName; else -> null to "" }

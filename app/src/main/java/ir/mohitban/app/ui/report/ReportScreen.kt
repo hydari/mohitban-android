@@ -138,9 +138,7 @@ fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?, chrome: Boolea
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val sig = rememberSignatureFieldState()
-    // the fuel station attendant signs the quarterly report on the phone (no paper form)
-    val stationSig = rememberSignatureFieldState()
-    var stationName by remember { mutableStateOf("") }
+
     var viewReceipt by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var preview by remember { mutableStateOf<List<Bitmap>?>(null) }
@@ -168,7 +166,7 @@ fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?, chrome: Boolea
         scope.launch {
             val sigBitmap = sig.bitmap
             val file = withContext(Dispatchers.IO) {
-                context.container.quarterReport.createPdf(s, p, sigBitmap, if (sig.hasNewDrawing || sig.existing == null) null else defaultSigPath, stationSig.bitmap, stationName.trim())
+                context.container.quarterReport.createPdf(s, p, sigBitmap, if (sig.hasNewDrawing || sig.existing == null) null else defaultSigPath)
             }
             busy = false
             then(file)
@@ -208,7 +206,7 @@ fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?, chrome: Boolea
                         Image(painterResource(R.drawable.doe_logo_full), null, modifier = Modifier.size(78.dp))
                         Text("گزارش فصلی هزینه سوخت", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 10.dp))
                         Text(
-                            "پاسگاه محیط‌بانی ${profile?.station ?: ""} | منطقه ${profile?.protectedArea ?: ""}",
+                            "پاسگاه محیط‌بانی ${profile?.station ?: ""} | ${ir.mohitban.app.domain.model.AreaTypes.title(profile?.protectedArea.orEmpty())}",
                             style = MaterialTheme.typography.bodySmall, color = MColors.Muted, textAlign = TextAlign.Center,
                             modifier = Modifier.padding(top = 4.dp),
                         )
@@ -261,10 +259,10 @@ fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?, chrome: Boolea
                     }
                     Spacer(Modifier.height(16.dp))
                     SignatureField(sig, "امضای محیط‌بان", Modifier.fillMaxWidth())
-                    Spacer(Modifier.height(14.dp))
-                    ir.mohitban.app.ui.components.MField(stationName, { stationName = it }, label = "نام متصدی یا جایگاه سوخت (اختیاری)", maxLength = 60)
-                    Spacer(Modifier.height(8.dp))
-                    SignatureField(stationSig, "مهر و امضای متصدی جایگاه سوخت", Modifier.fillMaxWidth())
+                    Text(
+                        "کادر «مهر و امضای متصدی جایگاه سوخت» در گزارش خالی می‌ماند تا پس از چاپ، در جایگاه مهر و امضا شود.",
+                        style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 6.dp, start = 4.dp),
+                    )
                     Spacer(Modifier.height(18.dp))
                     PillButton("مشاهده گزارش فصلی", icon = Icons.Outlined.Visibility, loading = busy, onClick = {
                         build { f -> scope.launch { preview = withContext(Dispatchers.IO) { context.container.quarterReport.renderPages(f) } } }

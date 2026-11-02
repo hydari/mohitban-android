@@ -191,7 +191,19 @@ fun LocationSection(form: ProfileForm, errors: Map<String, String>, onChange: (P
         leadingIcon = Icons.Outlined.LocationOn, placeholder = if (form.province.isBlank()) "ابتدا استان را انتخاب کنید" else "انتخاب شهرستان",
         error = errors["city"], title = "شهرستان محل خدمت را انتخاب کنید",
     )
-    MField(form.protectedArea, { onChange(form.copy(protectedArea = it)) }, label = "منطقه حفاظت‌شده", leadingIcon = Icons.Outlined.Park, placeholder = "کاغذکنان", error = errors["protectedArea"])
+    // the area: one of the four kinds, then its name; stored as one title ("پارک ملی گلستان")
+    val (areaType, areaName) = ir.mohitban.app.domain.model.AreaTypes.split(form.protectedArea)
+    ir.mohitban.app.ui.components.SelectField(
+        areaType, { t -> onChange(form.copy(protectedArea = ir.mohitban.app.domain.model.AreaTypes.join(t, areaName))) },
+        ir.mohitban.app.domain.model.AreaTypes.ALL, label = "نوع منطقه (مناطق چهارگانه)", leadingIcon = Icons.Outlined.Park,
+        error = errors["areaType"], title = "نوع منطقه‌ی محل خدمت",
+    )
+    MField(
+        areaName, { n -> onChange(form.copy(protectedArea = ir.mohitban.app.domain.model.AreaTypes.join(areaType, n))) },
+        label = if (areaType.isBlank()) "نام منطقه" else "نام $areaType", leadingIcon = Icons.Outlined.Park,
+        placeholder = when (areaType) { "پارک ملی" -> "گلستان"; "پناهگاه حیات وحش" -> "میانکاله"; "اثر طبیعی ملی" -> "دماوند"; else -> "کاغذکنان" },
+        error = errors["protectedArea"],
+    )
     MField(form.station, { onChange(form.copy(station = it)) }, label = "پاسگاه محیط‌بانی", leadingIcon = Icons.Outlined.Home, placeholder = "آقکند", error = errors["station"], imeAction = androidx.compose.ui.text.input.ImeAction.Done)
 }
 
