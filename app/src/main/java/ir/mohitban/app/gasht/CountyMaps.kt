@@ -72,7 +72,11 @@ data class Download(val map: CountyMap, val done: Long, val total: Long, val sta
  * interrupted download from where it stopped.
  */
 object MapDownloader {
-    const val BASE = "https://github.com/hydari/mohitban-android/releases/download/maps-v1/"
+    /** Where the map files are: the department's own site first, the app's GitHub release as a backup. */
+    val SOURCES = listOf(
+        "https://muhitban.ir/app/maps/",
+        "https://github.com/hydari/mohitban-android/releases/download/maps-v1/",
+    )
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val jobs = HashMap<String, Job>()
@@ -106,7 +110,7 @@ object MapDownloader {
         val part = File(target.parentFile, m.file + ".part")
         try {
             fun open(u: URL): HttpURLConnection {
-                // only the published map files (GitHub hands the file over from its download host, https only)
+                // only the published map files, over https (GitHub hands its files over from its download host)
                 require(u.protocol == "https") { "insecure" }
                 return (u.openConnection() as HttpURLConnection).apply {
                     instanceFollowRedirects = false
@@ -115,15 +119,25 @@ object MapDownloader {
                     if (part.exists() && part.length() > 0) setRequestProperty("Range", "bytes=${part.length()}-")
                 }
             }
-            var url = URL(BASE + m.file)
-            var conn = open(url)
-            var redirects = 0
-            while (conn.responseCode in 300..399 && redirects < 5) {
-                val loc = conn.getHeaderField("Location") ?: error("redirect")
-                conn.disconnect()
-                url = URL(url, loc); redirects++
-                conn = open(url)
+            /** Opens the file at one source, following redirects; null when that source cannot serve it. */
+            fun connect(base: String): HttpURLConnection? = runCatching {
+                var url = URL(base + m.file)
+                var c = open(url)
+                var redirects = 0
+                while (c.responseCode in 300..399 && redirects < 5) {
+                    val loc = c.getHeaderField("Location") ?: error("redirect")
+                    c.disconnect()
+                    url = URL(url, loc); redirects++
+                    c = open(url)
+                }
+                if (c.responseCode in listOf(200, 206, 416)) c else { c.disconnect(); null }
+            }.getOrNull()
+            var conn: HttpURLConnection? = null
+            for (base in SOURCES) {
+                conn = connect(base)
+                if (conn != null) break
             }
+            if (conn == null) throw java.net.ConnectException("no source")
             val code = conn.responseCode
             val append = code == 206
             if (code == 416 && part.length() != m.size) { part.delete(); error("HTTP 416") }
