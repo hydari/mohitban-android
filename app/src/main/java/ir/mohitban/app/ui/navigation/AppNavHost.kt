@@ -72,8 +72,7 @@ object Routes {
     const val VEHICLES = "vehicles"
     const val ALERTS = "alerts"
     const val SHIFT = "shift"
-    const val GASHT = "gasht?tab={tab}"
-    fun gasht(tab: Int = 0) = "gasht?tab=$tab"
+    const val GASHT = "gasht"
     const val VEHICLE = "vehicle/{id}"
 
     fun fuel(id: Long = 0L) = "fuel?entryId=$id"
@@ -84,7 +83,7 @@ object Routes {
 private const val RECEIPT_KEY = "cropped_receipt"
 private const val VEHICLE_KEY = "new_vehicle"
 
-private val TAB_ROUTES = setOf(Routes.HOME, Routes.RECORDS, Routes.REPORTS, Routes.SETTINGS)
+private val TAB_ROUTES = setOf(Routes.HOME, Routes.GASHT, Routes.REPORTS, Routes.SETTINGS)
 
 /** Tab switches and the splash/registration hand-over only cross-fade. */
 private fun calm(from: String?, to: String?): Boolean =
@@ -93,7 +92,7 @@ private fun calm(from: String?, to: String?): Boolean =
 private fun NavHostController.openTab(tab: MainTab) {
     val route = when (tab) {
         MainTab.HOME -> Routes.HOME
-        MainTab.RECORDS -> Routes.RECORDS
+        MainTab.GASHT -> Routes.GASHT
         MainTab.REPORTS -> Routes.REPORTS
         MainTab.SETTINGS -> Routes.SETTINGS
     }
@@ -113,11 +112,11 @@ fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0, openGasht
 
     // a tap on the quarterly-report reminder opens the reports tab
     LaunchedEffect(openReportsRequest, started) {
-        if (openReportsRequest > 0 && started) nav.openTab(MainTab.REPORTS)
+        if (openReportsRequest > 0 && started) { ir.mohitban.app.ui.report.ReportsHubTab.tab = 1; nav.openTab(MainTab.REPORTS) }
     }
     // a tap on the گشت‌یار notification (recording / off-route) opens it
     LaunchedEffect(openGashtRequest, started) {
-        if (openGashtRequest > 0 && started && nav.currentDestination?.route != Routes.GASHT) nav.navigate(Routes.gasht())
+        if (openGashtRequest > 0 && started) nav.openTab(MainTab.GASHT)
     }
     // a tap on the shift reminder opens the shift calendar
     LaunchedEffect(openShiftRequest, started) {
@@ -189,22 +188,19 @@ fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0, openGasht
         composable(Routes.HOME) {
             DashboardScreen(
                 onFuel = { nav.navigate(Routes.fuel()) },
-                onRecords = { nav.openTab(MainTab.RECORDS) },
-                onReport = { nav.openTab(MainTab.REPORTS) },
+                onRecords = { ir.mohitban.app.ui.report.ReportsHubTab.tab = 0; nav.openTab(MainTab.REPORTS) },
+                onReport = { ir.mohitban.app.ui.report.ReportsHubTab.tab = 1; nav.openTab(MainTab.REPORTS) },
                 onVehicle = { nav.navigate(Routes.VEHICLES) },
                 onProfile = { nav.navigate(Routes.EDIT_PROFILE) },
                 onSettings = { nav.openTab(MainTab.SETTINGS) },
                 onAlerts = { nav.navigate(Routes.ALERTS) },
                 onShift = { nav.navigate(Routes.SHIFT) },
-                onGasht = { nav.navigate(Routes.gasht()) },
+                onGasht = { nav.openTab(MainTab.GASHT) },
                 onTab = { nav.openTab(it) },
             )
         }
-        composable(Routes.RECORDS) {
-            RecordsScreen(onEdit = { nav.navigate(Routes.fuel(it)) }, onTab = { nav.openTab(it) }, onBack = null)
-        }
         composable(Routes.REPORTS) {
-            ReportScreen(onTab = { nav.openTab(it) }, onBack = null)
+            ir.mohitban.app.ui.report.ReportsHub(onTab = { nav.openTab(it) }, onEdit = { nav.navigate(Routes.fuel(it)) })
         }
         composable(Routes.SETTINGS) {
             SettingsScreen(
@@ -235,7 +231,7 @@ fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0, openGasht
                 onBack = { nav.popBackStack() },
                 onDone = {
                     nav.popBackStack()
-                    if (id == 0L) nav.openTab(MainTab.RECORDS)
+                    if (id == 0L) { ir.mohitban.app.ui.report.ReportsHubTab.tab = 0; nav.openTab(MainTab.REPORTS) }
                 },
             )
         }
@@ -262,16 +258,15 @@ fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0, openGasht
                 onOpen = { target ->
                     nav.popBackStack()
                     when (target) {
-                        AlertTarget.REPORTS -> nav.openTab(MainTab.REPORTS)
+                        AlertTarget.REPORTS -> { ir.mohitban.app.ui.report.ReportsHubTab.tab = 1; nav.openTab(MainTab.REPORTS) }
                         AlertTarget.SETTINGS -> nav.openTab(MainTab.SETTINGS)
                         AlertTarget.SHIFT -> nav.navigate(Routes.SHIFT)
-                        AlertTarget.PATROL -> nav.navigate(Routes.gasht(3))
                     }
                 },
             )
         }
-        composable(Routes.GASHT, arguments = listOf(navArgument("tab") { type = NavType.IntType; defaultValue = 0 })) { entry ->
-            ir.mohitban.app.ui.gasht.GashtScreen(onBack = { nav.popBackStack() }, initialTab = entry.arguments?.getInt("tab") ?: 0)
+        composable(Routes.GASHT) {
+            ir.mohitban.app.ui.gasht.GashtScreen(onTab = { nav.openTab(it) })
         }
         composable(Routes.SHIFT) {
             ir.mohitban.app.ui.shift.ShiftScreen(onBack = { nav.popBackStack() })

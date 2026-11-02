@@ -11,12 +11,13 @@ import ir.mohitban.app.domain.model.Vehicle
 import ir.mohitban.app.domain.model.VehicleType
 
 fun ProfileEntity.toDomain() = RangerProfile(
-    fullName, fatherName, nationalId, mobile, rank, photoPath, province, city, protectedArea, station,
+    fullName, fatherName, nationalId, mobile, rank, photoPath, province, city, protectedArea, station, grade, hireJdn, birthJdn,
 )
 
 fun RangerProfile.toEntity() = ProfileEntity(
     fullName = fullName, fatherName = fatherName, nationalId = nationalId, mobile = mobile, rank = rank,
     photoPath = photoPath, province = province, city = city, protectedArea = protectedArea, station = station,
+    grade = grade, hireJdn = hireJdn, birthJdn = birthJdn,
 )
 
 private val FALLBACK_PLATE = Plate.Car("", "الف", "", "")

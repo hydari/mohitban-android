@@ -12,7 +12,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ProfileEntity::class, VehicleEntity::class, SettingsEntity::class, FuelEntryEntity::class,
         TrackEntity::class, TrackPointEntity::class, WaypointEntity::class, PatrolLogEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -96,9 +96,18 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v7: the ranger's rank (درجه), date of employment and birthday. */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `profile` ADD COLUMN `grade` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `profile` ADD COLUMN `hireJdn` INTEGER")
+                db.execSQL("ALTER TABLE `profile` ADD COLUMN `birthJdn` INTEGER")
+            }
+        }
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .build()
     }
 }

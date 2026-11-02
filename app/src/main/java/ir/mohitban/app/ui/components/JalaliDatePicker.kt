@@ -54,6 +54,8 @@ fun JalaliDatePickerDialog(
     var selected by remember { mutableStateOf(initial) }
     var year by remember { mutableIntStateOf(initial.year) }
     var month by remember { mutableIntStateOf(initial.month) }
+    // tapping the month title opens a year list (birthdays and employment dates are years back)
+    var pickYear by remember { mutableStateOf(false) }
 
     fun shift(delta: Int) {
         val d = JalaliDate(year, month, 1).plusMonths(delta)
@@ -75,9 +77,9 @@ fun JalaliDatePickerDialog(
                     Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, "ماه قبل", tint = MColors.Ink)
                 }
                 Text(
-                    "${Jalali.MONTH_NAMES[month - 1]} ${year.fa()}",
+                    "${Jalali.MONTH_NAMES[month - 1]} ${year.fa()} ▾",
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable { pickYear = !pickYear }.padding(vertical = 6.dp),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
                 Box(Modifier.size(40.dp).clip(CircleShape).clickable { shift(1) }, contentAlignment = Alignment.Center) {
@@ -85,6 +87,24 @@ fun JalaliDatePickerDialog(
                 }
             }
             Spacer(Modifier.height(8.dp))
+            if (pickYear) {
+                val last = maxDate?.year ?: (today.year + 5)
+                val years = (last downTo 1320).toList()
+                androidx.compose.foundation.lazy.LazyColumn(Modifier.fillMaxWidth().height(300.dp)) {
+                    items(years.chunked(4).size) { r ->
+                        Row(Modifier.fillMaxWidth()) {
+                            years.chunked(4)[r].forEach { y ->
+                                Box(
+                                    Modifier.weight(1f).padding(3.dp).height(40.dp).clip(RoundedCornerShape(10.dp))
+                                        .background(if (y == year) MColors.Green else Color.Transparent)
+                                        .clickable { year = y; pickYear = false },
+                                    contentAlignment = Alignment.Center,
+                                ) { Text(y.fa(), color = if (y == year) Color.White else MColors.Ink, style = MaterialTheme.typography.bodyMedium) }
+                            }
+                        }
+                    }
+                }
+            } else {
             Row(Modifier.fillMaxWidth()) {
                 Jalali.WEEKDAY_SHORT.forEachIndexed { i, d ->
                     Text(
@@ -135,6 +155,7 @@ fun JalaliDatePickerDialog(
                         }
                     }
                 }
+            }
             }
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {

@@ -73,10 +73,9 @@ object ZoneStore {
 
     fun load(context: Context): List<Zone> {
         cache?.let { return it }
-        val f = file(context)
-        // a file the ranger imported wins; otherwise the boundaries built into the app
-        val z = if (f.exists()) runCatching { parse(f.readText()) }.getOrDefault(emptyList())
-        else runCatching { assetText(context, BUNDLED)?.let(::parse) }.getOrNull() ?: emptyList()
+        // only the boundaries built into the app (an older imported file is removed)
+        file(context).takeIf { it.exists() }?.delete()
+        val z = runCatching { assetText(context, BUNDLED)?.let(::parse) }.getOrNull() ?: emptyList()
         cache = z
         return z
     }

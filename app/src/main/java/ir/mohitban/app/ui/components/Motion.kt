@@ -241,6 +241,7 @@ fun SkyHeader(
     modifier: Modifier = Modifier,
     parallax: () -> Int = { 0 },
     fallback: Pair<Double, Double>? = null,
+    darkIcons: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val context = LocalContext.current
@@ -256,7 +257,7 @@ fun SkyHeader(
         gradeAt(minute, (sun.sunrise ?: 360).toFloat(), (sun.sunset ?: 1080).toFloat())
     }
     // white status-bar icons over the photo (a soft shade at the top keeps them readable)
-    StatusBarIcons(darkIcons = false)
+    StatusBarIcons(darkIcons = darkIcons)
     val filter = remember(grade) { ColorFilter.colorMatrix(grade.matrix()) }
     val stars = remember { val r = Random(7); List(60) { Star(r.nextFloat(), r.nextFloat() * 0.34f, 0.4f + r.nextFloat() * 0.8f, r.nextFloat()) } }
     val t = rememberInfiniteTransition(label = "sky")
@@ -287,7 +288,7 @@ fun SkyHeader(
         }
     }
 
-    Box(modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp))) {
+    Box(modifier.clipToBounds()) {
         androidx.compose.foundation.Image(
             androidx.compose.ui.res.painterResource(photo), null,
             contentScale = androidx.compose.ui.layout.ContentScale.Crop,

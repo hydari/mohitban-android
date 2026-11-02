@@ -132,6 +132,10 @@ import ir.mohitban.app.ui.components.SkyHeader
 import ir.mohitban.app.ui.components.rememberCountUp
 import ir.mohitban.app.ui.components.staggerIn
 import androidx.compose.ui.layout.layout
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.heightIn
 
 data class DashboardState(
     val profile: RangerProfile? = null,
@@ -214,89 +218,71 @@ fun DashboardScreen(
 
     Box(Modifier.fillMaxSize().background(MColors.Bg)) {
         CompositionLocalProvider(LocalGlassBackdrop provides null) {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+            val headerH = statusTop + 206.dp
+            val headerPx = with(density) { headerH.toPx() }
+            // the sheet has covered the sky: the status bar sits on the light page
+            val covered by remember { androidx.compose.runtime.derivedStateOf { scroll.value > headerPx - with(density) { (statusTop + 8.dp).toPx() } } }
+            val province = profile?.province.orEmpty().trim().removePrefix("استان").trim()
+            // sun times fall back to the county chosen at registration when the phone has no position
+            var home by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+            LaunchedEffect(profile?.city, profile?.province) {
+                val p = profile ?: return@LaunchedEffect
+                home = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    ir.mohitban.app.gasht.Whereabouts.countyCenter(context, p.city, p.province)?.let { it.lat to it.lon }
+                }
+            }
+            // ---------- the living sky stays in place; the page slides over it ----------
+            SkyHeader(Modifier.fillMaxWidth().height(headerH), parallax = { -scroll.value / 2 }, fallback = home, darkIcons = covered) {
+                Column(
+                    Modifier.fillMaxWidth().statusBarsPadding().padding(top = 14.dp)
+                        .graphicsLayer {
+                            // the organisation block drifts up, shrinks a little and fades as the page rises
+                            val k = (scroll.value / (headerPx * 0.55f)).coerceIn(0f, 1f)
+                            alpha = 1f - k
+                            translationY = -scroll.value * 0.35f
+                            val sc = 1f - 0.08f * k
+                            scaleX = sc; scaleY = sc
+                        },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    ShimmerLogo(size = 66.dp, modifier = Modifier.padding(bottom = 4.dp).staggerIn(0, "dash"))
+                    OrgPlate("سازمان حفاظت محیط زیست", 10.5.sp, Modifier.staggerIn(1, "dash"))
+                    if (province.isNotEmpty()) OrgPlate("اداره کل حفاظت محیط زیست استان $province", 9.5.sp, Modifier.staggerIn(2, "dash"))
+                }
+            }
+            androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+            val screenH = maxHeight
+            Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
+                Spacer(Modifier.height(headerH - 28.dp))
             Column(
                 Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scroll)
+                    .fillMaxWidth()
+                    .heightIn(min = screenH - statusTop)
+                    .shadow(18.dp, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp), ambientColor = Color(0xFF0B2414), spotColor = Color(0xFF0B2414))
+                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                    .background(MColors.Bg)
                     .padding(horizontal = 18.dp),
             ) {
-                // ---------- organisation: DoE logo + name plates, no background ----------
-                val province = profile?.province.orEmpty().trim().removePrefix("استان").trim()
-                // the living sky of this moment behind the logo, edge to edge
-                // sun times fall back to the county chosen at registration when the phone has no position
-                var home by remember { mutableStateOf<Pair<Double, Double>?>(null) }
-                LaunchedEffect(profile?.city, profile?.province) {
-                    val p = profile ?: return@LaunchedEffect
-                    home = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        ir.mohitban.app.gasht.Whereabouts.countyCenter(context, p.city, p.province)?.let { it.lat to it.lon }
-                    }
-                }
-                SkyHeader(Modifier.fullBleed(18.dp), parallax = { scroll.value }, fallback = home) {
-                    Column(
-                        Modifier.fillMaxWidth().statusBarsPadding().padding(top = 14.dp, bottom = 40.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        ShimmerLogo(size = 66.dp, modifier = Modifier.padding(bottom = 4.dp).staggerIn(0, "dash"))
-                        OrgPlate("سازمان حفاظت محیط زیست", 10.5.sp, Modifier.staggerIn(1, "dash"))
-                        if (province.isNotEmpty()) OrgPlate("اداره کل حفاظت محیط زیست استان $province", 9.5.sp, Modifier.staggerIn(2, "dash"))
-                    }
+                // grab line of the sheet
+                Box(Modifier.align(Alignment.CenterHorizontally).padding(top = 10.dp).size(width = 42.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(Color(0x332B3A31)))
+
+                // ---------- birthday ----------
+                val birth = profile?.birthJdn
+                if (birth != null && ir.mohitban.app.reminder.BirthdayReminder.isBirthday(birth, vm.today)) {
+                    BirthdayCard(profile.fullName, Modifier.padding(top = 12.dp).staggerIn(3, "dash"))
                 }
 
-                // ---------- personal card (liquid glass): photo | name, rank · station | bell ----------
-                GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).staggerIn(3, "dash"), dark = true) {
-                    GlassRing(
-                        70.dp, Modifier.padding(start = 12.dp, top = 12.dp, bottom = 12.dp), onClick = onProfile,
-                        rim = shiftStatus?.let { if (it is ShiftStatus.OnDuty) ShiftColors.On else ShiftColors.Off },
-                    ) {
-                        Box(
-                            Modifier.fillMaxSize().clip(CircleShape)
-                                .background(Brush.linearGradient(listOf(Color(0xFFD9CFB4), Color(0xFFA68A5F)))),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            val p = photo
-                            if (p != null) {
-                                Image(p, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
-                            } else {
-                                // no photo yet: the app's ranger badge
-                                Image(painterResource(R.drawable.avatar_default), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
-                            }
-                        }
-                    }
-                    Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
-                        Text(
-                            profile?.fullName ?: "",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Black,
-                            ),
-                            color = MColors.GreenDark,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        )
-                        val rank = profile?.rank?.takeIf { it.isNotBlank() }
-                        val station = profile?.station?.takeIf { it.isNotBlank() }
-                        if (rank != null || station != null) {
-                            // rank and station on one line, each icon on its right side
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 5.dp)) {
-                                if (rank != null) {
-                                    VerifiedBadge()
-                                    Text(
-                                        " $rank", style = MaterialTheme.typography.bodySmall, color = MColors.Ink,
-                                        maxLines = 1,
-                                    )
-                                }
-                                if (rank != null && station != null) Spacer(Modifier.width(10.dp))
-                                if (station != null) {
-                                    CircleIcon(Icons.Outlined.LocationOn, Color(0xFFE5483B), Color.White, size = 17.dp, iconSize = 11.dp)
-                                    Text(
-                                        " پاسگاه $station", style = MaterialTheme.typography.bodySmall, color = MColors.Muted,
-                                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    MinimalBell(ringing = unseen, count = if (unseen) urgentCount else 0, onClick = onAlerts, modifier = Modifier.padding(end = 8.dp))
-                }
+                // ---------- the ranger's official card ----------
+                OfficerCard(
+                    profile = profile, photo = photo, today = vm.today.jdn,
+                    rim = shiftStatus?.let { if (it is ShiftStatus.OnDuty) ShiftColors.On else ShiftColors.Off },
+                    bell = { MinimalBell(ringing = unseen, count = if (unseen) urgentCount else 0, onClick = onAlerts, light = true) },
+                    onClick = onProfile,
+                    modifier = Modifier.padding(top = 12.dp).staggerIn(3, "dash"),
+                )
 
                 // ---------- today's shift ----------
                 val onDuty = shiftStatus is ShiftStatus.OnDuty
@@ -467,6 +453,8 @@ fun DashboardScreen(
                 if (showDev) DeveloperDialog(onDismiss = { showDev = false })
                 Spacer(Modifier.height(124.dp))
             }
+            }
+            }
             BottomBar(MainTab.HOME, onTab, Modifier.align(Alignment.BottomCenter))
             // the dashboard is the root screen: back twice within 2 s to leave the app
             var lastBack by remember { mutableStateOf(0L) }
@@ -557,7 +545,7 @@ private fun OrgPlate(text: String, size: androidx.compose.ui.unit.TextUnit, modi
 
 /** A simple white outline bell that swings when something needs attention; red dot shows the count. */
 @Composable
-private fun MinimalBell(ringing: Boolean, count: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun MinimalBell(ringing: Boolean, count: Int, onClick: () -> Unit, modifier: Modifier = Modifier, light: Boolean = false) {
     val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "bell")
     val swing by t.animateFloat(
         initialValue = 0f, targetValue = 0f,
@@ -578,7 +566,7 @@ private fun MinimalBell(ringing: Boolean, count: Int, onClick: () -> Unit, modif
     Box(modifier.size(44.dp).clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Icon(
             if (ringing) Icons.Filled.Notifications else Icons.Outlined.NotificationsNone, "اعلان‌ها",
-            tint = if (ringing) Color(0xFFFFC21A) else MColors.Ink,
+            tint = if (ringing) Color(0xFFFFC21A) else if (light) Color.White else MColors.Ink,
             modifier = Modifier
                 .size(27.dp)
                 .graphicsLayer {

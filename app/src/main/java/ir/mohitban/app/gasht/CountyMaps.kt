@@ -72,11 +72,29 @@ data class Download(val map: CountyMap, val done: Long, val total: Long, val sta
  * interrupted download from where it stopped.
  */
 object MapDownloader {
-    /** Where the map files are: the department's own site first, the app's GitHub release as a backup. */
-    val SOURCES = listOf(
-        "https://muhitban.ir/app/maps/",
-        "https://github.com/hydari/mohitban-android/releases/download/maps-v1/",
-    )
+    /** The map files live only on the department's own site (served to this app alone). */
+    val SOURCES = listOf("https://muhitban.ir/app/maps/")
+
+    // the host answers only requests that carry this app's access token, and the files are
+    // encrypted: a copied file is useless outside the app
+    private val K1 = byteArrayOf(102, 22, 21, 28, -98, -56, 57, 56, -57, 104, -122, 111, -83, 35, -109, 32, 34, 1, -40, -28, 58, 58, 37, 127, -106, 30, 23, -88, -16, 83, -36, -37)
+    private val K2 = byteArrayOf(-13, -27, -74, 44, -36, -117, 99, -19, -124, -54, -42, -13, -5, -80, 72, -98, 114, -50, 62, 54, -47, -79, 26, 100, 11, -58, -102, -2, 99, -30, 22, 108)
+    private val T1 = byteArrayOf(-54, -69, 90, 107, -92, -66, 47, -63, -119, 52, 26, -72, 44, 47, -15, -117, -25, -78, 26, -36, 41, -8, -61, 41, 99, 117, 33, -73, -13, 36, -79, 93, -89, 117, 15, -77)
+    private val T2 = byteArrayOf(-7, -113, 109, 93, -105, -122, 24, -12, -65, 82, 46, -120, 77, 23, -58, -66, -41, -118, 42, -67, 17, -102, -6, 77, 82, 20, 18, -43, -62, 69, -43, 106, -59, 23, 108, -126)
+
+    private fun join(a: ByteArray, b: ByteArray) = ByteArray(a.size) { (a[it].toInt() xor b[it].toInt()).toByte() }
+    private val token: String get() = String(join(T1, T2), Charsets.US_ASCII)
+
+    /** File layout: "MHYM1" + 16-byte IV + AES-256-CTR of the MBTiles file. */
+    private fun decrypt(src: File, dst: File) {
+        src.inputStream().buffered().use { input ->
+            val magic = ByteArray(5); require(input.read(magic) == 5 && String(magic, Charsets.US_ASCII) == "MHYM1") { "invalid" }
+            val iv = ByteArray(16); require(input.read(iv) == 16) { "invalid" }
+            val cipher = javax.crypto.Cipher.getInstance("AES/CTR/NoPadding")
+            cipher.init(javax.crypto.Cipher.DECRYPT_MODE, javax.crypto.spec.SecretKeySpec(join(K1, K2), "AES"), javax.crypto.spec.IvParameterSpec(iv))
+            javax.crypto.CipherInputStream(input, cipher).use { c -> dst.outputStream().use { c.copyTo(it, 1 shl 16) } }
+        }
+    }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val jobs = HashMap<String, Job>()
@@ -116,6 +134,7 @@ object MapDownloader {
                     instanceFollowRedirects = false
                     connectTimeout = 20_000; readTimeout = 30_000
                     setRequestProperty("User-Agent", "Mohityar")
+                    setRequestProperty("X-Mohityar-Key", token)
                     if (part.exists() && part.length() > 0) setRequestProperty("Range", "bytes=${part.length()}-")
                 }
             }
@@ -166,10 +185,14 @@ object MapDownloader {
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
             }
             if (m.size > 0 && part.length() != m.size) error("size")
-            val ok = runCatching { OfflineMap(part).use { it.isValid() } }.getOrDefault(false)
-            if (!ok) { part.delete(); error("invalid") }
+            // decrypt next to the target, check it really is a map, then put it in place
+            val plain = File(target.parentFile, m.file + ".tmp")
+            runCatching { decrypt(part, plain) }.onFailure { plain.delete(); part.delete(); error("invalid") }
+            val ok = runCatching { OfflineMap(plain).use { it.isValid() } }.getOrDefault(false)
+            if (!ok) { plain.delete(); part.delete(); error("invalid") }
+            part.delete()
             if (target.exists()) target.delete()
-            part.renameTo(target)
+            plain.renameTo(target)
             set(m, Download(m, target.length(), target.length(), Download.State.FINISHED))
             _finished.tryEmit(target)
         } catch (e: kotlinx.coroutines.CancellationException) {

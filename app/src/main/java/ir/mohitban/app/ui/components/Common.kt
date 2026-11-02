@@ -32,6 +32,7 @@ import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -318,7 +319,7 @@ fun TopBar(
 
 enum class MainTab(val title: String, val icon: ImageVector, val color: Color) {
     HOME("خانه", Icons.Outlined.Home, Color(0xFF239B56)),
-    RECORDS("سوابق", Icons.AutoMirrored.Outlined.FormatListBulleted, Color(0xFF2F7FC1)),
+    GASHT("گشت‌یار", Icons.Outlined.Explore, Color(0xFF2F7FC1)),
     REPORTS("گزارش‌ها", Icons.Outlined.Assessment, Color(0xFFE08A1E)),
     SETTINGS("تنظیمات", Icons.Outlined.Settings, Color(0xFF5F6F7A)),
 }

@@ -44,6 +44,9 @@ import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material.icons.outlined.WarningAmber
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -394,7 +397,7 @@ fun LtrText(text: String, modifier: Modifier = Modifier, style: androidx.compose
 // ============================================================================ screen
 
 @Composable
-fun GashtScreen(onBack: () -> Unit, initialTab: Int = 0) {
+fun GashtScreen(onTab: (ir.mohitban.app.ui.components.MainTab) -> Unit) {
     val vm = appViewModel(key = "gasht") { c, _ -> GashtViewModel(c) }
     val context = LocalContext.current
     val permitted by vm.hasPermission.collectAsStateWithLifecycle()
@@ -405,12 +408,11 @@ fun GashtScreen(onBack: () -> Unit, initialTab: Int = 0) {
         askPermission.launch(list.toTypedArray())
     }
     LaunchedEffect(Unit) { if (!permitted) requestPermission() }
-    LaunchedEffect(initialTab) { if (initialTab > 0) vm.tab = initialTab }
-
-    Column(Modifier.fillMaxSize().background(MColors.Bg)) {
-        TopBar("گشت‌یار", onBack = onBack)
+    Box(Modifier.fillMaxSize().background(MColors.Bg)) {
+    Column(Modifier.fillMaxSize().padding(bottom = 88.dp).navigationBarsPadding()) {
+        TopBar("گشت‌یار", onBack = null)
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf("نقشه", "مسیرها", "نقاط", "دفتر گشت", "ابزارها").forEachIndexed { i, t ->
+            listOf("نقشه", "مسیرها", "نقاط", "ابزارها").forEachIndexed { i, t ->
                 val on = vm.tab == i
                 Box(
                     Modifier.weight(1f).height(40.dp)
@@ -434,9 +436,10 @@ fun GashtScreen(onBack: () -> Unit, initialTab: Int = 0) {
             0 -> MapTab(vm)
             1 -> TracksTab(vm)
             2 -> PlacesTab(vm)
-            3 -> PatrolLogTab(vm)
             else -> ToolsTab(vm)
         }
+    }
+    ir.mohitban.app.ui.components.BottomBar(ir.mohitban.app.ui.components.MainTab.GASHT, onTab, Modifier.align(Alignment.BottomCenter))
     }
 }
 
@@ -565,11 +568,18 @@ private fun MapTab(vm: GashtViewModel) {
                             else -> ""
                         }
                         if (text.isNotEmpty()) {
-                            Text(
-                                text, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                color = if (inside != null) Color(ir.mohitban.app.gasht.ZoneTypes.color(inside.type)) else MColors.Muted,
-                                textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp),
-                            )
+                            // green inside a protected area, red outside
+                            val bg by androidx.compose.animation.animateColorAsState(if (inside != null) Color(0xFF1F8A4C) else Color(0xFFC62828), label = "zoneBg")
+                            Row(
+                                Modifier.padding(top = 8.dp).clip(RoundedCornerShape(12.dp)).background(bg).padding(horizontal = 12.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(if (inside != null) Icons.Outlined.Shield else Icons.Outlined.WarningAmber, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                Text(
+                                    "  $text", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                    color = Color.White, textAlign = TextAlign.Center,
+                                )
+                            }
                         }
                     }
                 }
@@ -594,7 +604,6 @@ private fun MapTab(vm: GashtViewModel) {
         CountyMapSuggestion(vm, fix)
         // ---- base map choice ----
         Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            ChoiceChip("بدون نقشه", vm.activeMap == null, Modifier.weight(1f)) { vm.selectMap(null) }
             vm.maps.take(2).forEach { f ->
                 val on = vm.activeMap?.file?.path == f.path
                 val label = ir.mohitban.app.gasht.CountyMaps.label(context, f)
@@ -851,9 +860,9 @@ private fun RecordPanel(vm: GashtViewModel, modifier: Modifier) {
     if (confirmStop) {
         ConfirmDialog(
             title = "پایان ضبط مسیر",
-            text = "مسیر ذخیره می‌شود و در زبانه‌ی «مسیرها» قابل مشاهده و ارسال است. سپس «دفتر گشت» باز می‌شود تا این گشت را با یک لمس ثبت کنید.",
+            text = "مسیر ذخیره می‌شود و در زبانه‌ی «مسیرها» قابل مشاهده و ارسال است.",
             confirm = "پایان و ذخیره",
-            onConfirm = { GashtSession.stopRecording(context); confirmStop = false; vm.tab = 3 },
+            onConfirm = { GashtSession.stopRecording(context); confirmStop = false },
             onDismiss = { confirmStop = false },
         )
     }
@@ -882,14 +891,7 @@ fun rememberRangerName(): String {
 @Composable
 private fun MapsDialog(vm: GashtViewModel, onDismiss: () -> Unit) {
     val context = LocalContext.current
-    var message by remember { mutableStateOf<String?>(null) }
     var deleting by remember { mutableStateOf<java.io.File?>(null) }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) vm.importMap(uri) { message = it }
-    }
-    val zonePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) vm.importZones(uri) { message = it }
-    }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = ir.mohitban.app.ui.components.Clay.Surface,
@@ -897,30 +899,11 @@ private fun MapsDialog(vm: GashtViewModel, onDismiss: () -> Unit) {
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
-                    "نقشه‌ی توپوگرافی (پستی‌وبلندی، خطوط تراز، رودخانه، جنگل، جاده و روستاها) بعد از یک بار دانلود، بدون اینترنت نمایش داده می‌شود.",
+                    "نقشه‌ی توپوگرافی (پستی‌وبلندی، خطوط تراز، رودخانه، جنگل، جاده و روستاها) بعد از یک بار دانلود، بدون اینترنت نمایش داده می‌شود. مرز مناطق حفاظت‌شده در خود برنامه است.",
                     style = MaterialTheme.typography.bodySmall, color = MColors.Ink,
                 )
                 CountyMapList(vm)
-                ir.mohitban.app.ui.components.OutlinePill(
-                    if (vm.mapBusy) "در حال وارد کردن…" else "وارد کردن فایل نقشه از گوشی (MBTiles)",
-                    { picker.launch(arrayOf("*/*")) }, Modifier.fillMaxWidth().padding(top = 12.dp),
-                )
-                message?.let { Text(it, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = MColors.Green, modifier = Modifier.padding(top = 6.dp)) }
-                // ---- protected-area boundaries ----
-                Text("مرز مناطق چهارگانه", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), modifier = Modifier.padding(top = 16.dp))
-                val imported = ir.mohitban.app.gasht.ZoneStore.isImported(context)
-                Text(
-                    when {
-                        imported -> "${vm.zones.size.fa()} منطقه از فایلی که وارد کرده‌اید."
-                        vm.zones.isNotEmpty() -> "مرز ${vm.zones.size.fa()} منطقه‌ی استان آذربایجان شرقی در برنامه موجود است. برای مرزهای جدیدتر، فایل GeoJSON اداره را وارد کنید."
-                        else -> "فایل مرز مناطق (GeoJSON) را وارد کنید."
-                    },
-                    style = MaterialTheme.typography.labelSmall, color = MColors.Muted,
-                )
-                Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SmallAction(Icons.Outlined.Layers, if (imported) "جایگزینی فایل" else "وارد کردن فایل جدیدتر", Modifier.weight(1.4f)) { zonePicker.launch(arrayOf("*/*")) }
-                    if (imported) SmallAction(Icons.Outlined.Close, "بازگشت به نسخه‌ی برنامه", Modifier.weight(1.4f), color = MColors.Error) { vm.deleteZones() }
-                }
+                if (vm.maps.isNotEmpty()) Text("نقشه‌های روی گوشی", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), modifier = Modifier.padding(top = 16.dp))
                 vm.maps.forEach { f ->
                     Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {

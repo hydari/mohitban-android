@@ -20,13 +20,20 @@ data class ProfileForm(
     val city: String = "",
     val protectedArea: String = "",
     val station: String = "",
+    val grade: String = "",
+    val hireJdn: Int? = null,
+    val birthJdn: Int? = null,
 ) {
     fun personalErrors(): Map<String, String> = buildMap {
         Validators.personName(fullName, "نام و نام خانوادگی")?.let { put("fullName", it) }
         Validators.personName(fatherName, "نام پدر")?.let { put("fatherName", it) }
         Validators.nationalId(nationalId)?.let { put("nationalId", it) }
         Validators.mobile(mobile)?.let { put("mobile", it) }
-        Validators.required(rank, "درجه / سمت")?.let { put("rank", it) }
+        Validators.required(rank, "سمت")?.let { put("rank", it) }
+        Validators.required(grade, "درجه")?.let { put("grade", it) }
+        if (birthJdn == null) put("birthJdn", "تاریخ تولد را انتخاب کنید")
+        if (hireJdn == null) put("hireJdn", "تاریخ استخدام را انتخاب کنید")
+        if (birthJdn != null && hireJdn != null && hireJdn <= birthJdn + 365 * 15) put("hireJdn", "تاریخ استخدام با تاریخ تولد جور نیست")
     }
 
     fun locationErrors(): Map<String, String> = buildMap {
@@ -40,12 +47,13 @@ data class ProfileForm(
         fullName = fullName.trim(), fatherName = fatherName.trim(), nationalId = nationalId.digitsOnly(),
         mobile = mobile.digitsOnly(), rank = rank.trim(), photoPath = photoPath, province = province.trim(),
         city = city.trim(), protectedArea = protectedArea.trim(), station = station.trim(),
+        grade = grade, hireJdn = hireJdn, birthJdn = birthJdn,
     )
 
     companion object {
         fun from(p: RangerProfile) = ProfileForm(
             p.fullName, p.fatherName, p.nationalId, p.mobile, p.rank, p.photoPath,
-            p.province, p.city, p.protectedArea, p.station,
+            p.province, p.city, p.protectedArea, p.station, p.grade, p.hireJdn, p.birthJdn,
         )
     }
 }

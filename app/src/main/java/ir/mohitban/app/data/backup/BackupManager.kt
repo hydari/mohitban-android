@@ -62,7 +62,6 @@ class BackupManager(
             }
         })
 
-        json.put("patrolZones", JSONArray().apply { ir.mohitban.app.gasht.MyZones.list(context).forEach { put(it) } })
         json.put("patrols", JSONArray().apply {
             gd.getPatrols().forEach { p ->
                 put(JSONObject().apply {
@@ -178,7 +177,6 @@ class BackupManager(
                 })
             }
         }
-        json.optJSONArray("patrolZones")?.let { arr -> ir.mohitban.app.gasht.MyZones.save(context, (0 until arr.length()).map { arr.getString(it) }) }
         // track statistics are derived; recompute after restore
         if (tracks != null) db.gashtDao().getTracks().forEach { ir.mohitban.app.gasht.GashtRepository(db, files).refreshStats(it.id) }
         // replace pictures
@@ -196,12 +194,15 @@ class BackupManager(
         put("fullName", fullName); put("fatherName", fatherName); put("nationalId", nationalId); put("mobile", mobile)
         put("rank", rank); put("photoPath", photoPath ?: JSONObject.NULL); put("province", province); put("city", city)
         put("protectedArea", protectedArea); put("station", station)
+        put("grade", grade); put("hireJdn", hireJdn ?: JSONObject.NULL); put("birthJdn", birthJdn ?: JSONObject.NULL)
     }
 
     private fun JSONObject.toProfile() = ProfileEntity(
         fullName = str("fullName"), fatherName = str("fatherName"), nationalId = str("nationalId"), mobile = str("mobile"),
         rank = str("rank"), photoPath = strOrNull("photoPath"), province = str("province"), city = str("city"),
-        protectedArea = str("protectedArea"), station = str("station"),
+        protectedArea = str("protectedArea"), station = str("station"), grade = optString("grade"),
+        hireJdn = if (isNull("hireJdn") || !has("hireJdn")) null else optInt("hireJdn"),
+        birthJdn = if (isNull("birthJdn") || !has("birthJdn")) null else optInt("birthJdn"),
     )
 
     private fun VehicleEntity.toJson() = JSONObject().apply {

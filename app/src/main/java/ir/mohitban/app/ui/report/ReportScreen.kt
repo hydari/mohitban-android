@@ -130,7 +130,7 @@ class ReportViewModel(profiles: ProfileRepository, fuel: FuelRepository, private
 }
 
 @Composable
-fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?) {
+fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?, chrome: Boolean = true) {
     val vm = appViewModel { c, _ -> ReportViewModel(c.profileRepository, c.fuelRepository, c.settingsRepository) }
     val filter by vm.filter.collectAsStateWithLifecycle()
     val summary by vm.summary.collectAsStateWithLifecycle()
@@ -176,7 +176,7 @@ fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?) {
 
     Box(Modifier.fillMaxSize().background(MColors.Bg)) {
         Column(Modifier.fillMaxSize()) {
-            TopBar(
+            if (chrome) TopBar(
                 "گزارش فصلی", onBack = onBack,
                 action = {
                     Box(Modifier.size(44.dp).clip(CircleShape).clickable { build { vm.markReported(); pendingSave = it; saveLauncher.launch(fileName) } }, contentAlignment = Alignment.Center) {
@@ -271,7 +271,7 @@ fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?) {
                 Spacer(Modifier.height(120.dp))
             }
         }
-        BottomBar(MainTab.REPORTS, onTab, Modifier.align(Alignment.BottomCenter))
+        if (chrome) BottomBar(MainTab.REPORTS, onTab, Modifier.align(Alignment.BottomCenter))
     }
 
     if (savedOk) SuccessDialog("گزارش ذخیره شد", onFinished = { savedOk = false })

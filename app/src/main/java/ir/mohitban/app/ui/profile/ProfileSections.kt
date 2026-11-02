@@ -29,6 +29,13 @@ import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.TwoWheeler
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.MilitaryTech
+import androidx.compose.material.icons.outlined.Cake
+import androidx.compose.material.icons.outlined.WorkHistory
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import ir.mohitban.app.core.text.fa
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -115,7 +122,43 @@ fun PersonalSection(form: ProfileForm, errors: Map<String, String>, onChange: (P
         form.mobile, { onChange(form.copy(mobile = it)) }, label = "شماره همراه", leadingIcon = Icons.Outlined.PhoneAndroid,
         numeric = NumericMode.Digits, maxLength = 11, placeholder = "۰۹۱۲۳۴۵۶۷۸۹", error = errors["mobile"] ?: mobileLiveError,
     )
-    ComboField(form.rank, { onChange(form.copy(rank = it)) }, Suggestions.ranks, label = "درجه / سمت", leadingIcon = Icons.Outlined.Park, placeholder = "انتخاب سمت", error = errors["rank"], readOnly = true)
+    // rank (درجه) with its insignia
+    var pickGrade by remember { mutableStateOf(false) }
+    MField(
+        form.grade, {}, label = "درجه", leadingIcon = Icons.Outlined.MilitaryTech, placeholder = "انتخاب درجه",
+        error = errors["grade"], onClick = { pickGrade = true },
+        trailing = if (form.grade.isNotBlank()) ({ ir.mohitban.app.ui.components.RankInsignia(form.grade, 26.dp, Modifier.padding(end = 6.dp)) }) else null,
+    )
+    if (pickGrade) {
+        ir.mohitban.app.ui.components.GradePickerDialog(form.grade, onDismiss = { pickGrade = false }) { onChange(form.copy(grade = it)); pickGrade = false }
+    }
+    ComboField(form.rank, { onChange(form.copy(rank = it)) }, Suggestions.ranks, label = "سمت", leadingIcon = Icons.Outlined.Park, placeholder = "انتخاب سمت", error = errors["rank"], readOnly = true)
+    // birthday (for the greeting) and employment date (for years of service)
+    var pickBirth by remember { mutableStateOf(false) }
+    var pickHire by remember { mutableStateOf(false) }
+    MField(
+        form.birthJdn?.let { ir.mohitban.app.core.jalali.JalaliDate.fromJdn(it).formatLong(false).fa() }.orEmpty(), {},
+        label = "تاریخ تولد", leadingIcon = Icons.Outlined.Cake, placeholder = "انتخاب تاریخ", error = errors["birthJdn"], onClick = { pickBirth = true },
+    )
+    MField(
+        form.hireJdn?.let { ir.mohitban.app.core.jalali.JalaliDate.fromJdn(it).formatLong(false).fa() }.orEmpty(), {},
+        label = "تاریخ استخدام", leadingIcon = Icons.Outlined.WorkHistory, placeholder = "انتخاب تاریخ", error = errors["hireJdn"], onClick = { pickHire = true },
+    )
+    val today = ir.mohitban.app.core.jalali.JalaliDate.today()
+    if (pickBirth) {
+        ir.mohitban.app.ui.components.JalaliDatePickerDialog(
+            initial = form.birthJdn?.let { ir.mohitban.app.core.jalali.JalaliDate.fromJdn(it) } ?: ir.mohitban.app.core.jalali.JalaliDate(today.year - 30, 1, 1),
+            title = "تاریخ تولد (روی ماه و سال بزنید تا سال را انتخاب کنید)",
+            onDismiss = { pickBirth = false }, onConfirm = { onChange(form.copy(birthJdn = it.jdn)); pickBirth = false },
+        )
+    }
+    if (pickHire) {
+        ir.mohitban.app.ui.components.JalaliDatePickerDialog(
+            initial = form.hireJdn?.let { ir.mohitban.app.core.jalali.JalaliDate.fromJdn(it) } ?: ir.mohitban.app.core.jalali.JalaliDate(today.year - 5, 1, 1),
+            title = "تاریخ استخدام (روی ماه و سال بزنید تا سال را انتخاب کنید)",
+            onDismiss = { pickHire = false }, onConfirm = { onChange(form.copy(hireJdn = it.jdn)); pickHire = false },
+        )
+    }
 }
 
 @Composable

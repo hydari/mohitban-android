@@ -159,7 +159,7 @@ fun YearSelector(year: Int, onYear: (Int) -> Unit) {
 }
 
 @Composable
-fun RecordsScreen(onEdit: (Long) -> Unit, onTab: (MainTab) -> Unit, onBack: (() -> Unit)?) {
+fun RecordsScreen(onEdit: (Long) -> Unit, onTab: (MainTab) -> Unit, onBack: (() -> Unit)?, chrome: Boolean = true) {
     val vm = appViewModel { c, _ -> RecordsViewModel(c.fuelRepository) }
     val filter by vm.filter.collectAsStateWithLifecycle()
     val entries by vm.entries.collectAsStateWithLifecycle()
@@ -170,7 +170,11 @@ fun RecordsScreen(onEdit: (Long) -> Unit, onTab: (MainTab) -> Unit, onBack: (() 
 
     Box(Modifier.fillMaxSize().background(MColors.Bg)) {
         Column(Modifier.fillMaxSize()) {
-            TopBar("سوابق سوخت", onBack = onBack, action = { YearSelector(filter.first, vm::setYear) })
+            if (chrome) TopBar("سوابق سوخت", onBack = onBack, action = { YearSelector(filter.first, vm::setYear) })
+            else Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("سال", style = MaterialTheme.typography.labelMedium, color = MColors.Muted, modifier = Modifier.padding(end = 8.dp))
+                YearSelector(filter.first, vm::setYear)
+            }
             SeasonChips(filter.second, vm::setSeason, Modifier.padding(horizontal = 16.dp))
             val list = entries
             if (list != null) {
@@ -228,7 +232,7 @@ fun RecordsScreen(onEdit: (Long) -> Unit, onTab: (MainTab) -> Unit, onBack: (() 
                 }
             }
         }
-        BottomBar(MainTab.RECORDS, onTab, Modifier.align(Alignment.BottomCenter))
+        if (chrome) BottomBar(MainTab.REPORTS, onTab, Modifier.align(Alignment.BottomCenter))
     }
 
     preview?.let { e -> FormPreviewDialog(e, onDismiss = { preview = null }) }

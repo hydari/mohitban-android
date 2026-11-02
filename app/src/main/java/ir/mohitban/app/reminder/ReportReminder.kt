@@ -92,6 +92,7 @@ object ReportReminder {
     /** Shows today's reminder once. Called by the worker and when the app opens. */
     suspend fun check(context: Context) {
         runCatching { ShiftReminder.check(context) }
+        runCatching { BirthdayReminder.check(context) }
         val c = context.container
         val today = JalaliDate.today()
         val state = c.settingsRepository.getReminder()

@@ -19,6 +19,11 @@ data class ProfileEntity(
     val city: String,
     val protectedArea: String,
     val station: String,
+    /** Official rank (درجه), e.g. «محیط‌بان یکم». */
+    @ColumnInfo(defaultValue = "") val grade: String = "",
+    /** Day of employment and birthday as Jalali day numbers. */
+    val hireJdn: Int? = null,
+    val birthJdn: Int? = null,
 )
 
 /** Every organisational vehicle (car or motorcycle) saved on this phone, with its red plate. */
