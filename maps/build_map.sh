@@ -11,7 +11,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 OUT="$PWD/out"; WORK="$PWD/work"
 mkdir -p "$OUT" "$WORK/dem"
 cd "$WORK"
-RES=19.1092570713     # metres per pixel of web-map zoom 13 (≈15 m on the ground at 38°N)
+RES=9.55462853565     # metres per pixel of web-map zoom 14 (≈7.5 m on the ground at 38°N): sharper detail when zoomed in
 
 echo "::group::Copernicus DEM"
 mkdir -p dem30 dem90
@@ -43,7 +43,7 @@ SCALE=$(python3 -c "import math;print(math.cos(math.radians($LAT_MID)))")   # we
 gdaldem hillshade -q -multidirectional -z 1.6 -s "$SCALE" -co TILED=YES -co COMPRESS=DEFLATE -co BIGTIFF=YES dem.tif hill.tif
 gdaldem color-relief -q dem.tif "$HERE/elevation.txt" tint.tif -co TILED=YES -co COMPRESS=DEFLATE -co BIGTIFF=YES
 # contours from a slightly smoothed DEM so the lines stay clean
-gdalwarp -q -overwrite -tr 38.2185141426 38.2185141426 -r average -co TILED=YES -co COMPRESS=DEFLATE dem.tif dem40.tif
+gdalwarp -q -overwrite -tr 28.6638856 28.6638856 -r average -co TILED=YES -co COMPRESS=DEFLATE dem.tif dem40.tif
 gdal_contour -q -a ele -i 50 dem40.tif contours.gpkg
 echo "::endgroup::"
 
@@ -87,9 +87,9 @@ echo "::endgroup::"
 echo "::group::compose + tiles"
 python3 "$HERE/compose.py" . composite.tif
 rm -f "$OUT/$SLUG.mbtiles"
-gdal_translate -q -of MBTILES -co TILE_FORMAT=JPEG -co QUALITY=78 -co ZOOM_LEVEL_STRATEGY=UPPER \
+gdal_translate -q -of MBTILES -co TILE_FORMAT=JPEG -co QUALITY=82 -co ZOOM_LEVEL_STRATEGY=UPPER \
   -co NAME="$TITLE" -co DESCRIPTION="نقشه توپوگرافی آفلاین گشت‌یار" composite.tif "$OUT/$SLUG.mbtiles"
-gdaladdo -q -r average "$OUT/$SLUG.mbtiles" 2 4 8 16 32 64 128 256
+gdaladdo -q -r average "$OUT/$SLUG.mbtiles" 2 4 8 16 32 64 128 256 512
 python3 "$HERE/places.py" osm_points.gpkg osm_multipolygons.gpkg "$OUT/$SLUG.mbtiles" "$TITLE"
 ls -la "$OUT"
 echo "::endgroup::"

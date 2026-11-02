@@ -23,6 +23,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Free disk space (zoom 14 needs room)
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost || true
+          df -h .
+
       - name: Tools (GDAL, osmium)
         run: |
           sudo apt-get update -q
@@ -41,13 +46,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p /tmp/prev
-          cp out/preview/*.jpg /tmp/prev/ 2>/dev/null || true
+          # only the log: map pictures are not published (maps are served from the department's own host)
           cp map.log /tmp/prev/map.log 2>/dev/null || true
           df -h . > /tmp/prev/disk.txt
           ls -la out work > /tmp/prev/files.txt 2>&1 || true
           # a separate tiny repository, so the large work files are never committed
           cd /tmp/prev
-          echo "Map previews from run ${{ github.run_number }}" > README.md
+          echo "Map build log from run ${{ github.run_number }}" > README.md
           git init -q -b map-previews
           git config user.name "map-bot"
           git config user.email "map-bot@users.noreply.github.com"
@@ -55,14 +60,20 @@ jobs:
           git commit -q -m "Map previews (run ${{ github.run_number }})"
           git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" map-previews
 
-      - name: Publish map file (release map-azarbaijan-sharghi)
+      - name: Publish the map encrypted (release map-azarbaijan-sharghi)
         if: success()
         env:
           GH_TOKEN: ${{ github.token }}
+          MOHITBAN_KEY_PASSWORD: ${{ secrets.MOHITBAN_KEY_PASSWORD }}
         run: |
+          # the map itself is never public: only an encrypted copy is kept here, for cutting county maps
+          openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:MOHITBAN_KEY_PASSWORD \
+            -in out/azarbaijan-sharghi.mbtiles -out out/azarbaijan-sharghi.mbtiles.enc
+          ls -la out
           gh release delete map-azarbaijan-sharghi --repo "${{ github.repository }}" --cleanup-tag -y || true
-          gh release create map-azarbaijan-sharghi out/azarbaijan-sharghi.mbtiles out/preview/*.jpg \
+          gh release delete maps-v1 --repo "${{ github.repository }}" --cleanup-tag -y || true
+          gh release create map-azarbaijan-sharghi out/azarbaijan-sharghi.mbtiles.enc \
             --repo "${{ github.repository }}" \
-            --title "نقشه آفلاین آذربایجان شرقی (گشت‌یار)" \
-            --notes "فایل azarbaijan-sharghi.mbtiles را دانلود کنید و در گشت‌یار، زبانه‌ی «نقشه»، گزینه‌ی «نقشه‌های آفلاین» وارد کنید. داده‌ها: Copernicus DEM و OpenStreetMap. (ساخت شماره ${{ github.run_number }})" \
+            --title "نقشه‌ی آذربایجان شرقی (رمزگذاری‌شده، فقط برای ساخت)" \
+            --notes "نسخه‌ی رمزگذاری‌شده برای ساخت نقشه‌ی شهرستان‌ها. نقشه‌ها فقط از داخل اپلیکیشن محیط‌یار دانلود می‌شوند. (ساخت شماره ${{ github.run_number }})" \
             --latest=false
