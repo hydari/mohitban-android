@@ -211,6 +211,17 @@ class GashtViewModel(private val c: AppContainer) : ViewModel() {
         }
     }
 
+    /** Set after a recorded track was named and saved: shows the success message, then «مسیرها». */
+    var trackSaved by mutableStateOf(false)
+
+    fun finishTrack(id: Long?, name: String) {
+        viewModelScope.launch {
+            // the service finishes the track's statistics first; then the name is written
+            if (id != null) { delay(900); repo.rename(id, name.trim().ifEmpty { "مسیر گشت" }) }
+            trackSaved = true
+        }
+    }
+
     fun refreshMaps() { maps = ir.mohitban.app.gasht.MapStore.list(ctx) }
 
     private fun openMap(file: java.io.File?) {
@@ -440,6 +451,7 @@ fun GashtScreen(onTab: (ir.mohitban.app.ui.components.MainTab) -> Unit) {
         }
     }
     ir.mohitban.app.ui.components.BottomBar(ir.mohitban.app.ui.components.MainTab.GASHT, onTab, Modifier.align(Alignment.BottomCenter))
+    if (vm.trackSaved) ir.mohitban.app.ui.components.SuccessDialog("مسیر با موفقیت ثبت شد", onFinished = { vm.trackSaved = false; vm.tab = 1 })
     }
 }
 
@@ -858,12 +870,27 @@ private fun RecordPanel(vm: GashtViewModel, modifier: Modifier) {
         }
     }
     if (confirmStop) {
-        ConfirmDialog(
-            title = "پایان ضبط مسیر",
-            text = "مسیر ذخیره می‌شود و در زبانه‌ی «مسیرها» قابل مشاهده و ارسال است.",
-            confirm = "پایان و ذخیره",
-            onConfirm = { GashtSession.stopRecording(context); confirmStop = false },
-            onDismiss = { confirmStop = false },
+        // the ranger names the patrol before it is saved
+        var trackName by remember { mutableStateOf("گشت ${JalaliDate.today().formatLong(false).fa()}") }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmStop = false },
+            containerColor = Color.White,
+            title = { Text("پایان ضبط مسیر", style = MaterialTheme.typography.titleMedium) },
+            text = {
+                Column {
+                    Text("برای این مسیر یک نام بنویسید تا بعداً راحت پیدا شود.", style = MaterialTheme.typography.bodySmall, color = MColors.Muted)
+                    ir.mohitban.app.ui.components.MField(trackName, { trackName = it }, Modifier.padding(top = 10.dp), label = "نام مسیر", maxLength = 80)
+                }
+            },
+            confirmButton = {
+                ir.mohitban.app.ui.components.OkButton("پایان و ذخیره") {
+                    val id = record.trackId
+                    GashtSession.stopRecording(context)
+                    confirmStop = false
+                    vm.finishTrack(id, trackName)
+                }
+            },
+            dismissButton = { ir.mohitban.app.ui.components.CancelButton { confirmStop = false } },
         )
     }
 }
@@ -915,7 +942,7 @@ private fun MapsDialog(vm: GashtViewModel, onDismiss: () -> Unit) {
                 }
             }
         },
-        confirmButton = { androidx.compose.material3.TextButton(onDismiss) { Text("بستن") } },
+        confirmButton = { ir.mohitban.app.ui.components.CancelButton("بستن", onClick = onDismiss) },
     )
     deleting?.let { f ->
         ConfirmDialog(

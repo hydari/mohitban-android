@@ -128,8 +128,8 @@ fun TracksTab(vm: GashtViewModel) {
             containerColor = Color.White,
             title = { Text("نام مسیر") },
             text = { MField(name, { name = it }, label = "نام", maxLength = 80) },
-            confirmButton = { TextButton({ vm.rename(t.id, name); renaming = null }) { Text("ذخیره") } },
-            dismissButton = { TextButton({ renaming = null }) { Text("انصراف") } },
+            confirmButton = { ir.mohitban.app.ui.components.OkButton("ذخیره") { vm.rename(t.id, name); renaming = null } },
+            dismissButton = { ir.mohitban.app.ui.components.CancelButton { renaming = null } },
         )
     }
     deleting?.let { t ->
@@ -294,7 +294,7 @@ fun AddPlaceDialog(vm: GashtViewModel, point: GeoPoint, onDismiss: () -> Unit) {
             }
         },
         confirmButton = {
-            TextButton({
+            ir.mohitban.app.ui.components.OkButton("ذخیره") {
                 vm.addPlace(
                     WaypointEntity(
                         name = name.trim().ifEmpty { kind.title }, kind = kind.name, lat = point.lat, lon = point.lon, ele = point.ele,
@@ -305,9 +305,9 @@ fun AddPlaceDialog(vm: GashtViewModel, point: GeoPoint, onDismiss: () -> Unit) {
                     ),
                 )
                 onDismiss()
-            }) { Text("ذخیره") }
+            }
         },
-        dismissButton = { TextButton(onDismiss) { Text("انصراف") } },
+        dismissButton = { ir.mohitban.app.ui.components.CancelButton(onClick = onDismiss) },
     )
 }
 
@@ -343,15 +343,15 @@ fun ManualPointDialog(onDismiss: () -> Unit, onPoint: (GeoPoint) -> Unit) {
             }
         },
         confirmButton = {
-            TextButton({
+            ir.mohitban.app.ui.components.OkButton("ادامه") {
                 val p = if (!utm) CoordFormat.parse(text) else {
                     val z = zone.toIntOrNull(); val e = east.toDoubleOrNull(); val n = north.toDoubleOrNull()
                     if (z == null || e == null || n == null || z !in 1..60) null
                     else ir.mohitban.app.gasht.Utm.toLatLon(ir.mohitban.app.gasht.Utm.Coord(z, true, e, n))
                 }
                 if (p == null) error = "مختصات معتبر نیست" else onPoint(p)
-            }) { Text("ادامه") }
+            }
         },
-        dismissButton = { TextButton(onDismiss) { Text("انصراف") } },
+        dismissButton = { ir.mohitban.app.ui.components.CancelButton(onClick = onDismiss) },
     )
 }

@@ -67,6 +67,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.unit.dp
 import ir.mohitban.app.core.text.fa
 import ir.mohitban.app.ui.theme.MColors
@@ -399,10 +400,10 @@ fun StepIndicator(count: Int, current: Int, modifier: Modifier = Modifier) {
         for (i in 0 until count) {
             val done = i < current
             val active = i == current
+            val halo by androidx.compose.animation.core.animateDpAsState(if (active) 44.dp else 34.dp, androidx.compose.animation.core.spring(dampingRatio = 0.5f), label = "halo")
             Box(
                 Modifier
-                    .then(if (active) Modifier.shadow(0.dp, CircleShape) else Modifier)
-                    .size(if (active) 44.dp else 34.dp)
+                    .size(halo)
                     .clip(CircleShape)
                     .background(if (active) MColors.Green.copy(alpha = 0.15f) else Color.Transparent),
                 contentAlignment = Alignment.Center,
@@ -438,7 +439,7 @@ fun StepIndicator(count: Int, current: Int, modifier: Modifier = Modifier) {
                         .weight(1f)
                         .height(2.dp)
                         .padding(horizontal = 6.dp)
-                        .background(if (i < current) MColors.Green2 else Color(0xFFDDE3DF)),
+                        .background(androidx.compose.animation.animateColorAsState(if (i < current) MColors.Green2 else Color(0xFFDDE3DF), androidx.compose.animation.core.tween(400), label = "line").value),
                 )
             }
         }
@@ -477,13 +478,36 @@ fun ConfirmDialog(
         containerColor = Color.White,
         title = { Text(title, style = MaterialTheme.typography.titleMedium) },
         text = { Text(text, style = MaterialTheme.typography.bodyMedium, color = MColors.Muted) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(confirm, color = if (danger) MColors.Error else MColors.Green, style = MaterialTheme.typography.labelLarge)
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(dismiss, color = MColors.Muted) } },
+        confirmButton = { OkButton(confirm, onClick = onConfirm) },
+        dismissButton = { CancelButton(dismiss, onClick = onDismiss) },
     )
+}
+
+/** Filled green dialog button for «تأیید / ذخیره / پایان» (white text, clay press). */
+@Composable
+fun OkButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
+    DialogButton(text, if (enabled) MColors.Green2 else Color(0xFFA9C2B1), modifier, enabled, onClick)
+}
+
+/** Filled red dialog button for «انصراف / بستن / بازگشت». */
+@Composable
+fun CancelButton(text: String = "انصراف", modifier: Modifier = Modifier, onClick: () -> Unit) {
+    DialogButton(text, Color(0xFFD64535), modifier, true, onClick)
+}
+
+@Composable
+private fun DialogButton(text: String, color: Color, modifier: Modifier, enabled: Boolean, onClick: () -> Unit) {
+    val press = rememberPress()
+    Box(
+        modifier
+            .height(44.dp)
+            .widthIn(min = 92.dp)
+            .clayPress(press)
+            .clay(12.dp, color = color, depth = 5.dp)
+            .clickable(interactionSource = press, indication = androidx.compose.material3.ripple(), enabled = enabled, onClick = onClick)
+            .padding(horizontal = 18.dp),
+        contentAlignment = Alignment.Center,
+    ) { Text(text, color = Color.White, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), maxLines = 1) }
 }
 
 @Composable

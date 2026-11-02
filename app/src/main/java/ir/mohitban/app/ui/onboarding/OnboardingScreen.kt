@@ -2,6 +2,7 @@ package ir.mohitban.app.ui.onboarding
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -168,18 +169,34 @@ fun OnboardingScreen(onFinished: () -> Unit) {
             Spacer(Modifier.height(18.dp))
             StepIndicator(count = 3, current = vm.step)
             Spacer(Modifier.height(22.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(TITLES[vm.step], style = MaterialTheme.typography.headlineSmall, color = MColors.Ink)
-                    Text(SUBTITLES[vm.step], style = MaterialTheme.typography.bodySmall, color = MColors.Muted, modifier = Modifier.padding(top = 4.dp))
+            // each step slides in from the reading direction (forward = from the left in Persian)
+            androidx.compose.animation.AnimatedContent(
+                targetState = vm.step,
+                transitionSpec = {
+                    val forward = targetState > initialState
+                    val dir = if (forward) -1 else 1
+                    (androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(360, easing = androidx.compose.animation.core.EaseOutCubic)) { it / 3 * dir } +
+                        androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(260, delayMillis = 60))) togetherWith
+                        (androidx.compose.animation.slideOutHorizontally(androidx.compose.animation.core.tween(300)) { -it / 3 * dir } +
+                            androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(180)))
+                },
+                label = "step",
+            ) { step ->
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(TITLES[step], style = MaterialTheme.typography.headlineSmall, color = MColors.Ink)
+                            Text(SUBTITLES[step], style = MaterialTheme.typography.bodySmall, color = MColors.Muted, modifier = Modifier.padding(top = 4.dp))
+                        }
+                        Image(painterResource(R.drawable.doe_emblem), null, modifier = Modifier.size(46.dp))
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    when (step) {
+                        0 -> PersonalSection(vm.profile, vm.errors, vm::updateProfile)
+                        1 -> LocationSection(vm.profile, vm.errors, vm::updateProfile)
+                        else -> ShiftStep(vm)
+                    }
                 }
-                Image(painterResource(R.drawable.doe_emblem), null, modifier = Modifier.size(46.dp))
-            }
-            Spacer(Modifier.height(10.dp))
-            when (vm.step) {
-                0 -> PersonalSection(vm.profile, vm.errors, vm::updateProfile)
-                1 -> LocationSection(vm.profile, vm.errors, vm::updateProfile)
-                else -> ShiftStep(vm)
             }
             Spacer(Modifier.height(24.dp))
             PillButton(

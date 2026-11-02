@@ -163,10 +163,8 @@ fun JalaliDatePickerDialog(
                     Text("امروز", color = MColors.Green2)
                 }
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = onDismiss) { Text("انصراف", color = MColors.Muted) }
-                TextButton(onClick = { onConfirm(selected) }) {
-                    Text("تأیید", color = MColors.Green, style = MaterialTheme.typography.labelLarge)
-                }
+                CancelButton("انصراف", onClick = onDismiss)
+                OkButton("تأیید", onClick = { onConfirm(selected) })
             }
         }
     }

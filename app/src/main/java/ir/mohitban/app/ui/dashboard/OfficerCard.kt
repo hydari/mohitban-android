@@ -122,13 +122,17 @@ fun OfficerCard(
                 if (photo != null) Image(photo, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
                 else Image(painterResource(R.drawable.avatar_default), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
             }
-            Column(Modifier.weight(1f).padding(start = 14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(
-                    profile?.fullName.orEmpty(),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black, shadow = Shadow(Color(0x66000000), Offset(0f, 2f), 6f)),
-                    color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
-                val grade = profile?.grade.orEmpty()
+            Column(Modifier.weight(1f).padding(start = 14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                // name and the alert bell on one line
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        profile?.fullName.orEmpty(),
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black, shadow = Shadow(Color(0x66000000), Offset(0f, 2f), 6f)),
+                        color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                    )
+                    bell()
+                }
+                val grade = profile?.grade.orEmpty().let { g -> ir.mohitban.app.domain.model.Grades.ALL.getOrNull(ir.mohitban.app.domain.model.Grades.indexOf(g)) ?: g }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (grade.isNotBlank()) {
                         RankInsignia(grade, 24.dp)
@@ -165,7 +169,6 @@ fun OfficerCard(
                 }
             }
         }
-        Box(Modifier.align(Alignment.TopEnd).padding(4.dp)) { bell() }
     }
 }
 

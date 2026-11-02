@@ -123,68 +123,133 @@ object MapDownloader {
 
     private fun set(m: CountyMap, d: Download) = _state.update { it + (m.file to d) }
 
-    private suspend fun run(context: Context, m: CountyMap) {
-        val target = CountyMaps.local(context, m)
-        val part = File(target.parentFile, m.file + ".part")
-        try {
-            fun open(u: URL): HttpURLConnection {
-                // only the published map files, over https (GitHub hands its files over from its download host)
-                require(u.protocol == "https") { "insecure" }
-                return (u.openConnection() as HttpURLConnection).apply {
-                    instanceFollowRedirects = false
-                    connectTimeout = 20_000; readTimeout = 30_000
-                    setRequestProperty("User-Agent", "Mohityar")
-                    setRequestProperty("X-Mohityar-Key", token)
-                    if (part.exists() && part.length() > 0) setRequestProperty("Range", "bytes=${part.length()}-")
-                }
-            }
-            /** Opens the file at one source, following redirects; null when that source cannot serve it. */
-            fun connect(base: String): HttpURLConnection? = runCatching {
+    /** Parallel connections: several ranged requests together fill a slow or throttled link much better than one. */
+    private const val PARTS = 6
+
+    private fun open(u: URL, range: LongRange?): HttpURLConnection {
+        require(u.protocol == "https") { "insecure" }
+        return (u.openConnection() as HttpURLConnection).apply {
+            instanceFollowRedirects = false
+            connectTimeout = 20_000; readTimeout = 30_000
+            setRequestProperty("User-Agent", "Mohityar")
+            setRequestProperty("X-Mohityar-Key", token)
+            setRequestProperty("Accept-Encoding", "identity")
+            if (range != null) setRequestProperty("Range", "bytes=${range.first}-${range.last}")
+        }
+    }
+
+    /** Opens [m] for the byte range, following redirects; null when no source can serve it. */
+    private fun connect(m: CountyMap, range: LongRange?): HttpURLConnection? {
+        for (base in SOURCES) {
+            val c = runCatching {
                 var url = URL(base + m.file)
-                var c = open(url)
+                var c = open(url, range)
                 var redirects = 0
                 while (c.responseCode in 300..399 && redirects < 5) {
                     val loc = c.getHeaderField("Location") ?: error("redirect")
                     c.disconnect()
                     url = URL(url, loc); redirects++
-                    c = open(url)
+                    c = open(url, range)
                 }
-                if (c.responseCode in listOf(200, 206, 416)) c else { c.disconnect(); null }
+                if (c.responseCode == 200 || c.responseCode == 206) c else { c.disconnect(); null }
             }.getOrNull()
-            var conn: HttpURLConnection? = null
-            for (base in SOURCES) {
-                conn = connect(base)
-                if (conn != null) break
-            }
-            if (conn == null) throw java.net.ConnectException("no source")
-            val code = conn.responseCode
-            val append = code == 206
-            if (code == 416 && part.length() != m.size) { part.delete(); error("HTTP 416") }
-            if (code == 416) {
-                conn.disconnect()
+            if (c != null) return c
+        }
+        return null
+    }
+
+    private suspend fun run(context: Context, m: CountyMap) {
+        val target = CountyMaps.local(context, m)
+        val part = File(target.parentFile, m.file + ".part")
+        val seg = File(target.parentFile, m.file + ".seg")
+        try {
+            val total = m.size
+            require(total > 0) { "size" }
+            // the file is cut into PARTS ranges, each fetched on its own connection; the bytes
+            // already received per range are kept in a small side file so a retry resumes
+            val n = if (total < 1_000_000) 1 else PARTS
+            val bounds = (0 until n).map { i -> (total * i / n) until (total * (i + 1) / n) }
+            val done = LongArray(n)
+            if (part.exists() && part.length() == total && seg.exists()) {
+                runCatching { seg.readText().split(',').map { it.trim().toLong() } }.getOrNull()
+                    ?.takeIf { it.size == n }?.forEachIndexed { i, v -> done[i] = v.coerceIn(0, bounds[i].last - bounds[i].first + 1) }
             } else {
-            if (code != 200 && code != 206) error("HTTP $code")
-            val total = if (append) part.length() + conn.contentLengthLong.coerceAtLeast(0) else conn.contentLengthLong.takeIf { it > 0 } ?: m.size
-            var done = if (append) part.length() else 0L
-            set(m, Download(m, done, total, Download.State.RUNNING))
-            conn.inputStream.use { input ->
-                FileOutputStream(part, append).use { out ->
+                part.delete(); seg.delete()
+                java.io.RandomAccessFile(part, "rw").use { it.setLength(total) }
+            }
+            fun received() = done.sum()
+            fun saveSeg() = runCatching { seg.writeText(done.joinToString(",")) }
+            set(m, Download(m, received(), total, Download.State.RUNNING))
+            var failure: Exception? = null
+            kotlinx.coroutines.coroutineScope {
+                val ticker = launch {
+                    while (true) {
+                        kotlinx.coroutines.delay(250)
+                        set(m, Download(m, received(), total, Download.State.RUNNING))
+                        saveSeg()
+                    }
+                }
+                val workers = bounds.mapIndexed { i, r ->
+                    launch(Dispatchers.IO) {
+                        var attempts = 0
+                        while (done[i] < r.last - r.first + 1 && kotlinx.coroutines.currentCoroutineContext().isActive) {
+                            val from = r.first + done[i]
+                            try {
+                                val c = connect(m, from..r.last) ?: throw java.net.ConnectException("no source")
+                                // a server that ignores ranges sends the whole file: only one connection can use that
+                                if (c.responseCode == 200 && (from != 0L || n > 1)) { c.disconnect(); error("norange") }
+                                java.io.RandomAccessFile(part, "rw").use { raf ->
+                                    raf.seek(from)
+                                    c.inputStream.use { input ->
+                                        val buf = ByteArray(1 shl 16)
+                                        while (kotlinx.coroutines.currentCoroutineContext().isActive && done[i] < r.last - r.first + 1) {
+                                            val k = input.read(buf)
+                                            if (k < 0) break
+                                            val take = minOf(k.toLong(), r.last - r.first + 1 - done[i]).toInt()
+                                            raf.write(buf, 0, take)
+                                            done[i] += take
+                                        }
+                                    }
+                                }
+                                c.disconnect()
+                                attempts = 0
+                            } catch (e: kotlinx.coroutines.CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                if (e.message == "norange" || ++attempts >= 4) { failure = e; return@launch }
+                                kotlinx.coroutines.delay(1500L * attempts)
+                            }
+                        }
+                    }
+                }
+                workers.forEach { it.join() }
+                ticker.cancel()
+            }
+            saveSeg()
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            if (failure?.message == "norange") {
+                // the host does not support ranges: one plain download from the start
+                part.delete(); seg.delete()
+                val c = connect(m, null) ?: throw java.net.ConnectException("no source")
+                var got = 0L
+                c.inputStream.use { input -> FileOutputStream(part).use { out ->
                     val buf = ByteArray(1 shl 16)
                     var last = 0L
                     while (kotlinx.coroutines.currentCoroutineContext().isActive) {
-                        val n = input.read(buf)
-                        if (n < 0) break
-                        out.write(buf, 0, n)
-                        done += n
+                        val k = input.read(buf); if (k < 0) break
+                        out.write(buf, 0, k); got += k
                         val now = System.currentTimeMillis()
-                        if (now - last > 200) { last = now; set(m, Download(m, done, total, Download.State.RUNNING)) }
+                        if (now - last > 250) { last = now; set(m, Download(m, got, total, Download.State.RUNNING)) }
                     }
-                }
+                } }
+                c.disconnect()
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            } else if (failure != null) {
+                throw failure!!
             }
-            conn.disconnect()
-            kotlinx.coroutines.currentCoroutineContext().ensureActive()
-            }
-            if (m.size > 0 && part.length() != m.size) error("size")
+            if (part.length() != total) error("size")
+            if (failure == null && received() != total) error("size")
+            seg.delete()
             // decrypt next to the target, check it really is a map, then put it in place
             val plain = File(target.parentFile, m.file + ".tmp")
             runCatching { decrypt(part, plain) }.onFailure { plain.delete(); part.delete(); error("invalid") }
@@ -204,7 +269,8 @@ object MapDownloader {
                 e.message == "invalid" || e.message == "size" -> "فایل کامل دریافت نشد. دوباره تلاش کنید."
                 else -> "دانلود انجام نشد (${e.message ?: "خطا"}). دوباره تلاش کنید."
             }
-            set(m, Download(m, part.length(), m.size, Download.State.FAILED, msg))
+            val got = runCatching { if (seg.exists()) seg.readText().split(',').sumOf { it.trim().toLong() } else 0L }.getOrDefault(0L)
+            set(m, Download(m, got, m.size, Download.State.FAILED, msg))
         } finally {
             synchronized(jobs) { jobs.remove(m.file) }
         }

@@ -215,11 +215,13 @@ private val NIGHT = Grade(0.30f, 0.40f, 0.68f, 0.25f, 0.0f, 1f)
 private val BLUE_HOUR = Grade(0.62f, 0.66f, 0.90f, 0.55f, 0.01f, 0.45f)
 private val GOLDEN = Grade(1.0f, 1.0f, 1.0f, 1.0f, 0f, 0f)
 private val DAY = Grade(0.94f, 1.02f, 1.12f, 0.88f, 0.02f, 0f)
+// morning: fresh, soft and bright, a touch of rose in the light and a lifted mist
+private val MORNING = Grade(1.02f, 0.97f, 1.04f, 0.8f, 0.07f, 0f)
 private val DUSK = Grade(0.95f, 0.70f, 0.78f, 0.9f, 0f, 0.25f)
 
 private fun gradeAt(minute: Float, sunrise: Float, sunset: Float): Grade {
     val keys = listOf(
-        sunrise - 90f to NIGHT, sunrise - 30f to BLUE_HOUR, sunrise + 15f to GOLDEN, sunrise + 90f to DAY,
+        sunrise - 90f to NIGHT, sunrise - 30f to BLUE_HOUR, sunrise + 15f to GOLDEN, sunrise + 75f to MORNING, sunrise + 200f to MORNING, sunrise + 280f to DAY,
         sunset - 90f to DAY, sunset - 10f to GOLDEN, sunset + 20f to DUSK, sunset + 50f to BLUE_HOUR, sunset + 100f to NIGHT,
     )
     if (minute <= keys.first().first || minute >= keys.last().first) return NIGHT

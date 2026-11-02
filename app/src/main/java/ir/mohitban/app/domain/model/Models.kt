@@ -101,13 +101,17 @@ data class QuarterSummary(
 /** The official ranks (درجه‌ها) of the environment guard, lowest first, with their insignia. */
 object Grades {
     val ALL = listOf(
-        "کنک محیط‌بان", "محیط‌بان سوم", "محیط‌بان دوم", "محیط‌بان یکم", "سر محیط‌بان",
+        "کمک محیط‌بان", "محیط‌بان سوم", "محیط‌بان دوم", "محیط‌بان یکم", "سر محیط‌بان",
         "محیط‌دار سوم", "محیط‌دار دوم", "محیط‌دار یکم",
         "افسر محیط‌دار سوم", "افسر محیط‌دار دوم", "افسر محیط‌دار یکم", "ارشد محیط‌دار",
     )
 
     /** Index in [ALL] (0-based) or -1. */
-    fun indexOf(grade: String): Int = ALL.indexOfFirst { it.replace("‌", "").replace(" ", "") == grade.replace("‌", "").replace(" ", "") }
+    fun indexOf(grade: String): Int {
+        // an early version spelled the first rank «کنک»; read it as «کمک»
+        val g = grade.replace("کنک", "کمک").replace("\u200c", "").replace(" ", "")
+        return ALL.indexOfFirst { it.replace("\u200c", "").replace(" ", "") == g }
+    }
 }
 
 /** Whole years and months between two Jalali day numbers («۱۲ سال و ۴ ماه»). */

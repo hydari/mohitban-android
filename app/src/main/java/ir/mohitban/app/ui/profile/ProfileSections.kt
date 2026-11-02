@@ -36,6 +36,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import ir.mohitban.app.core.text.fa
+import ir.mohitban.app.container
+import kotlinx.coroutines.launch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -69,7 +71,24 @@ import ir.mohitban.app.ui.components.clayInset
 
 @Composable
 fun PersonalSection(form: ProfileForm, errors: Map<String, String>, onChange: (ProfileForm) -> Unit) {
-    val picker = rememberImagePicker("profile", onImported = { onChange(form.copy(photoPath = it)) })
+    // camera or gallery → crop to the round frame → confirm → saved at the profile size
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var cropSource by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    val picker = rememberImagePicker("profile", onImported = { onChange(form.copy(photoPath = it)) }, rawCameraFile = { f ->
+        scope.launch {
+            cropSource = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { context.container.files.decodeFile(f, 2000) }
+        }
+    })
+    cropSource?.let { src ->
+        ir.mohitban.app.ui.components.PhotoCropDialog(src, onDismiss = { cropSource = null }, onCropped = { out ->
+            cropSource = null
+            scope.launch {
+                val path = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { context.container.files.saveJpeg(out, "profile", 92) }
+                onChange(form.copy(photoPath = path))
+            }
+        })
+    }
     val photo by rememberStoredImage(form.photoPath, 400)
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(Modifier.padding(top = 6.dp).clickable { picker.openSheet() }) {
@@ -132,7 +151,7 @@ fun PersonalSection(form: ProfileForm, errors: Map<String, String>, onChange: (P
     if (pickGrade) {
         ir.mohitban.app.ui.components.GradePickerDialog(form.grade, onDismiss = { pickGrade = false }) { onChange(form.copy(grade = it)); pickGrade = false }
     }
-    ComboField(form.rank, { onChange(form.copy(rank = it)) }, Suggestions.ranks, label = "سمت", leadingIcon = Icons.Outlined.Park, placeholder = "انتخاب سمت", error = errors["rank"], readOnly = true)
+    ir.mohitban.app.ui.components.SelectField(form.rank, { onChange(form.copy(rank = it)) }, Suggestions.ranks, label = "سمت", leadingIcon = Icons.Outlined.Park, placeholder = "انتخاب سمت", error = errors["rank"], title = "سمت خود را انتخاب کنید")
     // birthday (for the greeting) and employment date (for years of service)
     var pickBirth by remember { mutableStateOf(false) }
     var pickHire by remember { mutableStateOf(false) }
@@ -163,14 +182,14 @@ fun PersonalSection(form: ProfileForm, errors: Map<String, String>, onChange: (P
 
 @Composable
 fun LocationSection(form: ProfileForm, errors: Map<String, String>, onChange: (ProfileForm) -> Unit) {
-    ComboField(
+    ir.mohitban.app.ui.components.SelectField(
         form.province, { p -> onChange(form.copy(province = p, city = if (form.city in Suggestions.citiesOf(p)) form.city else "")) }, Suggestions.provinces,
-        label = "اداره کل استان", leadingIcon = Icons.Outlined.LocationOn, error = errors["province"], readOnly = true,
+        label = "اداره کل استان", leadingIcon = Icons.Outlined.LocationOn, error = errors["province"], title = "استان را انتخاب کنید",
     )
-    ComboField(
+    ir.mohitban.app.ui.components.SelectField(
         form.city, { onChange(form.copy(city = it)) }, Suggestions.citiesOf(form.province), label = "شهرستان",
         leadingIcon = Icons.Outlined.LocationOn, placeholder = if (form.province.isBlank()) "ابتدا استان را انتخاب کنید" else "انتخاب شهرستان",
-        error = errors["city"], readOnly = true,
+        error = errors["city"], title = "شهرستان محل خدمت را انتخاب کنید",
     )
     MField(form.protectedArea, { onChange(form.copy(protectedArea = it)) }, label = "منطقه حفاظت‌شده", leadingIcon = Icons.Outlined.Park, placeholder = "کاغذکنان", error = errors["protectedArea"])
     MField(form.station, { onChange(form.copy(station = it)) }, label = "پاسگاه محیط‌بانی", leadingIcon = Icons.Outlined.Home, placeholder = "آقکند", error = errors["station"], imeAction = androidx.compose.ui.text.input.ImeAction.Done)

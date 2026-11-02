@@ -122,12 +122,12 @@ fun FuelFormScreen(
             title = { Text("ابتدا وسیله‌ی نقلیه را ثبت کنید", style = MaterialTheme.typography.titleMedium) },
             text = {
                 Text(
-                    "برای ثبت سند هزینه سوخت، اول خودرو یا موتورسیکلت سازمانی خود را با پلاک ثبت کنید.",
+                    "برای ثبت سند سوخت، اول خودرو یا موتورسیکلت سازمانی خود را با پلاک ثبت کنید.",
                     style = MaterialTheme.typography.bodyMedium, color = MColors.Muted,
                 )
             },
             confirmButton = { GreenButton("ثبت خودرو یا موتورسیکلت", onClick = onAddVehicle, modifier = Modifier.fillMaxWidth().height(50.dp)) },
-            dismissButton = { TextButton(onBack) { Text("بازگشت") } },
+            dismissButton = { ir.mohitban.app.ui.components.CancelButton("بازگشت", onClick = onBack) },
         )
     }
     val context = LocalContext.current
@@ -158,7 +158,7 @@ fun FuelFormScreen(
     val receiptPicker = rememberImagePicker("receipt", onImported = { vm.onReceipt(it) }, rawCameraFile = onCropReceipt)
 
     Column(Modifier.fillMaxSize().background(MColors.Bg)) {
-        TopBar(if (vm.isEdit) "ویرایش هزینه سوخت" else "ثبت هزینه سوخت", onBack = onBack)
+        TopBar(if (vm.isEdit) "ویرایش سند سوخت" else "ثبت سند سوخت", onBack = onBack)
         if (!vm.loaded) return@Column
         Column(
             Modifier
@@ -397,7 +397,7 @@ fun FuelFormScreen(
                     onClick = { vm.save(driverSig.bitmap, passengerSig.bitmap, passengerCleared = passengerSig.isEmpty) },
                 )
             },
-            dismissButton = { TextButton(onClick = { vm.showConfirm = false }) { Text("ویرایش", color = MColors.Muted) } },
+            dismissButton = { ir.mohitban.app.ui.components.CancelButton("ویرایش", onClick = { vm.showConfirm = false }) },
         )
     }
 

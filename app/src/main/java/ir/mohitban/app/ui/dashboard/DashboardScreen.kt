@@ -266,8 +266,7 @@ fun DashboardScreen(
                     .background(MColors.Bg)
                     .padding(horizontal = 18.dp),
             ) {
-                // grab line of the sheet
-                Box(Modifier.align(Alignment.CenterHorizontally).padding(top = 10.dp).size(width = 42.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(Color(0x332B3A31)))
+                Spacer(Modifier.height(6.dp))
 
                 // ---------- birthday ----------
                 val birth = profile?.birthJdn
@@ -352,8 +351,8 @@ fun DashboardScreen(
                 GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).height(DashH).staggerIn(6, "dash"), radius = Corners.R, onClick = onFuel) {
                     CircleIcon(Icons.Outlined.LocalGasStation, Color(0xFF239B56), Color.White, size = DashIcon, iconSize = 23.dp, modifier = Modifier.padding(start = 14.dp))
                     Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                        Text("ثبت هزینه سوخت", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.GreenDark)
-                        Text("بنزین یا گاز، رسید و امضا", style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 2.dp))
+                        Text("ثبت سند سوخت", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.GreenDark)
+                        Text("ثبت سند سوخت بنزین و گاز CNG", style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 2.dp))
                     }
                     CircleIcon(
                         Icons.AutoMirrored.Outlined.KeyboardArrowRight, MColors.Green.copy(alpha = 0.14f), MColors.Green,
