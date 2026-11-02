@@ -82,7 +82,7 @@ fun GradePickerDialog(current: String, onDismiss: () -> Unit, onPick: (String) -
                     }
                 }
             }
-            CancelButton("بستن", Modifier.align(Alignment.End).padding(top = 10.dp), onClick = onDismiss)
+            CancelButton("بستن", Modifier.fillMaxWidth().padding(top = 12.dp), onClick = onDismiss)
         }
     }
 }

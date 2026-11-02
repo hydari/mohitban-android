@@ -126,8 +126,7 @@ fun FuelFormScreen(
                     style = MaterialTheme.typography.bodyMedium, color = MColors.Muted,
                 )
             },
-            confirmButton = { GreenButton("ثبت خودرو یا موتورسیکلت", onClick = onAddVehicle, modifier = Modifier.fillMaxWidth().height(50.dp)) },
-            dismissButton = { ir.mohitban.app.ui.components.CancelButton("بازگشت", onClick = onBack) },
+            confirmButton = { ir.mohitban.app.ui.components.DialogActions("ثبت وسیله", onAddVehicle, "بازگشت", onBack) },
         )
     }
     val context = LocalContext.current
@@ -391,13 +390,12 @@ fun FuelFormScreen(
                 }
             },
             confirmButton = {
-                GreenButton(
+                ir.mohitban.app.ui.components.DialogActions(
                     if (vm.saving) "در حال ثبت…" else "ثبت نهایی",
-                    enabled = !vm.saving,
-                    onClick = { vm.save(driverSig.bitmap, passengerSig.bitmap, passengerCleared = passengerSig.isEmpty) },
+                    { vm.save(driverSig.bitmap, passengerSig.bitmap, passengerCleared = passengerSig.isEmpty) },
+                    "ویرایش", { vm.showConfirm = false }, okEnabled = !vm.saving,
                 )
             },
-            dismissButton = { ir.mohitban.app.ui.components.CancelButton("ویرایش", onClick = { vm.showConfirm = false }) },
         )
     }
 

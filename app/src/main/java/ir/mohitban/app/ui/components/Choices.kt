@@ -90,7 +90,7 @@ fun ChoiceDialog(title: String, options: List<String>, current: String, onDismis
                 }
             }
             if (shown.isEmpty()) Text("موردی پیدا نشد", style = MaterialTheme.typography.bodySmall, color = MColors.Muted, modifier = Modifier.padding(8.dp))
-            CancelButton("بستن", Modifier.align(Alignment.End).padding(top = 10.dp), onClick = onDismiss)
+            CancelButton("بستن", Modifier.fillMaxWidth().padding(top = 12.dp), onClick = onDismiss)
         }
     }
 }

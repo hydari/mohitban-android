@@ -883,14 +883,13 @@ private fun RecordPanel(vm: GashtViewModel, modifier: Modifier) {
                 }
             },
             confirmButton = {
-                ir.mohitban.app.ui.components.OkButton("پایان و ذخیره") {
+                ir.mohitban.app.ui.components.DialogActions("پایان و ذخیره", onOk = {
                     val id = record.trackId
                     GashtSession.stopRecording(context)
                     confirmStop = false
                     vm.finishTrack(id, trackName)
-                }
+                }, onCancel = { confirmStop = false })
             },
-            dismissButton = { ir.mohitban.app.ui.components.CancelButton { confirmStop = false } },
         )
     }
 }
@@ -942,7 +941,7 @@ private fun MapsDialog(vm: GashtViewModel, onDismiss: () -> Unit) {
                 }
             }
         },
-        confirmButton = { ir.mohitban.app.ui.components.CancelButton("بستن", onClick = onDismiss) },
+        confirmButton = { ir.mohitban.app.ui.components.CancelButton("بستن", Modifier.fillMaxWidth(), onClick = onDismiss) },
     )
     deleting?.let { f ->
         ConfirmDialog(

@@ -29,6 +29,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Cake
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.WorkHistory
+import androidx.compose.material.icons.outlined.Badge
+import androidx.compose.material.icons.outlined.Cottage
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -87,7 +89,6 @@ fun OfficerCard(
     Box(
         modifier
             .fillMaxWidth()
-            .height(178.dp)
             .shadow(14.dp, shape, ambientColor = Color(0xFF0B2414), spotColor = Color(0xFF0B2414))
             .clip(shape)
             .background(Brush.linearGradient(listOf(Color(0xFF0F3B22), Color(0xFF17512F), Color(0xFF0C3020)), start = Offset.Zero, end = Offset.Infinite))
@@ -107,67 +108,71 @@ fun OfficerCard(
             .border(1.dp, Brush.verticalGradient(listOf(Gold.copy(alpha = 0.75f), Gold.copy(alpha = 0.25f))), shape)
             .clickable(onClick = onClick),
     ) {
-        // the emblem as a watermark on the far side
+        // the emblem as a faint watermark on the far side
         Image(
             painterResource(R.drawable.doe_emblem), null,
-            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 6.dp).size(150.dp).graphicsLayer { alpha = 0.07f },
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp).size(110.dp).graphicsLayer { alpha = 0.07f },
         )
-        Row(Modifier.fillMaxSize().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            // photo inside the shift ring and a thin gold ring
-            Box(
-                Modifier.size(96.dp).clip(CircleShape).background(rim ?: Gold).padding(3.dp)
-                    .clip(CircleShape).background(Gold).padding(2.dp).clip(CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (photo != null) Image(photo, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
-                else Image(painterResource(R.drawable.avatar_default), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
-            }
-            Column(Modifier.weight(1f).padding(start = 14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                // name and the alert bell on one line
-                Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.fillMaxWidth().padding(14.dp)) {
+            // ---- photo | name and rank | bell (only while there is something new) ----
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(78.dp).clip(CircleShape).background(rim ?: Gold).padding(3.dp)
+                        .clip(CircleShape).background(Gold).padding(2.dp).clip(CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (photo != null) Image(photo, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
+                    else Image(painterResource(R.drawable.avatar_default), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
+                }
+                Column(Modifier.weight(1f).padding(start = 12.dp)) {
                     Text(
                         profile?.fullName.orEmpty(),
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black, shadow = Shadow(Color(0x66000000), Offset(0f, 2f), 6f)),
-                        color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black, shadow = Shadow(Color(0x66000000), Offset(0f, 2f), 6f)),
+                        color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
-                    bell()
-                }
-                val grade = profile?.grade.orEmpty().let { g -> ir.mohitban.app.domain.model.Grades.ALL.getOrNull(ir.mohitban.app.domain.model.Grades.indexOf(g)) ?: g }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (grade.isNotBlank()) {
-                        RankInsignia(grade, 24.dp)
-                        Text(
-                            "  $grade", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = Gold,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        )
-                    } else {
-                        Text("درجه را در اطلاعات فردی انتخاب کنید", style = MaterialTheme.typography.labelSmall, color = GoldSoft)
+                    val grade = profile?.grade.orEmpty().let { g -> ir.mohitban.app.domain.model.Grades.ALL.getOrNull(ir.mohitban.app.domain.model.Grades.indexOf(g)) ?: g }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                        if (grade.isNotBlank()) {
+                            RankInsignia(grade, 22.dp)
+                            Text(
+                                grade, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = Gold,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 8.dp),
+                            )
+                        } else {
+                            Text("درجه را در اطلاعات فردی انتخاب کنید", style = MaterialTheme.typography.labelSmall, color = GoldSoft)
+                        }
                     }
                 }
-                val post = profile?.rank?.takeIf { it.isNotBlank() }
-                val station = profile?.station?.takeIf { it.isNotBlank() }
-                if (post != null || station != null) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.LocationOn, null, tint = Color(0xFFFF8A7A), modifier = Modifier.size(15.dp))
-                        Text(
-                            " " + listOfNotNull(post, station?.let { "پاسگاه $it" }).joinToString(" | "),
-                            style = MaterialTheme.typography.labelMedium, color = Color(0xE6FFFFFF), maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-                val hire = profile?.hireJdn
-                Row(
-                    Modifier.padding(top = 2.dp).clip(RoundedCornerShape(8.dp)).background(Color(0x26FFFFFF))
-                        .border(0.8.dp, Gold.copy(alpha = 0.45f), RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Outlined.WorkHistory, null, tint = Gold, modifier = Modifier.size(14.dp))
-                    Text(
-                        if (hire != null) "  ${serviceText(hire, today).fa()} سابقه‌ی خدمت" else "  تاریخ استخدام را وارد کنید",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = Color.White,
-                    )
-                }
+                bell()
             }
+            // ---- post | station | service, three even columns under a thin gold line ----
+            Box(Modifier.fillMaxWidth().padding(vertical = 12.dp).height(1.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, Gold.copy(alpha = 0.5f), Color.Transparent))))
+            val hire = profile?.hireJdn
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                InfoCell(Icons.Outlined.Badge, "سمت", profile?.rank?.takeIf { it.isNotBlank() } ?: "—", Modifier.weight(1f))
+                InfoCell(Icons.Outlined.Cottage, "پاسگاه", profile?.station?.takeIf { it.isNotBlank() } ?: "—", Modifier.weight(1f))
+                InfoCell(Icons.Outlined.WorkHistory, "سابقه‌ی خدمت", if (hire != null) serviceText(hire, today).fa() else "—", Modifier.weight(1.15f))
+            }
+        }
+    }
+}
+
+/** One labelled fact on the officer card: a gold icon, a small label and the value. */
+@Composable
+private fun InfoCell(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String, modifier: Modifier) {
+    Row(
+        modifier.clip(RoundedCornerShape(12.dp)).background(Color(0x1FFFFFFF)).padding(horizontal = 8.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(26.dp).clip(CircleShape).background(Gold.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
+            Icon(icon, null, tint = Gold, modifier = Modifier.size(15.dp))
+        }
+        Column(Modifier.padding(start = 6.dp)) {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = Color(0xB3FFFFFF), maxLines = 1)
+            Text(
+                value, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = Color.White,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }

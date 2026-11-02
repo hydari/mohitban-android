@@ -80,10 +80,13 @@ class ProfileEditViewModel(private val repo: ProfileRepository) : ViewModel() {
     var saved by mutableStateOf(false)
         private set
     private var showErrors = false
+    /** The profile as last saved, to tell whether anything was changed. */
+    private var original: ProfileForm? = null
+    val dirty: Boolean get() = loaded && !saved && original != null && profile != original
 
     init {
         viewModelScope.launch {
-            repo.getProfile()?.let { profile = ProfileForm.from(it) }
+            repo.getProfile()?.let { profile = ProfileForm.from(it); original = profile }
             loaded = true
         }
     }
@@ -109,8 +112,26 @@ fun ProfileEditScreen(onBack: () -> Unit) {
     val vm = appViewModel(key = "edit_profile") { c, _ -> ProfileEditViewModel(c.profileRepository) }
     val context = LocalContext.current
     if (vm.saved) SuccessDialog("تغییرات ذخیره شد", onFinished = onBack)
+    // leaving with unsaved changes asks first (back arrow and the phone's back button)
+    var askLeave by remember { mutableStateOf(false) }
+    val leave: () -> Unit = { if (vm.dirty) { askLeave = true } else { onBack() } }
+    androidx.activity.compose.BackHandler(enabled = vm.dirty) { askLeave = true }
+    if (askLeave) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { askLeave = false },
+            containerColor = androidx.compose.ui.graphics.Color.White,
+            title = { Text("تغییرات ذخیره نشده", style = MaterialTheme.typography.titleMedium) },
+            text = { Text("اطلاعات فردی را تغییر داده‌اید ولی هنوز ذخیره نکرده‌اید. ذخیره شود؟", style = MaterialTheme.typography.bodyMedium, color = MColors.Muted) },
+            confirmButton = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ir.mohitban.app.ui.components.DialogActions("ذخیره", { askLeave = false; vm.save() }, "خروج بدون ذخیره", { askLeave = false; onBack() })
+                    androidx.compose.material3.TextButton(onClick = { askLeave = false }, modifier = Modifier.fillMaxWidth()) { Text("ادامه‌ی ویرایش", color = MColors.Muted) }
+                }
+            },
+        )
+    }
     Column(Modifier.fillMaxSize().background(MColors.Bg)) {
-        TopBar("ویرایش اطلاعات فردی", onBack = onBack)
+        TopBar("ویرایش اطلاعات فردی", onBack = leave)
         if (!vm.loaded) return@Column
         Column(
             Modifier

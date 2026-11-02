@@ -18,6 +18,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import ir.mohitban.app.container
+import androidx.compose.material.icons.outlined.Cake
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
@@ -167,6 +169,12 @@ fun ShiftScreen(onBack: () -> Unit) {
     val vm = appViewModel(key = "shift") { c, _ -> ShiftViewModel(c.settingsRepository) }
     val shift by vm.shift.collectAsStateWithLifecycle()
     var pickStart by remember { mutableStateOf(false) }
+    // the ranger's birthday is marked on the calendar
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var birth by remember { mutableStateOf<Int?>(null) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        birth = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { context.container.profileRepository.getProfile()?.birthJdn }
+    }
 
     Column(Modifier.fillMaxSize().background(MColors.Bg)) {
         TopBar("شیفت کاری", onBack = onBack)
@@ -176,9 +184,10 @@ fun ShiftScreen(onBack: () -> Unit) {
             StatusCard(shift, vm.today)
             Spacer(Modifier.height(14.dp))
             CalendarCard(
-                shift = shift, today = vm.today, month = vm.month,
+                shift = shift, today = vm.today, month = vm.month, birth = birth,
                 onMonth = { vm.month = it }, onDay = { vm.toggle(it) },
             )
+            OccasionsCard(vm.today, vm.month, birth, Modifier.padding(top = 12.dp))
             if (shift?.overrides?.isNotEmpty() == true) {
                 OutlinePill(
                     "حذف تغییرات دستی و بازگشت به الگو", { vm.clearOverrides() },
@@ -314,6 +323,7 @@ private fun CalendarCard(
     shift: ShiftPattern?,
     today: JalaliDate,
     month: JalaliDate,
+    birth: Int?,
     onMonth: (JalaliDate) -> Unit,
     onDay: (Int) -> Unit,
 ) {
@@ -367,6 +377,8 @@ private fun CalendarCard(
                                 DayCell(
                                     day = day, on = on, today = jdn == today.jdn, friday = c == 6,
                                     manual = shift?.isOverridden(jdn) == true,
+                                    event = ir.mohitban.app.domain.model.EnvCalendar.on(jdn).isNotEmpty(),
+                                    birthday = birth != null && isBirthday(birth, JalaliDate.fromJdn(jdn)),
                                     onClick = if (shift != null) ({ onDay(jdn) }) else null,
                                 )
                             }
@@ -404,7 +416,7 @@ private fun NavArrow(icon: androidx.compose.ui.graphics.vector.ImageVector, labe
 }
 
 @Composable
-private fun DayCell(day: Int, on: Boolean?, today: Boolean, friday: Boolean, manual: Boolean, onClick: (() -> Unit)?) {
+private fun DayCell(day: Int, on: Boolean?, today: Boolean, friday: Boolean, manual: Boolean, event: Boolean, birthday: Boolean, onClick: (() -> Unit)?) {
     val shape = RoundedCornerShape(9.dp)
     val bg = when (on) { true -> ShiftColors.OnBg; false -> ShiftColors.OffBg; null -> Color.Transparent }
     Box(
@@ -436,6 +448,82 @@ private fun DayCell(day: Int, on: Boolean?, today: Boolean, friday: Boolean, man
         }
         if (manual) {
             Box(Modifier.align(Alignment.TopStart).padding(4.dp).size(6.dp).clip(CircleShape).background(MColors.Amber))
+        }
+        // environmental day: a small green leaf mark; birthday: a red cake mark
+        if (event) {
+            Box(Modifier.align(Alignment.TopEnd).padding(3.dp).size(7.dp).clip(CircleShape).background(Color(0xFF1F8A4C)))
+        }
+        if (birthday) {
+            Icon(Icons.Outlined.Cake, "تولد", tint = Color(0xFFE5483B), modifier = Modifier.align(Alignment.BottomEnd).padding(2.dp).size(12.dp))
+        }
+    }
+}
+
+private fun isBirthday(birth: Int, day: JalaliDate): Boolean {
+    val b = JalaliDate.fromJdn(birth)
+    if (b.month != day.month || day.year <= b.year) return false
+    return minOf(b.day, Jalali.monthLength(day.year, day.month)) == day.day
+}
+
+/** Under the calendar: what today is, and the environmental days (and birthday) of the month shown. */
+@Composable
+private fun OccasionsCard(today: JalaliDate, month: JalaliDate, birth: Int?, modifier: Modifier = Modifier) {
+    val todayList = ir.mohitban.app.domain.model.EnvCalendar.on(today.jdn)
+    val first = Jalali.toJdn(month.year, month.month, 1)
+    val len = Jalali.monthLength(month.year, month.month)
+    val monthList = (0 until len).flatMap { i ->
+        val jdn = first + i
+        val d = JalaliDate.fromJdn(jdn)
+        ir.mohitban.app.domain.model.EnvCalendar.on(jdn).map { Triple(d.day, it.title, if (it.national) 0 else 1) } +
+            (if (birth != null && isBirthday(birth, d)) listOf(Triple(d.day, "روز تولد شما", 2)) else emptyList())
+    }
+    AppCard(modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp)) {
+            // today
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(46.dp).clip(RoundedCornerShape(12.dp)).background(MColors.Green2),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(today.day.fa(), color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp, lineHeight = 19.sp)
+                        Text(Jalali.MONTH_NAMES[today.month - 1], color = Color.White, fontSize = 9.sp, lineHeight = 10.sp)
+                    }
+                }
+                Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                    Text("امروز ${today.formatLong().fa()}", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Ink)
+                    val todayBirthday = birth != null && isBirthday(birth, today)
+                    val lines = todayList.map { it.title } + (if (todayBirthday) listOf("روز تولد شما؛ تولدتان مبارک!") else emptyList())
+                    Text(
+                        if (lines.isEmpty()) "امروز مناسبت محیط‌زیستی ثبت نشده است." else lines.joinToString(" | "),
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = if (lines.isEmpty()) FontWeight.Normal else FontWeight.Bold),
+                        color = if (lines.isEmpty()) MColors.Muted else Color(0xFF1F8A4C),
+                    )
+                }
+            }
+            Box(Modifier.fillMaxWidth().padding(vertical = 12.dp).height(1.dp).background(MColors.Line))
+            Text(
+                "سالنامه‌ی محیط زیست ${Jalali.MONTH_NAMES[month.month - 1]} ${month.year.fa()}",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Green,
+            )
+            if (monthList.isEmpty()) {
+                Text("در این ماه مناسبتی ثبت نشده است.", style = MaterialTheme.typography.labelMedium, color = MColors.Muted, modifier = Modifier.padding(top = 6.dp))
+            }
+            monthList.forEach { (day, title, kind) ->
+                val color = when (kind) { 0 -> Color(0xFF1F8A4C); 1 -> Color(0xFF2F7FC1); else -> Color(0xFFE5483B) }
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier.size(32.dp).clip(CircleShape).background(color.copy(alpha = 0.14f)),
+                        contentAlignment = Alignment.Center,
+                    ) { Text(day.fa(), color = color, fontWeight = FontWeight.Black, fontSize = 13.sp) }
+                    Text(title, style = MaterialTheme.typography.bodySmall, color = MColors.Ink, modifier = Modifier.weight(1f).padding(start = 10.dp))
+                    Text(
+                        when (kind) { 0 -> "ملی"; 1 -> "جهانی"; else -> "تولد" },
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = color,
+                        modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(color.copy(alpha = 0.12f)).padding(horizontal = 8.dp, vertical = 2.dp),
+                    )
+                }
+            }
         }
     }
 }

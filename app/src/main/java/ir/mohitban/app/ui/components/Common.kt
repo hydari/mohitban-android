@@ -478,9 +478,20 @@ fun ConfirmDialog(
         containerColor = Color.White,
         title = { Text(title, style = MaterialTheme.typography.titleMedium) },
         text = { Text(text, style = MaterialTheme.typography.bodyMedium, color = MColors.Muted) },
-        confirmButton = { OkButton(confirm, onClick = onConfirm) },
-        dismissButton = { CancelButton(dismiss, onClick = onDismiss) },
+        confirmButton = { DialogActions(confirm, onConfirm, dismiss, onDismiss) },
     )
+}
+
+/**
+ * The two buttons of a dialog, equal and stretched across: the confirm (green) on the right,
+ * the cancel (red) on the left. [cancel] null shows the confirm alone, full width.
+ */
+@Composable
+fun DialogActions(ok: String, onOk: () -> Unit, cancel: String? = "انصراف", onCancel: () -> Unit = {}, okEnabled: Boolean = true, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        OkButton(ok, Modifier.weight(1f), enabled = okEnabled, onClick = onOk)
+        if (cancel != null) CancelButton(cancel, Modifier.weight(1f), onClick = onCancel)
+    }
 }
 
 /** Filled green dialog button for «تأیید / ذخیره / پایان» (white text, clay press). */
@@ -498,9 +509,15 @@ fun CancelButton(text: String = "انصراف", modifier: Modifier = Modifier, o
 @Composable
 private fun DialogButton(text: String, color: Color, modifier: Modifier, enabled: Boolean, onClick: () -> Unit) {
     val press = rememberPress()
+    // buttons rise in softly when the dialog opens
+    val appear = remember { androidx.compose.animation.core.Animatable(0.85f) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        appear.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.55f, stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow))
+    }
     Box(
         modifier
-            .height(44.dp)
+            .graphicsLayer { scaleX = appear.value; scaleY = appear.value; alpha = ((appear.value - 0.85f) / 0.15f).coerceIn(0f, 1f) }
+            .height(48.dp)
             .widthIn(min = 92.dp)
             .clayPress(press)
             .clay(12.dp, color = color, depth = 5.dp)

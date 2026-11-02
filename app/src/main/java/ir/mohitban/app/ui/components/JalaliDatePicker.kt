@@ -158,14 +158,10 @@ fun JalaliDatePickerDialog(
             }
             }
             Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(onClick = { selected = today; year = today.year; month = today.month }) {
-                    Text("امروز", color = MColors.Green2)
-                }
-                Spacer(Modifier.weight(1f))
-                CancelButton("انصراف", onClick = onDismiss)
-                OkButton("تأیید", onClick = { onConfirm(selected) })
+            TextButton(onClick = { selected = today; year = today.year; month = today.month }) {
+                Text("رفتن به امروز", color = MColors.Green2)
             }
+            DialogActions("تأیید", { onConfirm(selected) }, "انصراف", onDismiss, modifier = Modifier.padding(top = 4.dp))
         }
     }
 }
