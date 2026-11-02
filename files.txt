@@ -1,0 +1,33 @@
+out:
+total 319800
+drwxr-xr-x  3 runner runner      4096 Nov  2 16:30 .
+drwxr-xr-x 11 runner runner      4096 Nov  2 16:04 ..
+-rw-r--r--  1 runner runner 327462912 Nov  2 16:30 azarbaijan-sharghi.mbtiles
+drwxr-xr-x  2 runner runner      4096 Nov  2 16:30 preview
+
+work:
+total 7499360
+drwxr-xr-x  5 runner runner       4096 Nov  2 16:24 .
+drwxr-xr-x 11 runner runner       4096 Nov  2 16:04 ..
+-rw-r--r--  1 runner runner   17837864 Nov  2 16:21 area.osm.pbf
+-rw-r--r--  1 runner runner  307039666 Nov  2 16:25 composite.tif
+-rw-r--r--  1 runner runner  107730801 Nov  2 16:23 contour.tif
+-rw-r--r--  1 runner runner  340733952 Nov  2 16:18 contours.gpkg
+drwxr-xr-x  2 runner runner       4096 Nov  2 16:04 dem
+-rw-r--r--  1 runner runner 4960259425 Nov  2 16:14 dem.tif
+drwxr-xr-x  2 runner runner       4096 Nov  2 16:05 dem30
+-rw-r--r--  1 runner runner       5942 Nov  2 16:05 dem30.vrt
+-rw-r--r--  1 runner runner  575199727 Nov  2 16:18 dem40.tif
+drwxr-xr-x  2 runner runner       4096 Nov  2 16:05 dem90
+-rw-r--r--  1 runner runner       9361 Nov  2 16:05 dem90.vrt
+-rw-r--r--  1 runner runner   14650685 Nov  2 16:21 features.osm.pbf
+-rw-r--r--  1 runner runner  905032198 Nov  2 16:15 hill.tif
+-rw-r--r--  1 runner runner  229968936 Nov  2 16:21 iran.osm.pbf
+-rw-r--r--  1 runner runner    5010302 Nov  2 16:23 landcover.tif
+-rw-r--r--  1 runner runner   55640064 Nov  2 16:21 osm_lines.gpkg
+-rw-r--r--  1 runner runner   10870784 Nov  2 16:21 osm_multipolygons.gpkg
+-rw-r--r--  1 runner runner    2195456 Nov  2 16:21 osm_points.gpkg
+-rw-r--r--  1 runner runner    4786656 Nov  2 16:23 river.tif
+-rw-r--r--  1 runner runner   17551190 Nov  2 16:24 road.tif
+-rw-r--r--  1 runner runner  121624191 Nov  2 16:17 tint.tif
+-rw-r--r--  1 runner runner    3135762 Nov  2 16:23 water.tif

@@ -1,0 +1,119 @@
+::group::Copernicus DEM
+curl: (22) The requested URL returned error: 404
+90 m only: Copernicus_DSM_COG_10_N38_00_E045_00_DEM
+curl: (22) The requested URL returned error: 404
+90 m only: Copernicus_DSM_COG_10_N38_00_E046_00_DEM
+curl: (22) The requested URL returned error: 404
+90 m only: Copernicus_DSM_COG_10_N38_00_E048_00_DEM
+curl: (22) The requested URL returned error: 404
+90 m only: Copernicus_DSM_COG_10_N39_00_E044_00_DEM
+curl: (22) The requested URL returned error: 404
+90 m only: Copernicus_DSM_COG_10_N39_00_E045_00_DEM
+curl: (22) The requested URL returned error: 404
+90 m only: Copernicus_DSM_COG_10_N39_00_E046_00_DEM
+curl: (22) The requested URL returned error: 404
+90 m only: Copernicus_DSM_COG_10_N39_00_E047_00_DEM
+curl: (22) The requested URL returned error: 404
+90 m only: Copernicus_DSM_COG_10_N39_00_E048_00_DEM
+35
+Size is 40779, 41437
+Origin = (5003806.737262583337724,4786343.391791189089417)
+Pixel Size = (9.554628535650000,-9.554628535650000)
+::endgroup::
+::group::relief
+Warning 1: Input dataset has no nodata value. Ignoring 'nv' entry in color palette
+::endgroup::
+::group::OpenStreetMap
+0...10...20...30...40...50...60...70...80...90...100 - done.
+0Warning 1: Non closed ring detected. To avoid accepting it, set the OGR_GEOMETRY_ACCEPT_UNCLOSED_RING configuration option to NO
+Warning 1: Non closed ring detected. To avoid accepting it, set the OGR_GEOMETRY_ACCEPT_UNCLOSED_RING configuration option to NO
+...10...20...30...40...50...60...70...80...90...100 - done.
+0...10...20...30...40...50...60...70...80...90...100 - done.
+::endgroup::
+::group::rasterize
+/usr/lib/python3/dist-packages/osgeo/gdal.py:312: FutureWarning: Neither gdal.UseExceptions() nor gdal.DontUseExceptions() has been explicitly called. In GDAL 4.0, exceptions will be enabled by default.
+  warnings.warn(
+::endgroup::
+::group::compose + tiles
+rows 0-1024 of 41437
+rows 1024-2048 of 41437
+rows 2048-3072 of 41437
+rows 3072-4096 of 41437
+rows 4096-5120 of 41437
+rows 5120-6144 of 41437
+rows 6144-7168 of 41437
+rows 7168-8192 of 41437
+rows 8192-9216 of 41437
+rows 9216-10240 of 41437
+rows 10240-11264 of 41437
+rows 11264-12288 of 41437
+rows 12288-13312 of 41437
+rows 13312-14336 of 41437
+rows 14336-15360 of 41437
+rows 15360-16384 of 41437
+rows 16384-17408 of 41437
+rows 17408-18432 of 41437
+rows 18432-19456 of 41437
+rows 19456-20480 of 41437
+rows 20480-21504 of 41437
+rows 21504-22528 of 41437
+rows 22528-23552 of 41437
+rows 23552-24576 of 41437
+rows 24576-25600 of 41437
+rows 25600-26624 of 41437
+rows 26624-27648 of 41437
+rows 27648-28672 of 41437
+rows 28672-29696 of 41437
+rows 29696-30720 of 41437
+rows 30720-31744 of 41437
+rows 31744-32768 of 41437
+rows 32768-33792 of 41437
+rows 33792-34816 of 41437
+rows 34816-35840 of 41437
+rows 35840-36864 of 41437
+rows 36864-37888 of 41437
+rows 37888-38912 of 41437
+rows 38912-39936 of 41437
+rows 39936-40960 of 41437
+rows 40960-41437 of 41437
+/usr/lib/python3/dist-packages/osgeo/osr.py:410: FutureWarning: Neither osr.UseExceptions() nor osr.DontUseExceptions() has been explicitly called. In GDAL 4.0, exceptions will be enabled by default.
+  warnings.warn(
+places: 7212 {'hamlet': 748, 'village': 5129, 'spring': 96, 'town': 186, 'peak': 1053}
+('type', 'overlay')
+('description', 'نقشه توپوگرافی آفلاین گشت\u200cیار')
+('version', '1.1')
+('format', 'jpg')
+('bounds', '44.9499607086321333,36.64996618880852,48.4500503540178826,39.450046195532785')
+('minzoom', '6')
+('maxzoom', '14')
+('name', 'آذربایجان شرقی — نقشه توپوگرافی')
+('attribution', 'Copernicus DEM © DLR/Airbus (ESA, EU) | داده\u200cها © مشارکت\u200cکنندگان OpenStreetMap (ODbL)')
+('mohityar', '1')
+tiles per zoom: [(6, 2), (7, 6), (8, 12), (9, 36), (10, 121), (11, 441), (12, 1722), (13, 6642), (14, 26243)]
+swig/python detected a memory leak of type 'OSRSpatialReferenceShadow *', no destructor found.
+swig/python detected a memory leak of type 'OSRSpatialReferenceShadow *', no destructor found.
+swig/python detected a memory leak of type 'OGRFeatureShadow *', no destructor found.
+swig/python detected a memory leak of type 'OGRGeometryShadow *', no destructor found.
+total 319796
+drwxr-xr-x  2 runner runner      4096 Nov  2 16:30 .
+drwxr-xr-x 11 runner runner      4096 Nov  2 16:04 ..
+-rw-r--r--  1 runner runner 327462912 Nov  2 16:30 azarbaijan-sharghi.mbtiles
+::endgroup::
+::group::previews
+/usr/lib/python3/dist-packages/osgeo/gdal.py:312: FutureWarning: Neither gdal.UseExceptions() nor gdal.DontUseExceptions() has been explicitly called. In GDAL 4.0, exceptions will be enabled by default.
+  warnings.warn(
+crop mianeh
+crop sahand
+crop tabriz
+total 6684
+drwxr-xr-x 2 runner runner    4096 Nov  2 16:30 .
+drwxr-xr-x 3 runner runner    4096 Nov  2 16:30 ..
+-rw-r--r-- 1 runner runner 1805337 Nov  2 16:30 azarbaijan-sharghi-mianeh.jpg
+-rw-r--r-- 1 runner runner    1601 Nov  2 16:30 azarbaijan-sharghi-mianeh.jpg.aux.xml
+-rw-r--r-- 1 runner runner 1107253 Nov  2 16:30 azarbaijan-sharghi-overview.jpg
+-rw-r--r-- 1 runner runner    1601 Nov  2 16:30 azarbaijan-sharghi-overview.jpg.aux.xml
+-rw-r--r-- 1 runner runner 1398697 Nov  2 16:30 azarbaijan-sharghi-sahand.jpg
+-rw-r--r-- 1 runner runner    1601 Nov  2 16:30 azarbaijan-sharghi-sahand.jpg.aux.xml
+-rw-r--r-- 1 runner runner 2498706 Nov  2 16:30 azarbaijan-sharghi-tabriz.jpg
+-rw-r--r-- 1 runner runner    1601 Nov  2 16:30 azarbaijan-sharghi-tabriz.jpg.aux.xml
+::endgroup::
