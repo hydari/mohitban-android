@@ -5,6 +5,7 @@ import android.graphics.Matrix
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -106,7 +107,7 @@ fun PhotoCropDialog(source: Bitmap, onDismiss: () -> Unit, onCropped: (Bitmap) -
                 Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
                     CircleIcon(Icons.AutoMirrored.Outlined.RotateRight, Color(0xFF2F7FC1), Color.White, size = 44.dp, iconSize = 22.dp,
                         modifier = Modifier.pointerInput(Unit) {
-                            androidx.compose.foundation.gestures.detectTapGestures {
+                            detectTapGestures {
                                 bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, Matrix().apply { postRotate(90f) }, true)
                                 zoom = 1f; ox = 0f; oy = 0f
                             }
