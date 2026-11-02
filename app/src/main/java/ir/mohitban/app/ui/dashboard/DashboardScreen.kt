@@ -278,13 +278,8 @@ fun DashboardScreen(
                 OfficerCard(
                     profile = profile, photo = photo, today = vm.today.jdn,
                     onDuty = shiftStatus?.let { it is ShiftStatus.OnDuty },
-                    // the bell appears only while there is a new alert, and goes once it has been seen
-                    bell = {
-                        androidx.compose.animation.AnimatedVisibility(
-                            unseen, enter = androidx.compose.animation.scaleIn() + androidx.compose.animation.fadeIn(),
-                            exit = androidx.compose.animation.scaleOut() + androidx.compose.animation.fadeOut(),
-                        ) { MinimalBell(ringing = true, count = urgentCount, onClick = onAlerts, light = true) }
-                    },
+                    // the bell is always there; it rings (gold, swinging, with a count) while there is a new alert
+                    bell = { MinimalBell(ringing = unseen, count = if (unseen) urgentCount else 0, onClick = onAlerts, light = true) },
                     onClick = onProfile,
                     modifier = Modifier.padding(top = 12.dp).staggerIn(3, "dash"),
                 )

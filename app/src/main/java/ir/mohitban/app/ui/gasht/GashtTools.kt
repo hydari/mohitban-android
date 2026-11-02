@@ -73,6 +73,7 @@ fun ToolsTab(vm: GashtViewModel) {
     val compass by vm.compass.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         EmergencyCard(fix)
+        WeatherCard(fix?.point, rememberHomePlace())
         if (vm.zones.isNotEmpty()) ZonesCard(vm, fix?.point)
         CompassCard(trueHeading(compass, fix), compass != null, fix?.point)
         AreaCard(fix?.point, fix?.accuracy)
@@ -108,6 +109,8 @@ private fun EmergencyCard(fix: ir.mohitban.app.gasht.Fix?) {
     var numbers by remember { mutableStateOf(prefs.getString("sos_numbers", "").orEmpty()) }
     var editing by remember { mutableStateOf(numbers.isBlank()) }
     val name = rememberRangerName()
+    var me by remember { mutableStateOf<ir.mohitban.app.domain.model.RangerProfile?>(null) }
+    LaunchedEffect(Unit) { me = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { context.container.profileRepository.getProfile() } }
     ToolCard(Icons.Outlined.Sos, MColors.Error, "پیامک اضطراری") {
         if (editing) {
             MField(numbers, { numbers = it.filter { c -> c.isDigit() || c == ',' || c == '،' || c == ' ' } }, label = "شماره‌ها (با ویرگول جدا کنید)", placeholder = "09xxxxxxxxx، 09xxxxxxxxx", maxLength = 60)
@@ -119,8 +122,11 @@ private fun EmergencyCard(fix: ir.mohitban.app.gasht.Fix?) {
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PillButton("ارسال پیامک اضطراری", {
                     val list = numbers.split(',', '،', ' ').map { it.trim() }.filter { it.length >= 5 }
-                    val body = fix?.let { positionMessage("اضطراری! محیط‌بان نیاز به کمک دارد", name, it) }
-                        ?: "اضطراری! محیط‌بان ${name} نیاز به کمک دارد. (موقعیت GPS هنوز پیدا نشده است)"
+                    // the last line lets a colleague's Mohityar open straight on this position
+                    val body = fix?.let {
+                        positionMessage("اضطراری! محیط‌بان نیاز به کمک دارد", name, it) + "\n\nکد محیط‌یار:\n" +
+                            ir.mohitban.app.gasht.SosCodec.line(name, me?.grade.orEmpty(), me?.station.orEmpty(), it)
+                    } ?: "اضطراری! محیط‌بان ${name} نیاز به کمک دارد. (موقعیت GPS هنوز پیدا نشده است)"
                     runCatching {
                         val i = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:" + list.joinToString(";"))).putExtra("sms_body", body)
                         context.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -132,6 +138,67 @@ private fun EmergencyCard(fix: ir.mohitban.app.gasht.Fix?) {
                 style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 6.dp),
             )
             SmallAction(Icons.Outlined.SwapHoriz, "تغییر شماره‌ها", Modifier.padding(top = 6.dp), color = MColors.Muted) { editing = true }
+        }
+        SosReceiveSection()
+    }
+}
+
+/** Receiving side: a colleague's emergency SMS opens this app on his position. */
+@Composable
+private fun SosReceiveSection() {
+    val context = LocalContext.current
+    var granted by remember { mutableStateOf(ir.mohitban.app.gasht.SosStore.canReceive(context)) }
+    var fullScreen by remember { mutableStateOf(ir.mohitban.app.gasht.SosNotifier.canFullScreen(context)) }
+    val alerts = remember(granted) { ir.mohitban.app.gasht.SosStore.all(context) }
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions(),
+    ) { granted = ir.mohitban.app.gasht.SosStore.canReceive(context); fullScreen = ir.mohitban.app.gasht.SosNotifier.canFullScreen(context) }
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().padding(vertical = 12.dp).height(1.dp).background(MColors.Line))
+    Text("دریافت هشدار همکاران", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Ink)
+    if (!granted) {
+        Text(
+            "اگر همکاری که محیط‌یار دارد برای شما پیامک اضطراری بفرستد، برنامه خودکار باز می‌شود و محل او را روی نقشه چشمک‌زن نشان می‌دهد. برای این کار اجازه‌ی دریافت پیامک لازم است (فقط پیامک‌های اضطراری محیط‌یار خوانده می‌شود).",
+            style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 4.dp),
+        )
+        PillButton("فعال‌سازی دریافت هشدار", {
+            val perms = buildList {
+                add(android.Manifest.permission.RECEIVE_SMS)
+                if (Build.VERSION.SDK_INT >= 33) add(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+            launcher.launch(perms.toTypedArray())
+        }, Modifier.padding(top = 8.dp))
+    } else {
+        Text("فعال است: پیامک اضطراری همکاران، برنامه را روی محل آن‌ها باز می‌کند.", style = MaterialTheme.typography.labelSmall, color = Color(0xFF1B7F3B), modifier = Modifier.padding(top = 4.dp))
+        if (!fullScreen && Build.VERSION.SDK_INT >= 34) {
+            Text("برای باز شدن خودکار روی صفحه‌ی قفل، اجازه‌ی «اعلان تمام‌صفحه» را بدهید.", style = MaterialTheme.typography.labelSmall, color = MColors.Amber, modifier = Modifier.padding(top = 4.dp))
+            SmallAction(Icons.Outlined.Sos, "اجازه‌ی تمام‌صفحه", Modifier.padding(top = 6.dp), color = MColors.Error) {
+                runCatching {
+                    context.startActivity(
+                        Intent(android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:${context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            }
+        }
+    }
+    if (alerts.isNotEmpty()) {
+        Text("هشدارهای دریافت‌شده", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = MColors.Ink, modifier = Modifier.padding(top = 10.dp))
+        alerts.take(5).forEach { a ->
+            Row(
+                Modifier.fillMaxWidth().padding(top = 6.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFFDECEC))
+                    .clickable { ir.mohitban.app.gasht.SosStore.open.value = a.id }.padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Outlined.LocationOn, null, tint = MColors.Error, modifier = Modifier.size(20.dp))
+                Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                    Text(a.name.ifBlank { a.from }, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = MColors.Ink)
+                    val c = java.util.Calendar.getInstance().apply { timeInMillis = a.receivedAt }
+                    Text(
+                        "${jalaliOf(a.receivedAt).format().fa()} ساعت ${String.format(java.util.Locale.US, "%02d:%02d", c.get(java.util.Calendar.HOUR_OF_DAY), c.get(java.util.Calendar.MINUTE)).fa()}",
+                        style = MaterialTheme.typography.labelSmall, color = MColors.Muted,
+                    )
+                }
+                Text("نمایش روی نقشه", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Error)
+            }
         }
     }
 }

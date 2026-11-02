@@ -38,6 +38,15 @@ class MainActivity : ComponentActivity() {
             ReportReminder.OPEN_REPORTS -> openReportsRequest.intValue += 1
             ir.mohitban.app.reminder.ShiftReminder.OPEN_SHIFT -> openShiftRequest.intValue += 1
             ir.mohitban.app.gasht.GashtService.OPEN_GASHT -> openGashtRequest.intValue += 1
+            ir.mohitban.app.gasht.SosNotifier.OPEN_SOS -> {
+                // a colleague's emergency: show over the lock screen and wake the display
+                if (android.os.Build.VERSION.SDK_INT >= 27) { setShowWhenLocked(true); setTurnScreenOn(true) }
+                else @Suppress("DEPRECATION") window.addFlags(
+                    android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                        android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
+                )
+                ir.mohitban.app.gasht.SosStore.open.value = intent.getLongExtra(ir.mohitban.app.gasht.SosNotifier.EXTRA_ID, 0L)
+            }
             else -> return
         }
         intent.removeExtra(ReportReminder.EXTRA_OPEN)

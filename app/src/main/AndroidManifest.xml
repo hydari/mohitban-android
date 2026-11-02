@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Internet is used for one thing only: downloading a county map file published with the app
-         (gasht/CountyMaps.kt, MapDownloader). Nothing about the phone or the ranger is ever sent;
-         every other feature works fully offline. -->
+    <!-- Internet is used only for downloading a county map file published with the app
+         (gasht/CountyMaps.kt, MapDownloader) and for the weather forecast of the ranger's area
+         (gasht/Weather.kt; only the rounded coordinates are sent). Every other feature works offline. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- گشت‌یار: satellite GPS only (no internet); foreground service keeps recording with the screen off -->
@@ -12,6 +12,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- a colleague's emergency SMS opens the app on his position (gasht/Sos.kt); messages
+         without the Mohityar line are ignored and nothing is stored -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
 
@@ -37,6 +42,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <receiver
+            android:name=".gasht.SosReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
 
         <service
             android:name=".gasht.GashtService"

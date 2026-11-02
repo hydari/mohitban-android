@@ -139,6 +139,7 @@ fun TrackCanvas(
     initialCenter: GeoPoint? = null,
     zones: List<MapZone> = emptyList(),
     fitPoints: List<GeoPoint> = emptyList(),
+    alert: GeoPoint? = null,
 ) {
     var cx by remember { mutableDoubleStateOf(Double.NaN) }
     var cy by remember { mutableDoubleStateOf(Double.NaN) }
@@ -282,6 +283,15 @@ fun TrackCanvas(
                 drawText(layout, topLeft = Offset(p.x - layout.size.width / 2, p.y + r + 2))
             }
 
+            // a colleague in need: a red pin (it blinks on the layer above)
+            alert?.let { a ->
+                val p = v.toScreen(Geo.mercatorX(a.lon), Geo.mercatorY(a.lat))
+                drawCircle(Color(0x44000000), 16f, p + Offset(0f, 3f))
+                drawCircle(Color.White, 15f, p)
+                drawCircle(Color(0xFFE5483B), 11f, p)
+                drawCircle(Color.White, 4f, p)
+            }
+
             // the ranger: accuracy circle, heading cone, blue dot
             fix?.let { f ->
                 val p = v.toScreen(Geo.mercatorX(f.point.lon), Geo.mercatorY(f.point.lat))
@@ -349,15 +359,28 @@ fun TrackCanvas(
         }
 
         // the "you are here" pulse on its own layer, so the map itself is not redrawn every frame
-        if (motion && fix != null) {
+        if ((motion && fix != null) || alert != null) {
             Canvas(Modifier.fillMaxSize()) {
                 if (cx.isNaN()) return@Canvas
-                val f = fix
                 val v = Viewport(cx, cy, mpp, this.size)
-                val p = v.toScreen(Geo.mercatorX(f.point.lon), Geo.mercatorY(f.point.lat))
                 val k = pulse.value
-                drawCircle(Color(0xFF1E6FD9).copy(alpha = 0.35f * (1f - k)), 13f + 34f * k, p)
-                drawCircle(Color(0xFF1E6FD9).copy(alpha = 0.5f * (1f - k)), 13f + 34f * k, p, style = Stroke(2f))
+                if (motion && fix != null) {
+                    val p = v.toScreen(Geo.mercatorX(fix.point.lon), Geo.mercatorY(fix.point.lat))
+                    drawCircle(Color(0xFF1E6FD9).copy(alpha = 0.35f * (1f - k)), 13f + 34f * k, p)
+                    drawCircle(Color(0xFF1E6FD9).copy(alpha = 0.5f * (1f - k)), 13f + 34f * k, p, style = Stroke(2f))
+                }
+                alert?.let { a ->
+                    // two red rings spreading out and a blinking core
+                    val p = v.toScreen(Geo.mercatorX(a.lon), Geo.mercatorY(a.lat))
+                    for (j in 0..1) {
+                        val q = (k + j * 0.5f) % 1f
+                        drawCircle(Color(0xFFE5483B).copy(alpha = 0.45f * (1f - q)), 15f + 70f * q, p)
+                        drawCircle(Color(0xFFE5483B).copy(alpha = 0.8f * (1f - q)), 15f + 70f * q, p, style = Stroke(3f))
+                    }
+                    val blink = if ((k * 4).toInt() % 2 == 0) 1f else 0.25f
+                    drawCircle(Color(0xFFFF1E1E).copy(alpha = blink), 11f, p)
+                    drawCircle(Color.White.copy(alpha = blink), 4f, p)
+                }
             }
         }
         Column(Modifier.align(Alignment.BottomEnd).padding(8.dp)) {

@@ -74,6 +74,7 @@ object Routes {
     const val SHIFT = "shift"
     const val GASHT = "gasht"
     const val VEHICLE = "vehicle/{id}"
+    const val SOS = "sos/{id}"
 
     fun fuel(id: Long = 0L) = "fuel?entryId=$id"
     fun crop(path: String) = "crop?path=${Uri.encode(path)}"
@@ -117,6 +118,14 @@ fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0, openGasht
     // a tap on the گشت‌یار notification (recording / off-route) opens it
     LaunchedEffect(openGashtRequest, started) {
         if (openGashtRequest > 0 && started) nav.openTab(MainTab.GASHT)
+    }
+    // a colleague's emergency SMS opens his position on the map
+    val sosOpen by ir.mohitban.app.gasht.SosStore.open.collectAsState()
+    LaunchedEffect(sosOpen, started) {
+        val id = sosOpen ?: return@LaunchedEffect
+        if (!started) return@LaunchedEffect
+        ir.mohitban.app.gasht.SosStore.open.value = null
+        nav.navigate("sos/$id") { launchSingleTop = true }
     }
     // a tap on the shift reminder opens the shift calendar
     LaunchedEffect(openShiftRequest, started) {
@@ -267,6 +276,13 @@ fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0, openGasht
         }
         composable(Routes.GASHT) {
             ir.mohitban.app.ui.gasht.GashtScreen(onTab = { nav.openTab(it) })
+        }
+        composable(Routes.SOS, arguments = listOf(navArgument("id") { type = NavType.LongType })) { e ->
+            ir.mohitban.app.ui.gasht.SosScreen(
+                id = e.arguments?.getLong("id") ?: 0L,
+                onBack = { if (!nav.popBackStack()) nav.navigate(Routes.HOME) },
+                onGuide = { nav.popBackStack(); nav.openTab(MainTab.GASHT) },
+            )
         }
         composable(Routes.SHIFT) {
             ir.mohitban.app.ui.shift.ShiftScreen(onBack = { nav.popBackStack() })
