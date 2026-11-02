@@ -138,6 +138,9 @@ fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?, chrome: Boolea
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val sig = rememberSignatureFieldState()
+    // the fuel station attendant signs the quarterly report on the phone (no paper form)
+    val stationSig = rememberSignatureFieldState()
+    var stationName by remember { mutableStateOf("") }
     var viewReceipt by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var preview by remember { mutableStateOf<List<Bitmap>?>(null) }
@@ -165,7 +168,7 @@ fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?, chrome: Boolea
         scope.launch {
             val sigBitmap = sig.bitmap
             val file = withContext(Dispatchers.IO) {
-                context.container.quarterReport.createPdf(s, p, sigBitmap, if (sig.hasNewDrawing || sig.existing == null) null else defaultSigPath)
+                context.container.quarterReport.createPdf(s, p, sigBitmap, if (sig.hasNewDrawing || sig.existing == null) null else defaultSigPath, stationSig.bitmap, stationName.trim())
             }
             busy = false
             then(file)
@@ -258,6 +261,10 @@ fun ReportScreen(onTab: (MainTab) -> Unit, onBack: (() -> Unit)?, chrome: Boolea
                     }
                     Spacer(Modifier.height(16.dp))
                     SignatureField(sig, "امضای محیط‌بان", Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(14.dp))
+                    ir.mohitban.app.ui.components.MField(stationName, { stationName = it }, label = "نام متصدی یا جایگاه سوخت (اختیاری)", maxLength = 60)
+                    Spacer(Modifier.height(8.dp))
+                    SignatureField(stationSig, "مهر و امضای متصدی جایگاه سوخت", Modifier.fillMaxWidth())
                     Spacer(Modifier.height(18.dp))
                     PillButton("مشاهده گزارش فصلی", icon = Icons.Outlined.Visibility, loading = busy, onClick = {
                         build { f -> scope.launch { preview = withContext(Dispatchers.IO) { context.container.quarterReport.renderPages(f) } } }

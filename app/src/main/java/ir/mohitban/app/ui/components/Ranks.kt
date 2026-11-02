@@ -48,11 +48,11 @@ fun rankImage(grade: String): Int? = Grades.indexOf(grade).takeIf { it >= 0 }?.l
 
 /** The shoulder insignia of [grade] at [height], with a thin gold edge and a soft shadow. */
 @Composable
-fun RankInsignia(grade: String, height: Dp, modifier: Modifier = Modifier) {
+fun RankInsignia(grade: String, height: Dp, modifier: Modifier = Modifier, plain: Boolean = false) {
     val img = rankImage(grade) ?: return
     Image(
         painterResource(img), grade, contentScale = ContentScale.FillHeight,
-        modifier = modifier.height(height).shadow(3.dp, RoundedCornerShape(3.dp)).clip(RoundedCornerShape(3.dp))
+        modifier = if (plain) modifier.height(height) else modifier.height(height).shadow(3.dp, RoundedCornerShape(3.dp)).clip(RoundedCornerShape(3.dp))
             .border(0.8.dp, Color(0xFFE2B54A).copy(alpha = 0.7f), RoundedCornerShape(3.dp)),
     )
 }

@@ -15,6 +15,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -77,103 +79,138 @@ fun OfficerCard(
     profile: RangerProfile?,
     photo: ImageBitmap?,
     today: Int,
-    rim: Color?,
+    onDuty: Boolean?,
     bell: @Composable () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val motion = rememberMotionOn()
     val t = rememberInfiniteTransition(label = "officer")
-    val sweep = t.animateFloat(-0.6f, 1.6f, infiniteRepeatable(tween(7000, delayMillis = 1200, easing = LinearEasing)), label = "sw")
+    val sweep = t.animateFloat(-0.6f, 1.6f, infiniteRepeatable(tween(7500, delayMillis = 1500, easing = LinearEasing)), label = "sw")
     val shape = RoundedCornerShape(22.dp)
+    val foil = Brush.linearGradient(listOf(Color(0xFFF6E3A1), Color(0xFFC99A34), Color(0xFF7A5A17), Color(0xFFE9C25A)))
     Box(
         modifier
             .fillMaxWidth()
-            .shadow(14.dp, shape, ambientColor = Color(0xFF0B2414), spotColor = Color(0xFF0B2414))
+            .shadow(16.dp, shape, ambientColor = Color(0xFF082515), spotColor = Color(0xFF082515))
             .clip(shape)
-            .background(Brush.linearGradient(listOf(Color(0xFF0F3B22), Color(0xFF17512F), Color(0xFF0C3020)), start = Offset.Zero, end = Offset.Infinite))
             .drawBehind {
-                // a faint light from the top and a slow diagonal sheen
-                drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.10f), Color.Transparent), endY = size.height * 0.5f))
+                // deep emerald lit from the upper corner
+                drawRect(
+                    Brush.radialGradient(
+                        listOf(Color(0xFF1C5C37), Color(0xFF0E3A22), Color(0xFF082515)),
+                        center = Offset(size.width * 0.15f, 0f), radius = size.width * 1.1f,
+                    ),
+                )
+                // guilloché: fine gold waves like the security print of an official card
+                for (k in 0 until 14) {
+                    val path = androidx.compose.ui.graphics.Path()
+                    var x = 0f
+                    while (x <= size.width) {
+                        val y = size.height * 0.5f + kotlin.math.sin(x / (22.dp.toPx()) + k * 0.45f) * (18 + k * 3) * density * 0.55f +
+                            kotlin.math.sin(x / (9.dp.toPx()) + k) * 3 * density * 0.5f
+                        if (x == 0f) path.moveTo(x, y) else path.lineTo(x, y)
+                        x += 2 * density
+                    }
+                    drawPath(path, Gold.copy(alpha = 0.07f), style = androidx.compose.ui.graphics.drawscope.Stroke(0.7f * density))
+                }
+                // a slow sheen crossing the card
                 if (motion) {
-                    val x = sweep.value * size.width
+                    val sx = sweep.value * size.width
                     drawRect(
                         Brush.linearGradient(
-                            0f to Color.Transparent, 0.5f to Color.White.copy(alpha = 0.09f), 1f to Color.Transparent,
-                            start = Offset(x - size.width * 0.25f, 0f), end = Offset(x + size.width * 0.25f, size.height),
+                            0f to Color.Transparent, 0.5f to Color.White.copy(alpha = 0.08f), 1f to Color.Transparent,
+                            start = Offset(sx - size.width * 0.25f, 0f), end = Offset(sx + size.width * 0.25f, size.height),
                         ),
                     )
                 }
             }
-            .border(1.dp, Brush.verticalGradient(listOf(Gold.copy(alpha = 0.75f), Gold.copy(alpha = 0.25f))), shape)
+            .border(1.4.dp, foil, shape)
             .clickable(onClick = onClick),
     ) {
-        // the emblem as a faint watermark on the far side
-        Image(
-            painterResource(R.drawable.doe_emblem), null,
-            modifier = Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp).size(110.dp).graphicsLayer { alpha = 0.07f },
-        )
-        Column(Modifier.fillMaxWidth().padding(14.dp)) {
-            // ---- photo | name and rank | bell (only while there is something new) ----
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier.size(78.dp).clip(CircleShape).background(rim ?: Gold).padding(3.dp)
-                        .clip(CircleShape).background(Gold).padding(2.dp).clip(CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (photo != null) Image(photo, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
-                    else Image(painterResource(R.drawable.avatar_default), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
+        // inner hairline: the double gold edge of a printed credential
+        Box(Modifier.matchParentSize().padding(5.dp).border(0.6.dp, Gold.copy(alpha = 0.35f), RoundedCornerShape(18.dp)))
+        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 14.dp)) {
+            // ---- organisation line | bell (only while there is something new) ----
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.height(30.dp)) {
+                Image(
+                    painterResource(R.drawable.doe_emblem), null,
+                    modifier = Modifier.size(22.dp).clip(CircleShape).background(Color.White).padding(2.dp),
+                )
+                Text(
+                    "  سازمان حفاظت محیط زیست", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = Gold, maxLines = 1, modifier = Modifier.weight(1f),
+                )
+                Text("کارت محیط‌بان", style = MaterialTheme.typography.labelSmall, color = Gold.copy(alpha = 0.8f))
+                bell()
+            }
+            // ---- portrait | name, rank, area ----
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 12.dp)) {
+                Box(contentAlignment = Alignment.BottomCenter) {
+                    Box(
+                        Modifier.padding(bottom = 8.dp).size(width = 76.dp, height = 94.dp).clip(RoundedCornerShape(14.dp))
+                            .background(Brush.linearGradient(listOf(Color(0xFFF6E3A1), Color(0xFFB88A2A), Color(0xFFE9C25A)))).padding(2.dp)
+                            .clip(RoundedCornerShape(12.dp)).background(Color(0xFFD9D3C2)),
+                    ) {
+                        if (photo != null) Image(photo, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                        else Image(painterResource(R.drawable.avatar_default), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    }
+                    if (onDuty != null) {
+                        Text(
+                            if (onDuty) "در شیفت" else "استراحت",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = Color.White,
+                            modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (onDuty) Color(0xFF239B56) else Color(0xFF6E7A73))
+                                .border(1.5.dp, Color(0xFF0E3A22), RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 1.dp),
+                        )
+                    }
                 }
-                Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                Column(Modifier.weight(1f).padding(start = 14.dp)) {
                     Text(
                         profile?.fullName.orEmpty(),
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black, shadow = Shadow(Color(0x66000000), Offset(0f, 2f), 6f)),
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black, shadow = Shadow(Color(0x66000000), Offset(0f, 2f), 6f)),
                         color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                     val grade = profile?.grade.orEmpty().let { g -> ir.mohitban.app.domain.model.Grades.ALL.getOrNull(ir.mohitban.app.domain.model.Grades.indexOf(g)) ?: g }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
                         if (grade.isNotBlank()) {
-                            RankInsignia(grade, 22.dp)
+                            Box(
+                                Modifier.height(24.dp).clip(RoundedCornerShape(5.dp)).background(Color(0xFF0A0A0A))
+                                    .border(1.dp, Gold.copy(alpha = 0.7f), RoundedCornerShape(5.dp)).padding(horizontal = 3.dp, vertical = 2.dp),
+                            ) { RankInsignia(grade, 20.dp, plain = true) }
                             Text(
-                                grade, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = Gold,
+                                grade, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = Color(0xFFF0CD6A),
                                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 8.dp),
                             )
                         } else {
                             Text("درجه را در اطلاعات فردی انتخاب کنید", style = MaterialTheme.typography.labelSmall, color = GoldSoft)
                         }
                     }
+                    val area = profile?.protectedArea?.takeIf { it.isNotBlank() }?.let { "منطقه‌ی $it" }
+                        ?: profile?.province?.takeIf { it.isNotBlank() }?.let { "استان ${it.removePrefix("استان").trim()}" }
+                    if (area != null) {
+                        Text(area, style = MaterialTheme.typography.labelMedium, color = Color(0xBFFFFFFF), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 5.dp))
+                    }
                 }
-                bell()
             }
-            // ---- post | station | service, three even columns under a thin gold line ----
-            Box(Modifier.fillMaxWidth().padding(vertical = 12.dp).height(1.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, Gold.copy(alpha = 0.5f), Color.Transparent))))
+            // ---- gold rule and three facts ----
+            Box(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 10.dp).height(1.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, Gold.copy(alpha = 0.7f), Color.Transparent))))
             val hire = profile?.hireJdn
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                InfoCell(Icons.Outlined.Badge, "سمت", profile?.rank?.takeIf { it.isNotBlank() } ?: "—", Modifier.weight(1f))
-                InfoCell(Icons.Outlined.Cottage, "پاسگاه", profile?.station?.takeIf { it.isNotBlank() } ?: "—", Modifier.weight(1f))
-                InfoCell(Icons.Outlined.WorkHistory, "سابقه‌ی خدمت", if (hire != null) serviceText(hire, today).fa() else "—", Modifier.weight(1.15f))
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
+                Fact("پاسگاه", profile?.station?.takeIf { it.isNotBlank() } ?: "—", Modifier.weight(1f))
+                Box(Modifier.width(1.dp).fillMaxHeight().background(Gold.copy(alpha = 0.35f)))
+                Fact("سابقه‌ی خدمت", if (hire != null) serviceText(hire, today).fa() else "—", Modifier.weight(1.2f))
+                Box(Modifier.width(1.dp).fillMaxHeight().background(Gold.copy(alpha = 0.35f)))
+                Fact("سمت", profile?.rank?.takeIf { it.isNotBlank() } ?: "—", Modifier.weight(1f))
             }
         }
     }
 }
 
-/** One labelled fact on the officer card: a gold icon, a small label and the value. */
 @Composable
-private fun InfoCell(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String, modifier: Modifier) {
-    Row(
-        modifier.clip(RoundedCornerShape(12.dp)).background(Color(0x1FFFFFFF)).padding(horizontal = 8.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.size(26.dp).clip(CircleShape).background(Gold.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
-            Icon(icon, null, tint = Gold, modifier = Modifier.size(15.dp))
-        }
-        Column(Modifier.padding(start = 6.dp)) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = Color(0xB3FFFFFF), maxLines = 1)
-            Text(
-                value, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = Color.White,
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
-        }
+private fun Fact(label: String, value: String, modifier: Modifier) {
+    Column(modifier.padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Gold.copy(alpha = 0.85f), maxLines = 1)
+        Text(value, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

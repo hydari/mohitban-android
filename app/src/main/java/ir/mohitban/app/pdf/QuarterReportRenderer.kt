@@ -50,7 +50,7 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
         return columns.map { if (it.second == 0f) (W - 2 * M) - fixed else it.second }
     }
 
-    fun createPdf(s: QuarterSummary, profile: RangerProfile, signature: Bitmap?, signaturePath: String?): File {
+    fun createPdf(s: QuarterSummary, profile: RangerProfile, signature: Bitmap?, signaturePath: String?, stationSig: Bitmap? = null, stationName: String = ""): File {
         val sig = signature ?: files.loadBitmap(signaturePath, 700)
         val firstTableTop = 300f
         // ---- paginate rows ----
@@ -92,7 +92,7 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
             }
             if (pi == pages.lastIndex) {
                 y = totalsRow(c, y, s)
-                if (!extraPage) finalBlock(c, y + 14f, s, profile, sig)
+                if (!extraPage) finalBlock(c, y + 14f, s, profile, sig, stationSig, stationName)
             }
             footer(c, pi + 1, totalPages)
             doc.finishPage(page)
@@ -100,7 +100,7 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
         if (extraPage) {
             val page = doc.startPage(PdfDocument.PageInfo.Builder(W.toInt(), H.toInt(), totalPages).create())
             watermark(page.canvas)
-            finalBlock(page.canvas, CONT_TOP, s, profile, sig)
+            finalBlock(page.canvas, CONT_TOP, s, profile, sig, stationSig, stationName)
             footer(page.canvas, totalPages, totalPages)
             doc.finishPage(page)
         }
@@ -266,7 +266,7 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
         return top + h
     }
 
-    private fun finalBlock(c: Canvas, top: Float, s: QuarterSummary, p: RangerProfile, sig: Bitmap?) {
+    private fun finalBlock(c: Canvas, top: Float, s: QuarterSummary, p: RangerProfile, sig: Bitmap?, stationSig: Bitmap?, stationName: String) {
         var y = top
         // ---- summary by fuel type ----
         PdfKit.line(c, "خلاصه هزینه‌ها به تفکیک نوع سوخت", W - M, y + 10f, PdfKit.text(10f, true, PdfKit.GREEN))
@@ -303,21 +303,20 @@ class QuarterReportRenderer(private val context: Context, private val files: Fil
         val words = "جمع کل به حروف: ${PersianWords.of(s.total)} ریال"
         y += PdfKit.paragraph(c, words, W - M, y, W - 2 * M, PdfKit.text(9.5f, true)) + 14f
 
-        // ---- signatures: ranger and head of office ----
-        val gap = 16f
-        val bw = (W - 2 * M - gap) / 2
+        // ---- signatures: ranger, fuel-station attendant and head of office ----
+        val gap = 12f
+        val bw = (W - 2 * M - gap * 2) / 3
         val bh = 104f
-        val titles = listOf("امضای محیط‌بان", "مهر و امضای رئیس اداره")
+        val titles = listOf("امضای محیط‌بان", "مهر و امضای متصدی جایگاه سوخت", "مهر و امضای رئیس اداره")
         var x = W - M
         titles.forEachIndexed { i, t ->
             val rr = RectF(x - bw, y, x, y + bh)
-            if (i == 1) c.drawRoundRect(rr, 6f, 6f, PdfKit.dashed(0.9f, Color.rgb(140, 155, 138)))
+            if (i == 2) c.drawRoundRect(rr, 6f, 6f, PdfKit.dashed(0.9f, Color.rgb(140, 155, 138)))
             else c.drawRoundRect(rr, 6f, 6f, PdfKit.stroke(0.7f, Color.rgb(200, 209, 195)))
-            PdfKit.line(c, t, rr.centerX(), rr.top + 16f, PdfKit.text(9f, true), Align.CENTER)
-            if (i == 0) {
-                sig?.let { PdfKit.bitmapFit(c, it, RectF(rr.left + 30f, rr.top + 22f, rr.right - 30f, rr.bottom - 24f)) }
-                PdfKit.line(c, p.fullName, rr.centerX(), rr.bottom - 10f, PdfKit.text(8.5f, false, PdfKit.MUTED), Align.CENTER)
-            }
+            PdfKit.fitLine(c, t, rr.centerX(), rr.top + 16f, PdfKit.text(8.5f, true), bw - 10f, Align.CENTER)
+            val (img, name) = when (i) { 0 -> sig to p.fullName; 1 -> stationSig to stationName; else -> null to "" }
+            img?.let { PdfKit.bitmapFit(c, it, RectF(rr.left + 16f, rr.top + 22f, rr.right - 16f, rr.bottom - 24f)) }
+            if (name.isNotBlank()) PdfKit.fitLine(c, name, rr.centerX(), rr.bottom - 10f, PdfKit.text(8.5f, false, PdfKit.MUTED), bw - 10f, Align.CENTER)
             x -= bw + gap
         }
     }

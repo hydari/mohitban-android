@@ -277,7 +277,7 @@ fun DashboardScreen(
                 // ---------- the ranger's official card ----------
                 OfficerCard(
                     profile = profile, photo = photo, today = vm.today.jdn,
-                    rim = shiftStatus?.let { if (it is ShiftStatus.OnDuty) ShiftColors.On else ShiftColors.Off },
+                    onDuty = shiftStatus?.let { it is ShiftStatus.OnDuty },
                     // the bell appears only while there is a new alert, and goes once it has been seen
                     bell = {
                         androidx.compose.animation.AnimatedVisibility(
