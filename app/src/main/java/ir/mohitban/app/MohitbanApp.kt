@@ -38,6 +38,7 @@ class MohitbanApp : Application() {
         AppFonts.init(this)
         container = AppContainer(this)
         ir.mohitban.app.reminder.ReportReminder.schedule(this)
+        runCatching { ir.mohitban.app.reminder.NoteAlarm.rescheduleAll(this) }
     }
 }
 

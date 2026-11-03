@@ -1,5 +1,7 @@
 package ir.mohitban.app.ui.gasht
 
+import androidx.compose.material.icons.outlined.LocalFireDepartment
+import androidx.compose.material.icons.outlined.Visibility
 import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -491,6 +493,14 @@ private fun MapTab(vm: GashtViewModel) {
     val name = rememberRangerName()
     var addPlace by remember { mutableStateOf(false) }
     var mapsDialog by remember { mutableStateOf(false) }
+    // a point held on the map: save it as a place, or report a poacher / fire there
+    var held by remember { mutableStateOf<GeoPoint?>(null) }
+    var heldMenu by remember { mutableStateOf(false) }
+    var addAt by remember { mutableStateOf<GeoPoint?>(null) }
+    var reportAt by remember { mutableStateOf<Pair<ir.mohitban.app.gasht.SosKind, GeoPoint>?>(null) }
+    // colleagues' open alerts blink on the map
+    val sosVer by ir.mohitban.app.gasht.SosStore.version.collectAsStateWithLifecycle()
+    val sosAlerts = remember(sosVer) { ir.mohitban.app.gasht.SosStore.active(context) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         // GPS switched off: a red, pulsing warning that stays until it is turned on
@@ -642,7 +652,8 @@ private fun MapTab(vm: GashtViewModel) {
             if (live.size > 1) add(MapTrack(-1, live, Color(0xFFC62828), 7f, true))
         }
         val mapPlaces = places.map { MapPlace(it.name, it.geo(), Color(0xFF7B4FB5), target is GuideTarget.Place && target.name == it.name) } +
-            listOfNotNull((target as? GuideTarget.Place)?.let { t -> MapPlace(t.name, t.point, Color(0xFFE08A1E), true).takeIf { places.none { p -> p.name == t.name } } })
+            listOfNotNull((target as? GuideTarget.Place)?.let { t -> MapPlace(t.name, t.point, Color(0xFFE08A1E), true).takeIf { places.none { p -> p.name == t.name } } }) +
+            listOfNotNull(held?.takeIf { heldMenu || addAt != null || reportAt != null }?.let { MapPlace("نقطه‌ی انتخابی", it, Color(0xFF2F7FC1), true) })
         TrackCanvas(
             mapTracks, mapPlaces, fix, heading,
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(360.dp),
@@ -653,7 +664,29 @@ private fun MapTab(vm: GashtViewModel) {
             initialCenter = vm.activeMap?.center,
             zones = if (vm.showZones) vm.mapZones else emptyList(),
             fitPoints = vm.fitPoints,
+            alerts = sosAlerts.map { a ->
+                MapAlert(a.focus, Color(a.kind.color), if (a.kind == ir.mohitban.app.gasht.SosKind.HELP) a.name.ifBlank { "کمک" } else a.kind.title)
+            },
+            onLongPress = { p -> held = p; heldMenu = true },
         )
+        Text(
+            "برای ثبت نقطه یا گزارش شکارچی و آتش‌سوزی، انگشت را روی نقشه نگه دارید.",
+            style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 4.dp),
+        )
+        sosAlerts.forEach { a ->
+            Row(
+                Modifier.fillMaxWidth().padding(top = 6.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                    .background(Color(a.kind.color).copy(alpha = 0.10f)).clickable { ir.mohitban.app.gasht.SosStore.open.value = a.id }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "${a.kind.title}: ${a.name.ifBlank { a.from }}" + (fix?.let { " — ${CoordFormat.meters(Geo.distance(it.point, a.focus)).fa()}" } ?: ""),
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = Color(a.kind.color), modifier = Modifier.weight(1f),
+                )
+                Text("جزئیات", style = MaterialTheme.typography.labelSmall, color = MColors.Muted)
+            }
+        }
         if (vm.shown.isEmpty() && target == null && !record.active) {
             Text(
                 "برای دیدن مسیرها از زبانه‌ی «مسیرها» گزینه‌ی نمایش را بزنید. با دو انگشت بزرگ‌نمایی کنید.",
@@ -667,6 +700,11 @@ private fun MapTab(vm: GashtViewModel) {
     }
 
     if (mapsDialog) MapsDialog(vm, onDismiss = { mapsDialog = false })
+    if (heldMenu) held?.let { p -> HeldPointDialog(p, fix?.point, onDismiss = { heldMenu = false }, onAdd = { heldMenu = false; addAt = p }, onReport = { k -> heldMenu = false; reportAt = k to p }) }
+    addAt?.let { p -> AddPlaceDialog(vm, p, onDismiss = { addAt = null }) }
+    reportAt?.let { (k, p) ->
+        ReportDialog(k, fix, heading, picked = p, onSavePlace = { vm.addPlace(it) }, onDismiss = { reportAt = null })
+    }
     if (addPlace) {
         fix?.let { f -> AddPlaceDialog(vm, f.point, onDismiss = { addPlace = false }) } ?: run { addPlace = false }
     }
@@ -949,4 +987,34 @@ private fun MapsDialog(vm: GashtViewModel, onDismiss: () -> Unit) {
             onConfirm = { vm.deleteMap(f); deleting = null }, onDismiss = { deleting = null },
         )
     }
+}
+
+/** What to do with a point held on the map. */
+@Composable
+private fun HeldPointDialog(p: GeoPoint, here: GeoPoint?, onDismiss: () -> Unit, onAdd: () -> Unit, onReport: (ir.mohitban.app.gasht.SosKind) -> Unit) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        title = { Text("این نقطه") },
+        text = {
+            Column {
+                LtrText(CoordFormat.decimal(p), Modifier.fillMaxWidth(), style = MaterialTheme.typography.labelLarge, color = MColors.Green)
+                LtrText("UTM " + CoordFormat.utm(p), Modifier.fillMaxWidth(), style = MaterialTheme.typography.labelMedium, color = MColors.Muted)
+                here?.let {
+                    Text(
+                        "${CoordFormat.meters(Geo.distance(it, p)).fa()} به سمت ${Geo.direction(Geo.bearing(it, p))} از شما",
+                        style = MaterialTheme.typography.labelMedium, color = MColors.Ink, modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+                SmallAction(Icons.Outlined.AddLocationAlt, "ثبت نقطه", Modifier.fillMaxWidth().padding(top = 12.dp), onClick = onAdd)
+                SmallAction(Icons.Outlined.Visibility, "گزارش شکارچی در این نقطه", Modifier.fillMaxWidth().padding(top = 8.dp), color = Color(ir.mohitban.app.gasht.SosKind.POACHER.color)) {
+                    onReport(ir.mohitban.app.gasht.SosKind.POACHER)
+                }
+                SmallAction(Icons.Outlined.LocalFireDepartment, "گزارش آتش‌سوزی در این نقطه", Modifier.fillMaxWidth().padding(top = 8.dp), color = Color(ir.mohitban.app.gasht.SosKind.FIRE.color)) {
+                    onReport(ir.mohitban.app.gasht.SosKind.FIRE)
+                }
+            }
+        },
+        confirmButton = { ir.mohitban.app.ui.components.CancelButton("بستن", Modifier.fillMaxWidth(), onClick = onDismiss) },
+    )
 }

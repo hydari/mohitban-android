@@ -35,6 +35,9 @@ import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Directions
 import androidx.compose.material.icons.outlined.Sms
 import androidx.compose.material.icons.outlined.Sos
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -98,7 +101,8 @@ fun SosScreen(id: Long, onBack: () -> Unit, onGuide: () -> Unit) {
     val scope = rememberCoroutineScope()
     var alert by remember { mutableStateOf<SosAlert?>(null) }
     var loaded by remember { mutableStateOf(false) }
-    LaunchedEffect(id) {
+    val ver by SosStore.version.collectAsState()
+    LaunchedEffect(id, ver) {
         alert = withContext(Dispatchers.IO) { SosStore.get(context, id) ?: SosStore.all(context).firstOrNull() }
         loaded = true
         SosNotifier.cancel(context, id)
@@ -117,7 +121,7 @@ fun SosScreen(id: Long, onBack: () -> Unit, onGuide: () -> Unit) {
         val a = alert ?: return@LaunchedEffect
         val found = withContext(Dispatchers.IO) {
             MapStore.list(context).firstNotNullOfOrNull { f ->
-                runCatching { OfflineMap(f) }.getOrNull()?.let { m -> if (m.bounds != null && m.contains(a.point)) m else { m.close(); null } }
+                runCatching { OfflineMap(f) }.getOrNull()?.let { m -> if (m.bounds != null && m.contains(a.focus)) m else { m.close(); null } }
             }
         }
         map = found
@@ -129,18 +133,27 @@ fun SosScreen(id: Long, onBack: () -> Unit, onGuide: () -> Unit) {
     val t = rememberInfiniteTransition(label = "sos")
     val blink by t.animateFloat(1f, 0.35f, infiniteRepeatable(tween(520, easing = LinearEasing), RepeatMode.Reverse), label = "b")
 
+    val tint = alert?.let { Color(it.kind.color) } ?: SosRed
     Column(Modifier.fillMaxSize().background(MColors.Bg)) {
-        // red header
+        // header in the colour of the report
         Row(
-            Modifier.fillMaxWidth().background(SosRed).statusBarsPadding().padding(horizontal = 8.dp, vertical = 10.dp),
+            Modifier.fillMaxWidth().background(if (alert?.resolvedAt != null) Color(0xFF1B7F3B) else tint).statusBarsPadding().padding(horizontal = 8.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.size(44.dp).clip(CircleShape).clickable(onClick = onBack), contentAlignment = Alignment.Center) {
                 Icon(Icons.AutoMirrored.Outlined.ArrowForward, "بازگشت", tint = Color.White)
             }
-            Icon(Icons.Outlined.Sos, null, tint = Color.White, modifier = Modifier.size(30.dp).graphicsLayer { alpha = blink })
+            Icon(
+                when (alert?.kind) { ir.mohitban.app.gasht.SosKind.POACHER -> Icons.Outlined.Visibility; ir.mohitban.app.gasht.SosKind.FIRE -> Icons.Outlined.LocalFireDepartment; else -> Icons.Outlined.Sos },
+                null, tint = Color.White, modifier = Modifier.size(30.dp).graphicsLayer { alpha = if (alert?.resolvedAt != null) 1f else blink },
+            )
             Column(Modifier.weight(1f).padding(start = 10.dp)) {
-                Text("هشدار اضطراری محیط‌بان", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black), color = Color.White)
+                Text(
+                    when {
+                        alert?.resolvedAt != null -> "${alert?.kind?.title.orEmpty()} — ${alert?.kind?.done.orEmpty()} ✓"
+                        alert == null || alert?.kind == ir.mohitban.app.gasht.SosKind.HELP -> "هشدار اضطراری محیط‌بان"
+                        else -> "هشدار ${alert?.kind?.title}"
+                    }, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black), color = Color.White)
                 alert?.let { Text("دریافت ${ago(it.receivedAt)}", style = MaterialTheme.typography.labelSmall, color = Color(0xE6FFFFFF)) }
             }
         }
@@ -160,6 +173,12 @@ fun SosScreen(id: Long, onBack: () -> Unit, onGuide: () -> Unit) {
                             Text("  ${a.grade}", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = MColors.Green)
                         }
                     }
+                    if (a.note.isNotBlank()) {
+                        Text(
+                            a.note, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = tint,
+                            modifier = Modifier.padding(top = 8.dp).clip(RoundedCornerShape(10.dp)).background(tint.copy(alpha = 0.08f)).padding(horizontal = 10.dp, vertical = 6.dp),
+                        )
+                    }
                     if (a.station.isNotBlank()) Text("پاسگاه ${a.station}", style = MaterialTheme.typography.bodyMedium, color = MColors.Ink, modifier = Modifier.padding(top = 6.dp))
                     LtrText(a.from, Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodyMedium)
                     val c = java.util.Calendar.getInstance().apply { timeInMillis = a.sentAt }
@@ -173,13 +192,21 @@ fun SosScreen(id: Long, onBack: () -> Unit, onGuide: () -> Unit) {
             // where
             val f = fix
             val pad = 0.004
-            val fit = if (f != null && Geo.distance(f.point, a.point) < 60_000) listOf(a.point, f.point)
-            else listOf(GeoPoint(a.point.lat - pad, a.point.lon - pad), GeoPoint(a.point.lat + pad, a.point.lon + pad))
+            val goal = a.focus
+            val base = listOfNotNull(goal, a.target?.let { a.point })
+            val fit = if (f != null && Geo.distance(f.point, goal) < 60_000) base + f.point
+            else if (base.size > 1) base
+            else listOf(GeoPoint(goal.lat - pad, goal.lon - pad), GeoPoint(goal.lat + pad, goal.lon + pad))
+            val reporter = a.name.ifBlank { "محیط‌بان" }
             TrackCanvas(
-                emptyList(), listOf(MapPlace(a.name.ifBlank { "محیط‌بان" }, a.point, SosRed, true)), f, heading,
+                // the line from the reporting ranger to the poacher / fire
+                if (a.target != null) listOf(MapTrack(-2, listOf(a.point, a.target), tint.copy(alpha = 0.7f), 4f)) else emptyList(),
+                if (a.target != null) listOf(MapPlace(reporter, a.point, Color(0xFF2F7FC1))) else emptyList(),
+                f, heading,
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(380.dp),
                 background = background, labels = labels, attribution = map?.attribution.orEmpty(),
-                fitKey = a.id to (f != null), fitPoints = fit, alert = a.point,
+                fitKey = a.id to (f != null), fitPoints = fit,
+                alerts = if (a.resolvedAt != null) emptyList() else listOf(MapAlert(goal, tint, if (a.target != null) a.kind.target else reporter)),
             )
             if (map == null) {
                 Text(
@@ -191,11 +218,11 @@ fun SosScreen(id: Long, onBack: () -> Unit, onGuide: () -> Unit) {
             AppCard(Modifier.fillMaxWidth().padding(top = 12.dp)) {
                 Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (f != null) {
-                        val bearing = Geo.bearing(f.point, a.point)
-                        if (heading != null) GuideArrow((bearing - heading).toFloat(), SosRed, Modifier.size(64.dp))
+                        val bearing = Geo.bearing(f.point, a.focus)
+                        if (heading != null) GuideArrow((bearing - heading).toFloat(), tint, Modifier.size(64.dp))
                         Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                            Text(CoordFormat.meters(Geo.distance(f.point, a.point)).fa(), style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black), color = SosRed)
-                            Text("به سمت ${Geo.direction(bearing)} (${bearing.toInt().fa()}°) از موقعیت شما", style = MaterialTheme.typography.labelMedium, color = MColors.Ink)
+                            Text(CoordFormat.meters(Geo.distance(f.point, a.focus)).fa(), style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black), color = tint)
+                            Text("${if (a.target != null) a.kind.target else "محیط‌بان"} به سمت ${Geo.direction(bearing)} (${bearing.toInt().fa()}°) از موقعیت شما", style = MaterialTheme.typography.labelMedium, color = MColors.Ink)
                         }
                     } else {
                         Text(
@@ -205,8 +232,23 @@ fun SosScreen(id: Long, onBack: () -> Unit, onGuide: () -> Unit) {
                     }
                 }
             }
-            LtrText(CoordFormat.decimal(a.point), Modifier.fillMaxWidth().padding(top = 10.dp), style = MaterialTheme.typography.bodyMedium)
-            LtrText("UTM " + CoordFormat.utm(a.point), Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyMedium)
+            if (a.target != null) Text(a.kind.target, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = tint, modifier = Modifier.padding(top = 10.dp))
+            LtrText(CoordFormat.decimal(a.focus), Modifier.fillMaxWidth().padding(top = if (a.target != null) 0.dp else 10.dp), style = MaterialTheme.typography.bodyMedium)
+            LtrText("UTM " + CoordFormat.utm(a.focus), Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyMedium)
+            // found / dealt with
+            Row(
+                Modifier.fillMaxWidth().padding(top = 12.dp).height(52.dp).clip(RoundedCornerShape(14.dp))
+                    .background(if (a.resolvedAt != null) Color(0xFFE8F5EC) else Color(0xFF1B7F3B))
+                    .clickable { SosStore.resolve(context, a.id, a.resolvedAt == null) },
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
+            ) {
+                Icon(Icons.Outlined.CheckCircle, null, tint = if (a.resolvedAt != null) Color(0xFF1B7F3B) else Color.White, modifier = Modifier.size(22.dp))
+                Text(
+                    if (a.resolvedAt != null) "  ${a.kind.done} — برگرداندن" else "  ${a.kind.done}",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black),
+                    color = if (a.resolvedAt != null) Color(0xFF1B7F3B) else Color.White,
+                )
+            }
             // actions
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SosAction(Icons.Outlined.Call, "تماس", SosRed, Modifier.weight(1f)) {
@@ -218,11 +260,11 @@ fun SosScreen(id: Long, onBack: () -> Unit, onGuide: () -> Unit) {
             }
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SosAction(Icons.Outlined.Directions, "راهنمای رسیدن", MColors.Green, Modifier.weight(1.3f)) {
-                    GashtSession.follow(context, GuideTarget.Place("محل ${a.name.ifBlank { "محیط‌بان" }}", a.point))
+                    GashtSession.follow(context, GuideTarget.Place(if (a.target != null) a.kind.target else "محل ${a.name.ifBlank { "محیط‌بان" }}", a.focus))
                     onGuide()
                 }
                 SosAction(Icons.Outlined.ContentCopy, "کپی مختصات", MColors.Muted, Modifier.weight(1f)) {
-                    copyText(context, "${CoordFormat.decimal(a.point)}\nUTM ${CoordFormat.utm(a.point)}")
+                    copyText(context, "${CoordFormat.decimal(a.focus)}\nUTM ${CoordFormat.utm(a.focus)}")
                 }
             }
             Spacer(Modifier.height(30.dp))

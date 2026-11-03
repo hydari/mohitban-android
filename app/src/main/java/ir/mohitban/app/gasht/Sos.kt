@@ -24,6 +24,15 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
 
+/** What an emergency SMS reports. */
+enum class SosKind(val code: Int, val title: String, val smsTitle: String, val color: Long, val target: String, val done: String) {
+    HELP(0, "درخواست کمک", "اضطراری! محیط‌بان نیاز به کمک دارد", 0xFFD32F2F, "محل محیط‌بان", "پیدا شد"),
+    POACHER(1, "مشاهده‌ی شکارچی", "گزارش مشاهده‌ی شکارچی", 0xFF8E3B13, "محل شکارچی", "رسیدگی شد"),
+    FIRE(2, "آتش‌سوزی", "گزارش آتش‌سوزی", 0xFFE65100, "محل آتش", "مهار شد");
+
+    companion object { fun of(code: Int) = entries.firstOrNull { it.code == code } ?: HELP }
+}
+
 /** An emergency message received from a colleague's Mohityar. */
 data class SosAlert(
     val id: Long,
@@ -31,44 +40,66 @@ data class SosAlert(
     val name: String,
     val grade: String,
     val station: String,
+    /** where the reporting ranger was */
     val point: GeoPoint,
     val accuracy: Int?,
     val sentAt: Long,
     val receivedAt: Long,
-)
+    val kind: SosKind = SosKind.HELP,
+    /** the poacher's or fire's place, when it differs from the ranger's */
+    val target: GeoPoint? = null,
+    val note: String = "",
+    /** when it was marked found / dealt with */
+    val resolvedAt: Long? = null,
+) {
+    /** The place to go to. */
+    val focus: GeoPoint get() = target ?: point
+}
 
 /**
  * The emergency SMS carries one machine line besides the readable text, so a colleague's phone
  * with Mohityar can open the app on the exact place:
- *   MHY1|lat|lon|accuracy|unix seconds|name|grade|station
+ *   MHY2|kind|lat|lon|accuracy|unix seconds|name|grade|station|target lat|target lon|note
+ * (MHY1, without kind/target/note, is still read).
  * Phones without the app just see the text and the map link.
  */
 object SosCodec {
-    const val TAG = "MHY1|"
+    private const val TAG1 = "MHY1|"
+    private const val TAG2 = "MHY2|"
 
-    private fun clean(s: String) = s.replace('|', ' ').replace('\n', ' ').trim().take(40)
+    private fun clean(s: String, max: Int = 40) = s.replace('|', ' ').replace('\n', ' ').trim().take(max)
+    private fun c(v: Double) = String.format(Locale.US, "%.5f", v)
 
-    fun line(name: String, grade: String, station: String, f: Fix): String = TAG + listOf(
-        String.format(Locale.US, "%.5f", f.point.lat),
-        String.format(Locale.US, "%.5f", f.point.lon),
+    fun line(kind: SosKind, name: String, grade: String, station: String, f: Fix, target: GeoPoint?, note: String): String = TAG2 + listOf(
+        kind.code.toString(), c(f.point.lat), c(f.point.lon),
         f.accuracy?.toInt()?.toString().orEmpty(),
         (f.time / 1000).toString(),
         clean(name), clean(grade), clean(station),
+        target?.let { c(it.lat) }.orEmpty(), target?.let { c(it.lon) }.orEmpty(),
+        clean(note, 80),
     ).joinToString("|")
 
+    private fun ok(lat: Double, lon: Double) = lat in -90.0..90.0 && lon in -180.0..180.0
+
     fun decode(body: String, from: String, receivedAt: Long): SosAlert? {
-        val i = body.indexOf(TAG)
-        if (i < 0) return null
-        val parts = body.substring(i + TAG.length).lineSequence().first().split('|')
+        val v2 = body.indexOf(TAG2)
+        val v1 = body.indexOf(TAG1)
+        val start = if (v2 >= 0) v2 + TAG2.length else if (v1 >= 0) v1 + TAG1.length else return null
+        var parts = body.substring(start).lineSequence().first().split('|').map { it.trim() }
+        val kind = if (v2 >= 0) SosKind.of(parts.firstOrNull()?.toIntOrNull() ?: 0).also { parts = parts.drop(1) } else SosKind.HELP
         if (parts.size < 4) return null
-        val lat = parts[0].trim().toDoubleOrNull() ?: return null
-        val lon = parts[1].trim().toDoubleOrNull() ?: return null
-        if (lat !in -90.0..90.0 || lon !in -180.0..180.0) return null
-        val sent = parts.getOrNull(3)?.trim()?.toLongOrNull()?.times(1000) ?: receivedAt
+        val lat = parts[0].toDoubleOrNull() ?: return null
+        val lon = parts[1].toDoubleOrNull() ?: return null
+        if (!ok(lat, lon)) return null
+        val sent = parts.getOrNull(3)?.toLongOrNull()?.times(1000) ?: receivedAt
+        val tLat = parts.getOrNull(7)?.toDoubleOrNull()
+        val tLon = parts.getOrNull(8)?.toDoubleOrNull()
         return SosAlert(
             id = receivedAt, from = from,
-            name = parts.getOrNull(4)?.trim().orEmpty(), grade = parts.getOrNull(5)?.trim().orEmpty(), station = parts.getOrNull(6)?.trim().orEmpty(),
-            point = GeoPoint(lat, lon), accuracy = parts[2].trim().toIntOrNull(), sentAt = sent, receivedAt = receivedAt,
+            name = parts.getOrNull(4).orEmpty(), grade = parts.getOrNull(5).orEmpty(), station = parts.getOrNull(6).orEmpty(),
+            point = GeoPoint(lat, lon), accuracy = parts[2].toIntOrNull(), sentAt = sent, receivedAt = receivedAt,
+            kind = kind, target = if (tLat != null && tLon != null && ok(tLat, tLon)) GeoPoint(tLat, tLon) else null,
+            note = parts.getOrNull(9).orEmpty(),
         )
     }
 }
@@ -83,11 +114,16 @@ object SosStore {
     private fun toJson(a: SosAlert) = JSONObject().apply {
         put("id", a.id); put("from", a.from); put("name", a.name); put("grade", a.grade); put("station", a.station)
         put("lat", a.point.lat); put("lon", a.point.lon); a.accuracy?.let { put("acc", it) }; put("sent", a.sentAt); put("recv", a.receivedAt)
+        put("kind", a.kind.code); a.target?.let { put("tlat", it.lat); put("tlon", it.lon) }; put("note", a.note); a.resolvedAt?.let { put("done", it) }
     }
 
     private fun fromJson(o: JSONObject) = SosAlert(
         o.getLong("id"), o.optString("from"), o.optString("name"), o.optString("grade"), o.optString("station"),
         GeoPoint(o.getDouble("lat"), o.getDouble("lon")), if (o.has("acc")) o.optInt("acc") else null, o.optLong("sent"), o.optLong("recv"),
+        kind = SosKind.of(o.optInt("kind", 0)),
+        target = if (o.has("tlat") && o.has("tlon")) GeoPoint(o.getDouble("tlat"), o.getDouble("tlon")) else null,
+        note = o.optString("note"),
+        resolvedAt = if (o.has("done")) o.optLong("done") else null,
     )
 
     fun all(context: Context): List<SosAlert> = runCatching {
@@ -99,16 +135,28 @@ object SosStore {
 
     @Synchronized
     fun add(context: Context, a: SosAlert) {
-        val list = (listOf(a) + all(context)).take(20)
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putString("list", JSONArray().apply { list.forEach { put(toJson(it)) } }.toString()).apply()
+        write(context, (listOf(a) + all(context)).take(20))
     }
 
-    fun delete(context: Context, id: Long) {
-        val list = all(context).filter { it.id != id }
+    private fun write(context: Context, list: List<SosAlert>) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putString("list", JSONArray().apply { list.forEach { put(toJson(it)) } }.toString()).apply()
+        version.value++
     }
+
+    fun delete(context: Context, id: Long) = write(context, all(context).filter { it.id != id })
+
+    /** Marks the alert found / dealt with (or undoes it). */
+    @Synchronized
+    fun resolve(context: Context, id: Long, done: Boolean) =
+        write(context, all(context).map { if (it.id == id) it.copy(resolvedAt = if (done) System.currentTimeMillis() else null) else it })
+
+    /** Open alerts of the last two days (shown on the Gasht map). */
+    fun active(context: Context): List<SosAlert> =
+        all(context).filter { it.resolvedAt == null && System.currentTimeMillis() - it.receivedAt < 48 * 3_600_000L }
+
+    /** Bumped on every change, so screens can reload. */
+    val version = MutableStateFlow(0)
 
     fun canReceive(context: Context) =
         ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
@@ -164,11 +212,15 @@ object SosNotifier {
         channel(context)
         val pi = PendingIntent.getActivity(context, notificationId(a.id), openIntent(context, a.id), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val who = a.name.ifBlank { a.from }
-        val text = "$who نیاز به کمک دارد. برای دیدن محل او روی نقشه بزنید." + (a.station.takeIf { it.isNotBlank() }?.let { " (پاسگاه $it)" } ?: "")
+        val text = when (a.kind) {
+            SosKind.HELP -> "$who نیاز به کمک دارد. برای دیدن محل او روی نقشه بزنید."
+            SosKind.POACHER -> "$who شکارچی دیده است. برای دیدن محل روی نقشه بزنید."
+            SosKind.FIRE -> "$who آتش‌سوزی گزارش کرده است. برای دیدن محل آتش روی نقشه بزنید."
+        } + (a.station.takeIf { it.isNotBlank() }?.let { " (پاسگاه $it)" } ?: "") + (a.note.takeIf { it.isNotBlank() }?.let { "\n$it" } ?: "")
         val n = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_leaf)
-            .setColor(0xFFE5483B.toInt())
-            .setContentTitle("هشدار اضطراری محیط‌بان")
+            .setColor(a.kind.color.toInt())
+            .setContentTitle(if (a.kind == SosKind.HELP) "هشدار اضطراری محیط‌بان" else "هشدار ${a.kind.title}")
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setPriority(NotificationCompat.PRIORITY_MAX)

@@ -31,6 +31,8 @@ import androidx.compose.material.icons.outlined.FlashlightOn
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Sos
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.SquareFoot
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.Undo
@@ -72,7 +74,7 @@ fun ToolsTab(vm: GashtViewModel) {
     val fix by vm.fix.collectAsStateWithLifecycle()
     val compass by vm.compass.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
-        EmergencyCard(fix)
+        EmergencyCard(vm, fix, trueHeading(compass, fix))
         WeatherCard(fix?.point, rememberHomePlace())
         if (vm.zones.isNotEmpty()) ZonesCard(vm, fix?.point)
         CompassCard(trueHeading(compass, fix), compass != null, fix?.point)
@@ -103,7 +105,7 @@ private fun ToolCard(icon: ImageVector, color: Color, title: String, content: @C
 private const val PREFS = "gasht_tools"
 
 @Composable
-private fun EmergencyCard(fix: ir.mohitban.app.gasht.Fix?) {
+private fun EmergencyCard(vm: GashtViewModel, fix: ir.mohitban.app.gasht.Fix?, heading: Float?) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
     var numbers by remember { mutableStateOf(prefs.getString("sos_numbers", "").orEmpty()) }
@@ -111,7 +113,11 @@ private fun EmergencyCard(fix: ir.mohitban.app.gasht.Fix?) {
     val name = rememberRangerName()
     var me by remember { mutableStateOf<ir.mohitban.app.domain.model.RangerProfile?>(null) }
     LaunchedEffect(Unit) { me = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { context.container.profileRepository.getProfile() } }
-    ToolCard(Icons.Outlined.Sos, MColors.Error, "پیامک اضطراری") {
+    var report by remember { mutableStateOf<ir.mohitban.app.gasht.SosKind?>(null) }
+    report?.let { k ->
+        ReportDialog(k, fix, heading, picked = null, onSavePlace = { vm.addPlace(it) }, onDismiss = { report = null })
+    }
+    ToolCard(Icons.Outlined.Sos, MColors.Error, "پیامک اضطراری و گزارش") {
         if (editing) {
             MField(numbers, { numbers = it.filter { c -> c.isDigit() || c == ',' || c == '،' || c == ' ' } }, label = "شماره‌ها (با ویرگول جدا کنید)", placeholder = "09xxxxxxxxx، 09xxxxxxxxx", maxLength = 60)
             PillButton("ذخیره شماره‌ها", {
@@ -119,27 +125,39 @@ private fun EmergencyCard(fix: ir.mohitban.app.gasht.Fix?) {
             }, Modifier.padding(top = 8.dp))
         } else {
             Text("گیرندگان: ${numbers.fa()}", style = MaterialTheme.typography.bodySmall, color = MColors.Ink)
-            Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PillButton("ارسال پیامک اضطراری", {
-                    val list = numbers.split(',', '،', ' ').map { it.trim() }.filter { it.length >= 5 }
-                    // the last line lets a colleague's Mohityar open straight on this position
-                    val body = fix?.let {
-                        positionMessage("اضطراری! محیط‌بان نیاز به کمک دارد", name, it) + "\n\nکد محیط‌یار:\n" +
-                            ir.mohitban.app.gasht.SosCodec.line(name, me?.grade.orEmpty(), me?.station.orEmpty(), it)
-                    } ?: "اضطراری! محیط‌بان ${name} نیاز به کمک دارد. (موقعیت GPS هنوز پیدا نشده است)"
-                    runCatching {
-                        val i = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:" + list.joinToString(";"))).putExtra("sms_body", body)
-                        context.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                    }
-                }, Modifier.weight(1f))
+            Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ir.mohitban.app.gasht.SosKind.entries.forEach { k ->
+                    ReportButton(k, Modifier.weight(1f)) { report = k }
+                }
             }
             Text(
-                "پیام آماده با مختصات در برنامه‌ی پیامک باز می‌شود؛ فقط دکمه‌ی ارسال را بزنید. بدون اینترنت و فقط با آنتن تلفن کار می‌کند.",
+                "پیام آماده با مختصات در برنامه‌ی پیامک باز می‌شود؛ فقط دکمه‌ی ارسال را بزنید. بدون اینترنت و فقط با آنتن تلفن کار می‌کند. محل شکارچی یا آتش را می‌توانید با فاصله و جهت، یا با نگه داشتن انگشت روی نقشه مشخص کنید.",
                 style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 6.dp),
             )
             SmallAction(Icons.Outlined.SwapHoriz, "تغییر شماره‌ها", Modifier.padding(top = 6.dp), color = MColors.Muted) { editing = true }
         }
         SosReceiveSection()
+    }
+}
+
+@Composable
+private fun ReportButton(k: ir.mohitban.app.gasht.SosKind, modifier: Modifier, onClick: () -> Unit) {
+    Column(
+        modifier.clip(RoundedCornerShape(14.dp)).background(Color(k.color)).clickable(onClick = onClick).padding(vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(
+            when (k) {
+                ir.mohitban.app.gasht.SosKind.HELP -> Icons.Outlined.Sos
+                ir.mohitban.app.gasht.SosKind.POACHER -> Icons.Outlined.Visibility
+                ir.mohitban.app.gasht.SosKind.FIRE -> Icons.Outlined.LocalFireDepartment
+            },
+            null, tint = Color.White, modifier = Modifier.size(24.dp),
+        )
+        Text(
+            if (k == ir.mohitban.app.gasht.SosKind.HELP) "درخواست کمک" else k.title,
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = Color.White, modifier = Modifier.padding(top = 3.dp),
+        )
     }
 }
 
@@ -149,7 +167,8 @@ private fun SosReceiveSection() {
     val context = LocalContext.current
     var granted by remember { mutableStateOf(ir.mohitban.app.gasht.SosStore.canReceive(context)) }
     var fullScreen by remember { mutableStateOf(ir.mohitban.app.gasht.SosNotifier.canFullScreen(context)) }
-    val alerts = remember(granted) { ir.mohitban.app.gasht.SosStore.all(context) }
+    val ver by ir.mohitban.app.gasht.SosStore.version.collectAsStateWithLifecycle()
+    val alerts = remember(granted, ver) { ir.mohitban.app.gasht.SosStore.all(context) }
     val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions(),
     ) { granted = ir.mohitban.app.gasht.SosStore.canReceive(context); fullScreen = ir.mohitban.app.gasht.SosNotifier.canFullScreen(context) }
@@ -184,20 +203,28 @@ private fun SosReceiveSection() {
         Text("هشدارهای دریافت‌شده", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = MColors.Ink, modifier = Modifier.padding(top = 10.dp))
         alerts.take(5).forEach { a ->
             Row(
-                Modifier.fillMaxWidth().padding(top = 6.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFFDECEC))
+                Modifier.fillMaxWidth().padding(top = 6.dp).clip(RoundedCornerShape(10.dp)).background(if (a.resolvedAt != null) Color(0xFFE8F5EC) else Color(0xFFFDECEC))
                     .clickable { ir.mohitban.app.gasht.SosStore.open.value = a.id }.padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Outlined.LocationOn, null, tint = MColors.Error, modifier = Modifier.size(20.dp))
+                Icon(Icons.Outlined.LocationOn, null, tint = if (a.resolvedAt != null) Color(0xFF1B7F3B) else Color(a.kind.color), modifier = Modifier.size(20.dp))
                 Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                    Text(a.name.ifBlank { a.from }, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = MColors.Ink)
+                    Text("${a.kind.title} — ${a.name.ifBlank { a.from }}", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = MColors.Ink)
                     val c = java.util.Calendar.getInstance().apply { timeInMillis = a.receivedAt }
                     Text(
                         "${jalaliOf(a.receivedAt).format().fa()} ساعت ${String.format(java.util.Locale.US, "%02d:%02d", c.get(java.util.Calendar.HOUR_OF_DAY), c.get(java.util.Calendar.MINUTE)).fa()}",
                         style = MaterialTheme.typography.labelSmall, color = MColors.Muted,
                     )
                 }
-                Text("نمایش روی نقشه", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Error)
+                if (a.resolvedAt != null) {
+                    Text("✓ ${a.kind.done}", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = Color(0xFF1B7F3B))
+                } else {
+                    Text(
+                        a.kind.done, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = Color.White,
+                        modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFF1B7F3B))
+                            .clickable { ir.mohitban.app.gasht.SosStore.resolve(context, a.id, true) }.padding(horizontal = 10.dp, vertical = 6.dp),
+                    )
+                }
             }
         }
     }

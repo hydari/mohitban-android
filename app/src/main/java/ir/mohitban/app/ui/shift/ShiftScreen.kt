@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import ir.mohitban.app.container
 import androidx.compose.material.icons.outlined.Cake
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
@@ -169,6 +170,7 @@ fun ShiftScreen(onBack: () -> Unit) {
     val vm = appViewModel(key = "shift") { c, _ -> ShiftViewModel(c.settingsRepository) }
     val shift by vm.shift.collectAsStateWithLifecycle()
     var pickStart by remember { mutableStateOf(false) }
+    var dayOpen by remember { mutableStateOf<Int?>(null) }
     // the ranger's birthday is marked on the calendar
     val context = androidx.compose.ui.platform.LocalContext.current
     var birth by remember { mutableStateOf<Int?>(null) }
@@ -185,8 +187,9 @@ fun ShiftScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(14.dp))
             CalendarCard(
                 shift = shift, today = vm.today, month = vm.month, birth = birth,
-                onMonth = { vm.month = it }, onDay = { vm.toggle(it) },
+                onMonth = { vm.month = it }, onDay = { dayOpen = it },
             )
+            MonthNotesCard(vm.month, vm.today.jdn, onOpenDay = { dayOpen = it }, modifier = Modifier.padding(top = 12.dp))
             OccasionsCard(vm.today, vm.month, birth, Modifier.padding(top = 12.dp))
             if (shift?.overrides?.isNotEmpty() == true) {
                 OutlinePill(
@@ -250,7 +253,7 @@ fun ShiftScreen(onBack: () -> Unit) {
                 }
             }
             Text(
-                "برای تغییر یک روز خاص (مثلاً جابه‌جایی شیفت)، روی همان روز در تقویم بزنید.",
+                "روی هر روز تقویم بزنید تا یادداشت و یادآوری بگذارید یا شیفت آن روز را جابه‌جا کنید.",
                 style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(8.dp),
             )
             Spacer(Modifier.height(40.dp))
@@ -262,6 +265,15 @@ fun ShiftScreen(onBack: () -> Unit) {
             initial = vm.start, maxDate = null, title = "اولین روز شیفت",
             onDismiss = { pickStart = false },
             onConfirm = { vm.start = it; pickStart = false },
+        )
+    }
+    dayOpen?.let { jdn ->
+        DayDialog(
+            jdn = jdn, shiftOn = shift?.isShift(jdn),
+            occasions = ir.mohitban.app.domain.model.EnvCalendar.on(jdn).map { it.title } +
+                listOfNotNull(birth?.takeIf { isBirthday(it, JalaliDate.fromJdn(jdn)) }?.let { "روز تولد شما" }),
+            onToggleShift = if (shift != null) ({ vm.toggle(jdn) }) else null,
+            onDismiss = { dayOpen = null },
         )
     }
     if (vm.saved) SuccessDialog("الگوی شیفت ذخیره شد", onFinished = { vm.saved = false })
@@ -364,6 +376,7 @@ private fun CalendarCard(
             val cells = lead + length
             val rows = (cells + 6) / 7
             var shiftDays = 0
+            val noteDays = rememberNotes().filter { !it.done }.map { it.jdn }.toSet()
             for (r in 0 until rows) {
                 Row(Modifier.fillMaxWidth()) {
                     for (c in 0 until 7) {
@@ -379,7 +392,8 @@ private fun CalendarCard(
                                     manual = shift?.isOverridden(jdn) == true,
                                     event = ir.mohitban.app.domain.model.EnvCalendar.on(jdn).isNotEmpty(),
                                     birthday = birth != null && isBirthday(birth, JalaliDate.fromJdn(jdn)),
-                                    onClick = if (shift != null) ({ onDay(jdn) }) else null,
+                                    note = jdn in noteDays,
+                                    onClick = { onDay(jdn) },
                                 )
                             }
                         }
@@ -416,7 +430,7 @@ private fun NavArrow(icon: androidx.compose.ui.graphics.vector.ImageVector, labe
 }
 
 @Composable
-private fun DayCell(day: Int, on: Boolean?, today: Boolean, friday: Boolean, manual: Boolean, event: Boolean, birthday: Boolean, onClick: (() -> Unit)?) {
+private fun DayCell(day: Int, on: Boolean?, today: Boolean, friday: Boolean, manual: Boolean, event: Boolean, birthday: Boolean, note: Boolean = false, onClick: (() -> Unit)?) {
     val shape = RoundedCornerShape(9.dp)
     val bg = when (on) { true -> ShiftColors.OnBg; false -> ShiftColors.OffBg; null -> Color.Transparent }
     Box(
@@ -452,6 +466,9 @@ private fun DayCell(day: Int, on: Boolean?, today: Boolean, friday: Boolean, man
         // environmental day: a small green leaf mark; birthday: a red cake mark
         if (event) {
             Box(Modifier.align(Alignment.TopEnd).padding(3.dp).size(7.dp).clip(CircleShape).background(Color(0xFF1F8A4C)))
+        }
+        if (note) {
+            Icon(Icons.Outlined.EditNote, "یادداشت", tint = Color(0xFF2F7FC1), modifier = Modifier.align(Alignment.BottomStart).padding(2.dp).size(12.dp))
         }
         if (birthday) {
             Icon(Icons.Outlined.Cake, "تولد", tint = Color(0xFFE5483B), modifier = Modifier.align(Alignment.BottomEnd).padding(2.dp).size(12.dp))

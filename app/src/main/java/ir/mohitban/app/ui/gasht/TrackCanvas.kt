@@ -123,6 +123,9 @@ class MapZone(val zone: ir.mohitban.app.gasht.Zone) {
     val minY = rings.minOf { it.second.min() }; val maxY = rings.maxOf { it.second.max() }
 }
 
+/** A blinking alert on the map (a colleague in need, a poacher, a fire). */
+class MapAlert(val point: GeoPoint, val color: Color, val label: String = "")
+
 class MapPlace(val name: String, val point: GeoPoint, val color: Color, val highlight: Boolean = false)
 
 @Composable
@@ -139,8 +142,10 @@ fun TrackCanvas(
     initialCenter: GeoPoint? = null,
     zones: List<MapZone> = emptyList(),
     fitPoints: List<GeoPoint> = emptyList(),
-    alert: GeoPoint? = null,
+    alerts: List<MapAlert> = emptyList(),
+    onLongPress: ((GeoPoint) -> Unit)? = null,
 ) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     var cx by remember { mutableDoubleStateOf(Double.NaN) }
     var cy by remember { mutableDoubleStateOf(Double.NaN) }
     var mpp by remember { mutableDoubleStateOf(3.0) }
@@ -201,6 +206,16 @@ fun TrackCanvas(
             Modifier
                 .fillMaxSize()
                 .onSizeChanged { size = it.toSize() }
+                .pointerInput(onLongPress != null) {
+                    if (onLongPress == null) return@pointerInput
+                    androidx.compose.foundation.gestures.detectTapGestures(onLongPress = { o ->
+                        if (cx.isNaN()) return@detectTapGestures
+                        val mx = cx + (o.x - size.width / 2) * mpp
+                        val my = cy - (o.y - size.height / 2) * mpp
+                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                        onLongPress(Geo.fromMercator(mx, my))
+                    })
+                }
                 .pointerInput(Unit) {
                     detectTransformGestures { _, pan, zoom, _ ->
                         if (cx.isNaN()) return@detectTransformGestures
@@ -284,12 +299,16 @@ fun TrackCanvas(
             }
 
             // a colleague in need: a red pin (it blinks on the layer above)
-            alert?.let { a ->
-                val p = v.toScreen(Geo.mercatorX(a.lon), Geo.mercatorY(a.lat))
+            for (al in alerts) {
+                val p = v.toScreen(Geo.mercatorX(al.point.lon), Geo.mercatorY(al.point.lat))
                 drawCircle(Color(0x44000000), 16f, p + Offset(0f, 3f))
                 drawCircle(Color.White, 15f, p)
-                drawCircle(Color(0xFFE5483B), 11f, p)
+                drawCircle(al.color, 11f, p)
                 drawCircle(Color.White, 4f, p)
+                if (al.label.isNotBlank()) {
+                    val layout = measurer.measure(al.label, TextStyle(fontSize = 11.sp, fontFamily = AppFonts.family(), fontWeight = FontWeight.Black, color = al.color, shadow = androidx.compose.ui.graphics.Shadow(Color.White, Offset(0f, 0f), 6f)))
+                    drawText(layout, topLeft = Offset(p.x - layout.size.width / 2, p.y + 18f))
+                }
             }
 
             // the ranger: accuracy circle, heading cone, blue dot
@@ -359,7 +378,7 @@ fun TrackCanvas(
         }
 
         // the "you are here" pulse on its own layer, so the map itself is not redrawn every frame
-        if ((motion && fix != null) || alert != null) {
+        if ((motion && fix != null) || alerts.isNotEmpty()) {
             Canvas(Modifier.fillMaxSize()) {
                 if (cx.isNaN()) return@Canvas
                 val v = Viewport(cx, cy, mpp, this.size)
@@ -369,16 +388,16 @@ fun TrackCanvas(
                     drawCircle(Color(0xFF1E6FD9).copy(alpha = 0.35f * (1f - k)), 13f + 34f * k, p)
                     drawCircle(Color(0xFF1E6FD9).copy(alpha = 0.5f * (1f - k)), 13f + 34f * k, p, style = Stroke(2f))
                 }
-                alert?.let { a ->
-                    // two red rings spreading out and a blinking core
-                    val p = v.toScreen(Geo.mercatorX(a.lon), Geo.mercatorY(a.lat))
+                for (al in alerts) {
+                    // two rings spreading out and a blinking core
+                    val p = v.toScreen(Geo.mercatorX(al.point.lon), Geo.mercatorY(al.point.lat))
                     for (j in 0..1) {
                         val q = (k + j * 0.5f) % 1f
-                        drawCircle(Color(0xFFE5483B).copy(alpha = 0.45f * (1f - q)), 15f + 70f * q, p)
-                        drawCircle(Color(0xFFE5483B).copy(alpha = 0.8f * (1f - q)), 15f + 70f * q, p, style = Stroke(3f))
+                        drawCircle(al.color.copy(alpha = 0.40f * (1f - q)), 15f + 70f * q, p)
+                        drawCircle(al.color.copy(alpha = 0.8f * (1f - q)), 15f + 70f * q, p, style = Stroke(3f))
                     }
                     val blink = if ((k * 4).toInt() % 2 == 0) 1f else 0.25f
-                    drawCircle(Color(0xFFFF1E1E).copy(alpha = blink), 11f, p)
+                    drawCircle(al.color.copy(alpha = blink), 11f, p)
                     drawCircle(Color.White.copy(alpha = blink), 4f, p)
                 }
             }
