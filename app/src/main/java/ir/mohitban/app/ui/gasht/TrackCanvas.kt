@@ -1,5 +1,6 @@
 package ir.mohitban.app.ui.gasht
 
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -208,7 +209,7 @@ fun TrackCanvas(
                 .onSizeChanged { size = it.toSize() }
                 .pointerInput(onLongPress != null) {
                     if (onLongPress == null) return@pointerInput
-                    androidx.compose.foundation.gestures.detectTapGestures(onLongPress = { o ->
+                    detectTapGestures(onLongPress = { o ->
                         if (cx.isNaN()) return@detectTapGestures
                         val mx = cx + (o.x - size.width / 2) * mpp
                         val my = cy - (o.y - size.height / 2) * mpp
