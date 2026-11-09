@@ -20,7 +20,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
+import ir.mohitban.app.ui.components.safeBottomPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -186,7 +186,7 @@ fun ReceiptCropScreen(rawPath: String, onDone: (String) -> Unit, onCancel: () ->
                 }
             }
         }
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp)) {
+        Column(Modifier.fillMaxWidth().safeBottomPadding().padding(16.dp)) {
             val r = result
             if (r != null) {
                 // ---------- step 2: confirm the straightened receipt ----------

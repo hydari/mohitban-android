@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
+import ir.mohitban.app.ui.components.safeBottomPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -321,13 +321,13 @@ fun FuelFormScreen(
                 icon = Icons.AutoMirrored.Outlined.Send,
             )
             Spacer(Modifier.height(20.dp))
-            Spacer(Modifier.navigationBarsPadding())
+            Spacer(Modifier.safeBottomPadding())
         }
     }
 
     if (vehicleSheet) {
-        ModalBottomSheet(onDismissRequest = { vehicleSheet = false }, containerColor = Color.White) {
-            Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 16.dp)) {
+        ModalBottomSheet(onDismissRequest = { vehicleSheet = false }, containerColor = Color.White, contentWindowInsets = { androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0) }) {
+            Column(Modifier.fillMaxWidth().safeBottomPadding().padding(horizontal = 16.dp).padding(bottom = 16.dp)) {
                 Text("انتخاب خودرو یا موتورسیکلت", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 10.dp))
                 vm.vehicles.forEach { v ->
                     val selected = v.id == vm.vehicle?.id

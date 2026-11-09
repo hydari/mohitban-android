@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import ir.mohitban.app.R
+import ir.mohitban.app.core.text.fa
 import ir.mohitban.app.domain.model.Grades
 import ir.mohitban.app.ui.theme.Corners
 import ir.mohitban.app.ui.theme.MColors
@@ -83,6 +84,34 @@ fun GradePickerDialog(current: String, onDismiss: () -> Unit, onPick: (String) -
                 }
             }
             CancelButton("بستن", Modifier.fillMaxWidth().padding(top = 12.dp), onClick = onDismiss)
+        }
+    }
+}
+
+/**
+ * «Your rank is probably …»: offered after the employment date is known. The ranger accepts it with
+ * one tap or chooses the rank by hand.
+ */
+@Composable
+fun GradeSuggestionDialog(years: Int, suggested: String, onAccept: () -> Unit, onManual: () -> Unit, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Column(Modifier.clip(RoundedCornerShape(Corners.R)).background(Clay.Surface).padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("درجه‌ی پیشنهادی", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = MColors.Ink)
+            Spacer(Modifier.height(12.dp))
+            Box(Modifier.height(60.dp), contentAlignment = Alignment.Center) { RankInsignia(suggested, 52.dp) }
+            Spacer(Modifier.height(10.dp))
+            Text(
+                suggested, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black), color = MColors.Green, textAlign = TextAlign.Center,
+            )
+            Text(
+                "با توجه به تاریخ استخدام شما (${years.fa()} سال سابقه) و ارتقای درجه هر ${Grades.YEARS_PER_RANK.fa()} سال یک‌بار، درجه‌ی فعلی شما این است. درست است؟",
+                style = MaterialTheme.typography.bodyMedium, color = MColors.Muted, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp),
+            )
+            Spacer(Modifier.height(16.dp))
+            OkButton("بله، درست است", Modifier.fillMaxWidth(), onClick = onAccept)
+            TextButton(onClick = onManual, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                Text("نه، خودم درجه را انتخاب می‌کنم", color = MColors.Muted)
+            }
         }
     }
 }

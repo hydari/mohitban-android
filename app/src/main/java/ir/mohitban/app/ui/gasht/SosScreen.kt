@@ -20,7 +20,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import ir.mohitban.app.ui.components.safeBottomPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -162,7 +162,7 @@ fun SosScreen(id: Long, onBack: () -> Unit, onGuide: () -> Unit) {
             if (loaded) Text("این هشدار پیدا نشد.", style = MaterialTheme.typography.bodyMedium, color = MColors.Muted, modifier = Modifier.padding(24.dp))
             return@Column
         }
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).navigationBarsPadding()) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).safeBottomPadding()) {
             // who
             AppCard(Modifier.fillMaxWidth().padding(top = 14.dp)) {
                 Column(Modifier.padding(14.dp)) {

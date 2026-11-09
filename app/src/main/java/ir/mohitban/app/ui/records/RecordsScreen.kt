@@ -3,7 +3,7 @@ package ir.mohitban.app.ui.records
 import android.graphics.BitmapFactory
 import ir.mohitban.app.ui.theme.Corners
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.navigationBarsPadding
+import ir.mohitban.app.ui.components.safeBottomPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape

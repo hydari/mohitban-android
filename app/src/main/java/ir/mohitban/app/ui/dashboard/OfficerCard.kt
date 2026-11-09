@@ -127,20 +127,21 @@ fun OfficerCard(
         Box(Modifier.matchParentSize().padding(5.dp).border(0.6.dp, Gold.copy(alpha = 0.35f), RoundedCornerShape(18.dp)))
         Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 14.dp)) {
             // ---- organisation line | bell (only while there is something new) ----
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.height(30.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.height(34.dp)) {
                 // the flag of the Islamic Republic of Iran in the top right corner
                 Image(
                     painterResource(R.drawable.flag_iran), "پرچم جمهوری اسلامی ایران", contentScale = ContentScale.FillBounds,
                     modifier = Modifier.padding(end = 8.dp).size(width = 35.dp, height = 20.dp).shadow(2.dp, RoundedCornerShape(3.dp))
                         .clip(RoundedCornerShape(3.dp)).border(0.6.dp, Gold.copy(alpha = 0.6f), RoundedCornerShape(3.dp)),
                 )
+                // the guard's own emblem (cut out, no background) and its name
                 Image(
-                    painterResource(R.drawable.doe_emblem), null,
-                    modifier = Modifier.size(22.dp).clip(CircleShape).background(Color.White).padding(2.dp),
+                    painterResource(R.drawable.yegan_logo), "نشان یگان حفاظت محیط زیست", contentScale = ContentScale.Fit,
+                    modifier = Modifier.height(30.dp),
                 )
                 Text(
-                    "  سازمان حفاظت محیط زیست", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = Gold, maxLines = 1, modifier = Modifier.weight(1f),
+                    "  یگان حفاظت محیط زیست", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = Gold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
                 )
                 bell()
             }

@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -111,8 +110,8 @@ fun rememberImagePicker(
     val pickGallery = { runCatching { gallery.launch("image/*") }; Unit }
 
     if (sheet) {
-        ModalBottomSheet(onDismissRequest = { sheet = false }, containerColor = Color.White) {
-            Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 18.dp)) {
+        ModalBottomSheet(onDismissRequest = { sheet = false }, containerColor = Color.White, contentWindowInsets = { androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0) }) {
+            Column(Modifier.fillMaxWidth().safeBottomPadding().padding(bottom = 18.dp)) {
                 SheetRow(Icons.Outlined.PhotoCamera, "گرفتن عکس با دوربین") { sheet = false; takePhoto() }
                 SheetRow(Icons.Outlined.PhotoLibrary, "انتخاب از گالری") { sheet = false; pickGallery() }
             }

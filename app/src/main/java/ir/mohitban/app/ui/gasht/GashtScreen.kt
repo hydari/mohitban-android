@@ -46,7 +46,7 @@ import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.Icon
-import androidx.compose.foundation.layout.navigationBarsPadding
+import ir.mohitban.app.ui.components.safeBottomPadding
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.MaterialTheme
@@ -422,7 +422,7 @@ fun GashtScreen(onTab: (ir.mohitban.app.ui.components.MainTab) -> Unit) {
     }
     LaunchedEffect(Unit) { if (!permitted) requestPermission() }
     Box(Modifier.fillMaxSize().background(MColors.Bg)) {
-    Column(Modifier.fillMaxSize().padding(bottom = 88.dp).navigationBarsPadding()) {
+    Column(Modifier.fillMaxSize().padding(bottom = 88.dp).safeBottomPadding()) {
         TopBar("گشت‌یار", onBack = null)
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf("نقشه", "مسیرها", "نقاط", "ابزارها").forEachIndexed { i, t ->

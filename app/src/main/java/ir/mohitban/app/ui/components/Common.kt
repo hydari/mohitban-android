@@ -1,5 +1,13 @@
 package ir.mohitban.app.ui.components
 
+import androidx.compose.ui.composed
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.mandatorySystemGestures
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.Image
 import ir.mohitban.app.ui.theme.Corners
 import androidx.compose.foundation.background
@@ -15,7 +23,6 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.offset
@@ -286,6 +293,18 @@ fun TagBadge(text: String, background: Color, color: Color, modifier: Modifier =
     )
 }
 
+/**
+ * Bottom space that keeps buttons tappable on every phone: the navigation bar or the gesture bar,
+ * but never less than [min]. Some phones (full-screen gestures, some skins, dialog windows) report
+ * no navigation inset at all, and a button in the last few millimetres of the screen is then
+ * swallowed by the system's swipe-home gesture.
+ */
+@Composable
+fun safeBottomInsets(min: Dp = 16.dp): WindowInsets =
+    WindowInsets.navigationBars.union(WindowInsets.mandatorySystemGestures).union(WindowInsets(bottom = min)).only(WindowInsetsSides.Bottom)
+
+fun Modifier.safeBottomPadding(min: Dp = 16.dp): Modifier = composed { windowInsetsPadding(safeBottomInsets(min)) }
+
 /* ------------------------------ Bars ------------------------------ */
 
 /** Centered title, back arrow on the right (RTL start), optional action on the left. */
@@ -348,7 +367,7 @@ fun BottomBar(current: MainTab, onSelect: (MainTab) -> Unit, modifier: Modifier 
     }
     androidx.compose.foundation.layout.BoxWithConstraints(
         modifier = modifier
-            .navigationBarsPadding()
+            .safeBottomPadding()
             .padding(horizontal = 14.dp, vertical = 10.dp)
             .fillMaxWidth()
             .height(72.dp)

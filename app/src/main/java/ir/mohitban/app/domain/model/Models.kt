@@ -106,6 +106,28 @@ object Grades {
         "افسر محیط‌دار سوم", "افسر محیط‌دار دوم", "افسر محیط‌دار یکم", "ارشد محیط‌دار",
     )
 
+    /** Years of service after which the rank goes up by one. */
+    const val YEARS_PER_RANK = 4
+
+    /**
+     * The rank a ranger hired on [hireJdn] normally holds on [todayJdn]: the first rank at hiring and
+     * one more every [YEARS_PER_RANK] full years, up to the highest. Null when the hire date is in the future.
+     */
+    fun suggest(hireJdn: Int, todayJdn: Int): String? {
+        val years = fullYears(hireJdn, todayJdn)
+        if (years < 0) return null
+        return ALL[(years / YEARS_PER_RANK).coerceIn(0, ALL.lastIndex)]
+    }
+
+    /** Whole Jalali years between two day numbers, or -1 when [toJdn] is before [fromJdn]. */
+    fun fullYears(fromJdn: Int, toJdn: Int): Int {
+        val a = ir.mohitban.app.core.jalali.JalaliDate.fromJdn(fromJdn)
+        val b = ir.mohitban.app.core.jalali.JalaliDate.fromJdn(toJdn)
+        var years = b.year - a.year
+        if (b.month < a.month || (b.month == a.month && b.day < a.day)) years--
+        return if (toJdn < fromJdn) -1 else years
+    }
+
     /** Index in [ALL] (0-based) or -1. */
     fun indexOf(grade: String): Int {
         // an early version spelled the first rank «کنک»; read it as «کمک»

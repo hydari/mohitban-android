@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -69,7 +68,7 @@ fun PhotoCropDialog(source: Bitmap, onDismiss: () -> Unit, onCropped: (Bitmap) -
     }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
-        Column(Modifier.fillMaxSize().background(Color(0xFF0E1311)).statusBarsPadding().navigationBarsPadding()) {
+        Column(Modifier.fillMaxSize().background(Color(0xFF0E1311)).statusBarsPadding().safeBottomPadding()) {
             Text(
                 "عکس را با دو انگشت بزرگ و کوچک کنید و جابه‌جا کنید تا صورت داخل دایره قرار بگیرد.",
                 style = MaterialTheme.typography.bodySmall, color = Color(0xCCFFFFFF), textAlign = TextAlign.Center,

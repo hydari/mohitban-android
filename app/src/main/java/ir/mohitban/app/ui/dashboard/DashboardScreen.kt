@@ -123,7 +123,7 @@ import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.foundation.layout.navigationBarsPadding
+import ir.mohitban.app.ui.components.safeBottomPadding
 import ir.mohitban.app.ui.alerts.AlertSeen
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.outlined.Explore
@@ -471,7 +471,7 @@ fun DashboardScreen(
                 Row(
                     Modifier
                         .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
+                        .safeBottomPadding()
                         .padding(bottom = 104.dp, start = 24.dp, end = 24.dp)
                         .shadow(10.dp, RoundedCornerShape(Corners.R))
                         .clip(RoundedCornerShape(Corners.R))

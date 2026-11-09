@@ -141,20 +141,10 @@ fun PersonalSection(form: ProfileForm, errors: Map<String, String>, onChange: (P
         form.mobile, { onChange(form.copy(mobile = it)) }, label = "شماره همراه", leadingIcon = Icons.Outlined.PhoneAndroid,
         numeric = NumericMode.Digits, maxLength = 11, placeholder = "۰۹۱۲۳۴۵۶۷۸۹", error = errors["mobile"] ?: mobileLiveError,
     )
-    // rank (درجه) with its insignia
-    var pickGrade by remember { mutableStateOf(false) }
-    MField(
-        form.grade, {}, label = "درجه", leadingIcon = Icons.Outlined.MilitaryTech, placeholder = "انتخاب درجه",
-        error = errors["grade"], onClick = { pickGrade = true },
-        trailing = if (form.grade.isNotBlank()) ({ ir.mohitban.app.ui.components.RankInsignia(form.grade, 26.dp, Modifier.padding(end = 6.dp)) }) else null,
-    )
-    if (pickGrade) {
-        ir.mohitban.app.ui.components.GradePickerDialog(form.grade, onDismiss = { pickGrade = false }) { onChange(form.copy(grade = it)); pickGrade = false }
-    }
-    ir.mohitban.app.ui.components.SelectField(form.rank, { onChange(form.copy(rank = it)) }, Suggestions.ranks, label = "سمت", leadingIcon = Icons.Outlined.Park, placeholder = "انتخاب سمت", error = errors["rank"], title = "سمت خود را انتخاب کنید")
-    // birthday (for the greeting) and employment date (for years of service)
+    // birthday (for the greeting) and employment date (the rank is suggested from it, so it comes first)
     var pickBirth by remember { mutableStateOf(false) }
     var pickHire by remember { mutableStateOf(false) }
+    val today = ir.mohitban.app.core.jalali.JalaliDate.today()
     MField(
         form.birthJdn?.let { ir.mohitban.app.core.jalali.JalaliDate.fromJdn(it).formatLong(false).fa() }.orEmpty(), {},
         label = "تاریخ تولد", leadingIcon = Icons.Outlined.Cake, placeholder = "انتخاب تاریخ", error = errors["birthJdn"], onClick = { pickBirth = true },
@@ -163,7 +153,30 @@ fun PersonalSection(form: ProfileForm, errors: Map<String, String>, onChange: (P
         form.hireJdn?.let { ir.mohitban.app.core.jalali.JalaliDate.fromJdn(it).formatLong(false).fa() }.orEmpty(), {},
         label = "تاریخ استخدام", leadingIcon = Icons.Outlined.WorkHistory, placeholder = "انتخاب تاریخ", error = errors["hireJdn"], onClick = { pickHire = true },
     )
-    val today = ir.mohitban.app.core.jalali.JalaliDate.today()
+    // rank (درجه) with its insignia: one rank per four years of service; the ranger confirms or picks by hand
+    var pickGrade by remember { mutableStateOf(false) }
+    var askSuggestion by remember { mutableStateOf(false) }
+    val suggested = form.hireJdn?.let { ir.mohitban.app.domain.model.Grades.suggest(it, today.jdn) }
+    val matches = suggested != null && ir.mohitban.app.domain.model.Grades.indexOf(form.grade) == ir.mohitban.app.domain.model.Grades.indexOf(suggested)
+    MField(
+        form.grade, {}, label = "درجه", leadingIcon = Icons.Outlined.MilitaryTech, placeholder = "انتخاب درجه",
+        error = errors["grade"],
+        onClick = { if (form.grade.isBlank() && suggested != null) askSuggestion = true else pickGrade = true },
+        success = if (matches) "مطابق سابقه‌ی خدمت شما" else null,
+        trailing = if (form.grade.isNotBlank()) ({ ir.mohitban.app.ui.components.RankInsignia(form.grade, 26.dp, Modifier.padding(end = 6.dp)) }) else null,
+    )
+    if (pickGrade) {
+        ir.mohitban.app.ui.components.GradePickerDialog(form.grade, onDismiss = { pickGrade = false }) { onChange(form.copy(grade = it)); pickGrade = false }
+    }
+    if (askSuggestion && suggested != null && form.hireJdn != null) {
+        ir.mohitban.app.ui.components.GradeSuggestionDialog(
+            years = ir.mohitban.app.domain.model.Grades.fullYears(form.hireJdn, today.jdn), suggested = suggested,
+            onAccept = { onChange(form.copy(grade = suggested)); askSuggestion = false },
+            onManual = { askSuggestion = false; pickGrade = true },
+            onDismiss = { askSuggestion = false },
+        )
+    }
+    ir.mohitban.app.ui.components.SelectField(form.rank, { onChange(form.copy(rank = it)) }, Suggestions.ranks, label = "سمت", leadingIcon = Icons.Outlined.Park, placeholder = "انتخاب سمت", error = errors["rank"], title = "سمت خود را انتخاب کنید")
     if (pickBirth) {
         ir.mohitban.app.ui.components.JalaliDatePickerDialog(
             initial = form.birthJdn?.let { ir.mohitban.app.core.jalali.JalaliDate.fromJdn(it) } ?: ir.mohitban.app.core.jalali.JalaliDate(today.year - 30, 1, 1),
@@ -175,7 +188,14 @@ fun PersonalSection(form: ProfileForm, errors: Map<String, String>, onChange: (P
         ir.mohitban.app.ui.components.JalaliDatePickerDialog(
             initial = form.hireJdn?.let { ir.mohitban.app.core.jalali.JalaliDate.fromJdn(it) } ?: ir.mohitban.app.core.jalali.JalaliDate(today.year - 5, 1, 1),
             title = "تاریخ استخدام (روی ماه و سال بزنید تا سال را انتخاب کنید)",
-            onDismiss = { pickHire = false }, onConfirm = { onChange(form.copy(hireJdn = it.jdn)); pickHire = false },
+            onDismiss = { pickHire = false },
+            onConfirm = {
+                val next = form.copy(hireJdn = it.jdn)
+                onChange(next); pickHire = false
+                // a new employment date: offer the rank that goes with it unless the current one already matches
+                val s = ir.mohitban.app.domain.model.Grades.suggest(it.jdn, today.jdn)
+                if (s != null && ir.mohitban.app.domain.model.Grades.indexOf(next.grade) != ir.mohitban.app.domain.model.Grades.indexOf(s)) askSuggestion = true
+            },
         )
     }
 }

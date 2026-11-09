@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
+import ir.mohitban.app.ui.components.safeBottomPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -130,13 +130,14 @@ fun ProfileEditScreen(onBack: () -> Unit) {
             },
         )
     }
-    Column(Modifier.fillMaxSize().background(MColors.Bg)) {
+    // the save button is pinned under the form, clear of the navigation / gesture bar, so it can
+    // never slide off the bottom of the screen
+    Column(Modifier.fillMaxSize().background(MColors.Bg).imePadding()) {
         TopBar("ویرایش اطلاعات فردی", onBack = leave)
         if (!vm.loaded) return@Column
         Column(
             Modifier
                 .weight(1f)
-                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 18.dp),
         ) {
@@ -144,10 +145,10 @@ fun ProfileEditScreen(onBack: () -> Unit) {
             PersonalSection(vm.profile, vm.errors, vm::update)
             SectionTitle("محل خدمت")
             LocationSection(vm.profile, vm.errors, vm::update)
-            Spacer(Modifier.height(22.dp))
+            Spacer(Modifier.height(16.dp))
+        }
+        Box(Modifier.fillMaxWidth().padding(horizontal = 18.dp).padding(top = 8.dp).safeBottomPadding()) {
             PillButton("ذخیره تغییرات", onClick = vm::save, icon = Icons.Outlined.Check)
-            Spacer(Modifier.height(24.dp))
-            Spacer(Modifier.navigationBarsPadding())
         }
     }
 }
@@ -216,7 +217,7 @@ fun VehiclesScreen(onBack: () -> Unit, onEdit: (Long) -> Unit) {
         }
         PillButton(
             "افزودن خودرو یا موتورسیکلت", onClick = { onEdit(0L) }, icon = Icons.Outlined.Add,
-            modifier = Modifier.padding(16.dp).navigationBarsPadding(),
+            modifier = Modifier.padding(16.dp).safeBottomPadding(),
         )
     }
 
@@ -295,21 +296,20 @@ fun VehicleEditScreen(vehicleId: Long, onBack: () -> Unit, onSaved: (Long) -> Un
     val vm = appViewModel(key = "vehicle_$vehicleId") { c, _ -> VehicleEditViewModel(c.profileRepository, c.settingsRepository, vehicleId) }
     val context = LocalContext.current
     vm.savedId?.let { id -> SuccessDialog("اطلاعات وسیله ذخیره شد", onFinished = { onSaved(id) }) }
-    Column(Modifier.fillMaxSize().background(MColors.Bg)) {
+    Column(Modifier.fillMaxSize().background(MColors.Bg).imePadding()) {
         TopBar(if (vehicleId == 0L) "افزودن وسیله نقلیه" else "ویرایش وسیله نقلیه", onBack = onBack)
         if (!vm.loaded) return@Column
         Column(
             Modifier
                 .weight(1f)
-                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 18.dp),
         ) {
             VehicleSection(vm.form, vm.errors, vm::update, vm.showErrors)
-            Spacer(Modifier.height(22.dp))
+            Spacer(Modifier.height(16.dp))
+        }
+        Box(Modifier.fillMaxWidth().padding(horizontal = 18.dp).padding(top = 8.dp).safeBottomPadding()) {
             PillButton("ذخیره", onClick = vm::save, icon = Icons.Outlined.Check)
-            Spacer(Modifier.height(24.dp))
-            Spacer(Modifier.navigationBarsPadding())
         }
     }
 }
