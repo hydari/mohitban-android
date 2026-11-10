@@ -109,14 +109,17 @@ object Grades {
     /** Years of service after which the rank goes up by one. */
     const val YEARS_PER_RANK = 4
 
+    /** Index in [ALL] of the rank every ranger starts with: «محیط‌بان سوم». */
+    const val START_INDEX = 1
+
     /**
-     * The rank a ranger hired on [hireJdn] normally holds on [todayJdn]: the first rank at hiring and
+     * The rank a ranger hired on [hireJdn] normally holds on [todayJdn]: «محیط‌بان سوم» at hiring and
      * one more every [YEARS_PER_RANK] full years, up to the highest. Null when the hire date is in the future.
      */
     fun suggest(hireJdn: Int, todayJdn: Int): String? {
         val years = fullYears(hireJdn, todayJdn)
         if (years < 0) return null
-        return ALL[(years / YEARS_PER_RANK).coerceIn(0, ALL.lastIndex)]
+        return ALL[(START_INDEX + years / YEARS_PER_RANK).coerceIn(START_INDEX, ALL.lastIndex)]
     }
 
     /** Whole Jalali years between two day numbers, or -1 when [toJdn] is before [fromJdn]. */

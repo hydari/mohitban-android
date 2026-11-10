@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Fingerprint
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Call
@@ -199,6 +200,27 @@ fun SettingsScreen(
                     "پیشنهاد: هر هفته یک فایل پشتیبان بسازید و روی کارت حافظه یا رایانه نگه دارید تا با گم شدن گوشی اطلاعات از بین نرود.",
                     style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(8.dp),
                 )
+
+                SectionTitle("امنیت")
+                AppCard(Modifier.fillMaxWidth()) {
+                    var lockOn by remember { mutableStateOf(ir.mohitban.app.security.AppLockPrefs.isEnabled(context)) }
+                    val canLock = remember { ir.mohitban.app.security.AppLock.available(context) }
+                    Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        CircleIcon(Icons.Outlined.Fingerprint, MColors.GreenLight, MColors.Green, size = 42.dp)
+                        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                            Text("قفل برنامه", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                if (canLock) "ورود با اثر انگشت یا چهره؛ در گوشی‌های بدون آن، با الگو یا رمز گوشی"
+                                else "ابتدا در تنظیمات گوشی یک قفل صفحه (الگو، رمز یا اثر انگشت) تعریف کنید",
+                                style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 2.dp),
+                            )
+                        }
+                        androidx.compose.material3.Switch(
+                            checked = lockOn && canLock, enabled = canLock,
+                            onCheckedChange = { lockOn = it; ir.mohitban.app.security.AppLockPrefs.setEnabled(context, it) },
+                        )
+                    }
+                }
 
                 SectionTitle("درباره")
                 var showDev by remember { mutableStateOf(false) }

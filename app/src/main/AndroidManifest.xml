@@ -5,6 +5,7 @@
          (gasht/CountyMaps.kt, MapDownloader) and for the weather forecast of the ranger's area
          (gasht/Weather.kt; only the rounded coordinates are sent). Every other feature works offline. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- گشت‌یار: satellite GPS only (no internet); foreground service keeps recording with the screen off -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />

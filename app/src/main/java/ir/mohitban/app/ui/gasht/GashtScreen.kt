@@ -35,6 +35,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AddLocationAlt
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.FullscreenExit
+import androidx.compose.material.icons.outlined.Fullscreen
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.FiberManualRecord
 import androidx.compose.material.icons.outlined.GpsFixed
@@ -155,6 +157,9 @@ class GashtViewModel(private val c: AppContainer) : ViewModel() {
 
     // ---- offline maps ----
     var maps by mutableStateOf(ir.mohitban.app.gasht.MapStore.list(ctx))
+    /** All downloaded county maps, shown together. */
+    var mapSet by mutableStateOf<ir.mohitban.app.gasht.MapSet?>(null)
+    /** The county the view was last taken to (its title and credit show under the map). */
     var activeMap by mutableStateOf<ir.mohitban.app.gasht.OfflineMap?>(null)
     var background by mutableStateOf<MapBackground>(GridBackground)
     var labels by mutableStateOf<List<ir.mohitban.app.gasht.MapLabel>>(emptyList())
@@ -203,13 +208,10 @@ class GashtViewModel(private val c: AppContainer) : ViewModel() {
     var dismissedMaps by mutableStateOf(setOf<String>())
 
     init {
-        ir.mohitban.app.gasht.MapStore.active(ctx)?.let { openMap(it) }
-        // a county map that finished downloading is listed and shown at once
+        loadMaps(ir.mohitban.app.gasht.MapStore.active(ctx), goTo = false)
+        // a county map that finished downloading joins the others and the view moves to it
         viewModelScope.launch {
-            ir.mohitban.app.gasht.MapDownloader.finished.collect { f ->
-                maps = ir.mohitban.app.gasht.MapStore.list(ctx)
-                openMap(f)
-            }
+            ir.mohitban.app.gasht.MapDownloader.finished.collect { f -> loadMaps(f, goTo = true) }
         }
     }
 
@@ -226,22 +228,41 @@ class GashtViewModel(private val c: AppContainer) : ViewModel() {
 
     fun refreshMaps() { maps = ir.mohitban.app.gasht.MapStore.list(ctx) }
 
-    private fun openMap(file: java.io.File?) {
+    /** Opens every map file on the phone together; [focus] is the one to take the view to when [goTo]. */
+    private fun loadMaps(focus: java.io.File?, goTo: Boolean) {
         viewModelScope.launch {
-            val old = activeMap
+            val old = mapSet
             val opened = withContext(Dispatchers.IO) {
-                file?.let { f -> runCatching { ir.mohitban.app.gasht.OfflineMap(f) }.getOrNull()?.let { m -> m to m.labels() } }
+                val files = ir.mohitban.app.gasht.MapStore.list(ctx)
+                val list = files.mapNotNull { f -> runCatching { ir.mohitban.app.gasht.OfflineMap(f) }.getOrNull() }
+                Triple(files, list, list.flatMap { it.labels() })
             }
-            activeMap = opened?.first
-            labels = opened?.second.orEmpty()
-            background = opened?.first?.let { TileBackground(it, viewModelScope) } ?: GridBackground
-            ir.mohitban.app.gasht.MapStore.setActive(ctx, opened?.first?.file)
-            fitKey++
-            if (old != null && old !== opened?.first) withContext(Dispatchers.IO) { runCatching { old.close() } }
+            val (files, list, names) = opened
+            maps = files
+            val set = if (list.isEmpty()) null else ir.mohitban.app.gasht.MapSet(list)
+            mapSet = set
+            labels = names
+            background = set?.let { TileBackground(it, viewModelScope) } ?: GridBackground
+            activeMap = list.firstOrNull { it.file.path == focus?.path } ?: list.firstOrNull()
+            ir.mohitban.app.gasht.MapStore.setActive(ctx, activeMap?.file)
+            if (goTo) goToMap(activeMap)
+            if (old != null && old !== set) withContext(Dispatchers.IO) { runCatching { old.close() } }
         }
     }
 
-    fun selectMap(file: java.io.File?) = openMap(file)
+    private fun goToMap(m: ir.mohitban.app.gasht.OfflineMap?) {
+        val b = m?.bounds ?: return
+        fitPoints = listOf(GeoPoint(b[1], b[0]), GeoPoint(b[3], b[2]))
+        fitKey++
+    }
+
+    /** Takes the view to a county map. The other maps stay on the screen. */
+    fun selectMap(file: java.io.File?) {
+        val m = mapSet?.maps?.firstOrNull { it.file.path == file?.path } ?: return
+        activeMap = m
+        ir.mohitban.app.gasht.MapStore.setActive(ctx, m.file)
+        goToMap(m)
+    }
 
     fun importMap(uri: Uri, onDone: (String) -> Unit) {
         mapBusy = true
@@ -257,21 +278,25 @@ class GashtViewModel(private val c: AppContainer) : ViewModel() {
             }
             mapBusy = false
             maps = ir.mohitban.app.gasht.MapStore.list(ctx)
-            result.onSuccess { openMap(it); onDone("نقشه وارد شد و نمایش داده می‌شود") }
+            result.onSuccess { loadMaps(it, goTo = true); onDone("نقشه وارد شد و کنار نقشه‌های دیگر نمایش داده می‌شود") }
                 .onFailure { onDone("این فایل نقشه‌ی معتبر MBTiles نیست") }
         }
     }
 
     fun deleteMap(file: java.io.File) {
         viewModelScope.launch {
-            if (activeMap?.file?.path == file.path) openMap(null)
-            withContext(Dispatchers.IO) { ir.mohitban.app.gasht.MapStore.delete(ctx, file) }
+            val keep = activeMap?.file?.takeIf { it.path != file.path }
+            // the old set is released before the file goes, then the rest are opened again
+            val old = mapSet
+            mapSet = null; activeMap = null; background = GridBackground
+            withContext(Dispatchers.IO) { runCatching { old?.close() }; ir.mohitban.app.gasht.MapStore.delete(ctx, file) }
             maps = ir.mohitban.app.gasht.MapStore.list(ctx)
+            loadMaps(keep, goTo = false)
         }
     }
 
     override fun onCleared() {
-        runCatching { activeMap?.close() }
+        runCatching { mapSet?.close() }
     }
     val trackPoints = mutableStateMapOf<Long, List<GeoPoint>>()
 
@@ -280,11 +305,11 @@ class GashtViewModel(private val c: AppContainer) : ViewModel() {
 
     fun toggleShown(id: Long) {
         if (id in shown) { shown = shown - id; return }
-        viewModelScope.launch { load(id); shown = shown + id; fitKey++ }
+        viewModelScope.launch { load(id); shown = shown + id; fitPoints = emptyList(); fitKey++ }
     }
 
     fun showOnly(id: Long) {
-        viewModelScope.launch { load(id); shown = setOf(id); fitKey++; tab = 0 }
+        viewModelScope.launch { load(id); shown = setOf(id); fitPoints = emptyList(); fitKey++; tab = 0 }
     }
 
     fun followTrack(t: TrackEntity) {
@@ -530,6 +555,121 @@ private fun MapTab(vm: GashtViewModel) {
             }
         }
 
+        // ---- the map: big, with its buttons on it ----
+        val target = guide.target
+        val mapTracks = buildList {
+            vm.shown.forEach { id ->
+                val pts = vm.trackPoints[id] ?: return@forEach
+                val isTarget = target is GuideTarget.Track && target.trackId == id
+                val src = tracks.firstOrNull { it.id == id }?.source
+                add(MapTrack(id, pts, if (isTarget) Color(0xFFE08A1E) else if (src == TrackSource.IMPORTED) Color(0xFF2F7FC1) else Color(0xFF239B56), if (isTarget) 9f else 6f, highlight = isTarget))
+            }
+            if (target is GuideTarget.Track && target.trackId !in vm.shown) add(MapTrack(target.trackId, target.points, Color(0xFFE08A1E), 9f, true))
+            if (live.size > 1) add(MapTrack(-1, live, Color(0xFFC62828), 7f, true))
+        }
+        val mapPlaces = places.map { MapPlace(it.name, it.geo(), Color(0xFF7B4FB5), target is GuideTarget.Place && target.name == it.name) } +
+            listOfNotNull((target as? GuideTarget.Place)?.let { t -> MapPlace(t.name, t.point, Color(0xFFE08A1E), true).takeIf { places.none { p -> p.name == t.name } } }) +
+            listOfNotNull(held?.takeIf { heldMenu || addAt != null || reportAt != null }?.let { MapPlace("نقطه‌ی انتخابی", it, Color(0xFF2F7FC1), true) })
+        val permitted by vm.hasPermission.collectAsStateWithLifecycle()
+        var fullscreen by remember { mutableStateOf(false) }
+        val mapHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.68f).dp.coerceAtLeast(400.dp)
+        val mapBox: @Composable (Modifier, Boolean) -> Unit = { mod, full ->
+            Box(mod) {
+                TrackCanvas(
+                    mapTracks, mapPlaces, fix, heading,
+                    modifier = Modifier.fillMaxSize(),
+                    fitKey = vm.fitKey,
+                    background = vm.background,
+                    labels = vm.labels,
+                    attribution = vm.activeMap?.attribution.orEmpty(),
+                    initialCenter = vm.activeMap?.center,
+                    zones = if (vm.showZones) vm.mapZones else emptyList(),
+                    fitPoints = vm.fitPoints,
+                    alerts = sosAlerts.map { a ->
+                        MapAlert(a.focus, Color(a.kind.color), if (a.kind == ir.mohitban.app.gasht.SosKind.HELP) a.name.ifBlank { "کمک" } else a.kind.title)
+                    },
+                    onLongPress = { p -> held = p; heldMenu = true },
+                )
+                // where I am, and whether that is inside a protected area (start side)
+                fix?.let { f ->
+                    Column(Modifier.align(Alignment.TopStart).padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Box(
+                            Modifier.clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.94f))
+                                .border(1.dp, MColors.Line, RoundedCornerShape(10.dp)).padding(horizontal = 10.dp, vertical = 6.dp),
+                        ) { LtrText(CoordFormat.decimal(f.point), style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)) }
+                        if (vm.zones.isNotEmpty()) {
+                            val zs = remember(f.point, vm.zones) { ir.mohitban.app.gasht.ZoneStore.status(vm.zones, f.point) }
+                            val inside = zs.inside
+                            if (inside != null || zs.nearest != null) {
+                                Row(
+                                    Modifier.clip(RoundedCornerShape(10.dp)).background(if (inside != null) Color(0xE61F8A4C) else Color(0xE6C62828)).padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(if (inside != null) Icons.Outlined.Shield else Icons.Outlined.WarningAmber, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                    Text(
+                                        " " + (inside?.title?.let { "داخل $it" } ?: "خارج از مناطق"),
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = Color.White, maxLines = 1,
+                                    )
+                                }
+                            }
+                        }
+                        if (record.active) {
+                            Row(
+                                Modifier.clip(RoundedCornerShape(10.dp)).background(Color(0xE6C62828)).padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                ir.mohitban.app.ui.components.PulseDot(Color.White, size = 9.dp, active = !record.paused)
+                                Text(
+                                    "  ضبط: ${CoordFormat.meters(record.distance).fa()}",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = Color.White,
+                                )
+                            }
+                        }
+                    }
+                }
+                // the tools (end side)
+                Column(Modifier.align(Alignment.TopEnd).padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    MapToolButton(if (full) Icons.Outlined.FullscreenExit else Icons.Outlined.Fullscreen) { fullscreen = !full }
+                    MapToolButton(Icons.Outlined.Layers) { mapsDialog = true }
+                    if (vm.zones.isNotEmpty()) MapToolButton(Icons.Outlined.Shield, active = vm.showZones) { vm.showZones = !vm.showZones }
+                    MapToolButton(Icons.Outlined.AddLocationAlt, enabled = fix != null) { addPlace = true }
+                    MapToolButton(Icons.Outlined.ContentCopy, enabled = fix != null) {
+                        fix?.let { copyText(context, "${CoordFormat.decimal(it.point)}\nUTM ${CoordFormat.utm(it.point)}") }
+                    }
+                    MapToolButton(Icons.Outlined.Share, enabled = fix != null) {
+                        fix?.let { shareText(context, positionMessage("موقعیت محیط‌بان", name, it)) }
+                    }
+                    if (!record.active) {
+                        MapToolButton(Icons.Outlined.FiberManualRecord, tint = Color(0xFFC62828), enabled = permitted) {
+                            if (GpsLocation.isGpsOn(context)) GashtSession.startRecording(context)
+                            else runCatching { context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                        }
+                    }
+                }
+            }
+        }
+        mapBox(Modifier.fillMaxWidth().height(mapHeight).clip(RoundedCornerShape(14.dp)), false)
+        if (fullscreen) {
+            androidx.compose.ui.window.Dialog(
+                onDismissRequest = { fullscreen = false },
+                properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+            ) {
+                Box(Modifier.fillMaxSize().background(MColors.Bg)) {
+                    mapBox(Modifier.fillMaxSize().statusBarsPadding().padding(top = 6.dp).safeBottomPadding(), true)
+                }
+            }
+        }
+        // a county's map offer or download progress sits right under the map
+        CountyMapSuggestion(vm, fix)
+        run {
+            val set = vm.mapSet
+            val fx = fix
+            if (set != null && fx != null && !set.covers(fx.point)) {
+                Text("شما خارج از محدوده‌ی نقشه‌های دانلودشده هستید.", style = MaterialTheme.typography.labelSmall, color = MColors.Amber, modifier = Modifier.padding(top = 4.dp))
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+
         // ---- position ----
         AppCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -622,53 +762,6 @@ private fun MapTab(vm: GashtViewModel) {
                 ChoiceChip(if (vm.showZones) "مرز مناطق: روشن" else "مرز مناطق: خاموش", vm.showZones, Modifier.weight(1f)) { vm.showZones = !vm.showZones }
             }
         }
-        // ---- county map: suggest the download where the ranger is ----
-        CountyMapSuggestion(vm, fix)
-        // ---- base map choice ----
-        Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            vm.maps.take(2).forEach { f ->
-                val on = vm.activeMap?.file?.path == f.path
-                val label = ir.mohitban.app.gasht.CountyMaps.label(context, f)
-                ChoiceChip(if (on) vm.activeMap?.title?.substringBefore(" —")?.ifBlank { null } ?: label else label, on, Modifier.weight(1.3f)) { vm.selectMap(f) }
-            }
-            SmallAction(Icons.Outlined.Layers, "نقشه‌ها", Modifier.weight(0.9f)) { mapsDialog = true }
-        }
-        val am = vm.activeMap
-        val fx = fix
-        if (am != null && fx != null && !am.contains(fx.point)) {
-            Text("شما خارج از محدوده‌ی این نقشه هستید.", style = MaterialTheme.typography.labelSmall, color = MColors.Amber, modifier = Modifier.padding(top = 4.dp))
-        }
-
-        // ---- canvas ----
-        val target = guide.target
-        val mapTracks = buildList {
-            vm.shown.forEach { id ->
-                val pts = vm.trackPoints[id] ?: return@forEach
-                val isTarget = target is GuideTarget.Track && target.trackId == id
-                val src = tracks.firstOrNull { it.id == id }?.source
-                add(MapTrack(id, pts, if (isTarget) Color(0xFFE08A1E) else if (src == TrackSource.IMPORTED) Color(0xFF2F7FC1) else Color(0xFF239B56), if (isTarget) 9f else 6f, highlight = isTarget))
-            }
-            if (target is GuideTarget.Track && target.trackId !in vm.shown) add(MapTrack(target.trackId, target.points, Color(0xFFE08A1E), 9f, true))
-            if (live.size > 1) add(MapTrack(-1, live, Color(0xFFC62828), 7f, true))
-        }
-        val mapPlaces = places.map { MapPlace(it.name, it.geo(), Color(0xFF7B4FB5), target is GuideTarget.Place && target.name == it.name) } +
-            listOfNotNull((target as? GuideTarget.Place)?.let { t -> MapPlace(t.name, t.point, Color(0xFFE08A1E), true).takeIf { places.none { p -> p.name == t.name } } }) +
-            listOfNotNull(held?.takeIf { heldMenu || addAt != null || reportAt != null }?.let { MapPlace("نقطه‌ی انتخابی", it, Color(0xFF2F7FC1), true) })
-        TrackCanvas(
-            mapTracks, mapPlaces, fix, heading,
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(360.dp),
-            fitKey = vm.fitKey,
-            background = vm.background,
-            labels = vm.labels,
-            attribution = vm.activeMap?.attribution.orEmpty(),
-            initialCenter = vm.activeMap?.center,
-            zones = if (vm.showZones) vm.mapZones else emptyList(),
-            fitPoints = vm.fitPoints,
-            alerts = sosAlerts.map { a ->
-                MapAlert(a.focus, Color(a.kind.color), if (a.kind == ir.mohitban.app.gasht.SosKind.HELP) a.name.ifBlank { "کمک" } else a.kind.title)
-            },
-            onLongPress = { p -> held = p; heldMenu = true },
-        )
         Text(
             "برای ثبت نقطه یا گزارش شکارچی و آتش‌سوزی، انگشت را روی نقشه نگه دارید.",
             style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 4.dp),
@@ -708,6 +801,20 @@ private fun MapTab(vm: GashtViewModel) {
     if (addPlace) {
         fix?.let { f -> AddPlaceDialog(vm, f.point, onDismiss = { addPlace = false }) } ?: run { addPlace = false }
     }
+}
+
+/** A square white button floating on the map (44 dp, a comfortable touch target). */
+@Composable
+private fun MapToolButton(icon: ImageVector, active: Boolean = false, enabled: Boolean = true, tint: Color = MColors.Ink, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(44.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (active) Color(0xFF1E6FD9) else Color.White.copy(alpha = if (enabled) 0.96f else 0.7f))
+            .border(1.dp, MColors.Line, RoundedCornerShape(12.dp))
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, null, tint = if (active) Color.White else if (enabled) tint else MColors.Hint, modifier = Modifier.size(22.dp)) }
 }
 
 @Composable
@@ -963,7 +1070,7 @@ private fun MapsDialog(vm: GashtViewModel, onDismiss: () -> Unit) {
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
-                    "نقشه‌ی توپوگرافی (پستی‌وبلندی، خطوط تراز، رودخانه، جنگل، جاده و روستاها) بعد از یک بار دانلود، بدون اینترنت نمایش داده می‌شود. مرز مناطق حفاظت‌شده در خود برنامه است.",
+                    "نقشه‌ی توپوگرافی (پستی‌وبلندی، خطوط تراز، رودخانه، جنگل، جاده و روستاها) بعد از یک بار دانلود، بدون اینترنت نمایش داده می‌شود. همه‌ی نقشه‌های دانلودشده با هم روی نقشه می‌مانند؛ با «نمایش» فقط نمای نقشه به آن شهرستان می‌رود. مرز مناطق حفاظت‌شده در خود برنامه است.",
                     style = MaterialTheme.typography.bodySmall, color = MColors.Ink,
                 )
                 CountyMapList(vm)

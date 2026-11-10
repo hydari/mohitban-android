@@ -9,11 +9,18 @@ import java.io.File
 /** A named place shipped inside a map file (town, village, peak, spring). */
 data class MapLabel(val name: String, val kind: String, val point: GeoPoint, val ele: Double?)
 
+/** Anything that can hand out map tiles: one map file, or several of them together. */
+interface TileSource {
+    override val minZoom: Int
+    override val maxZoom: Int
+    fun tile(z: Int, x: Int, y: Int): ByteArray?
+}
+
 /**
  * An offline map in MBTiles form (an SQLite file of web-map tiles). Read-only; works with no
  * internet. Tiles use the TMS row order of the MBTiles standard.
  */
-class OfflineMap(val file: File) : Closeable {
+class OfflineMap(val file: File) : Closeable, TileSource {
     private val db: SQLiteDatabase = SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY or SQLiteDatabase.NO_LOCALIZED_COLLATORS)
     private val meta: Map<String, String> = runCatching {
         db.rawQuery("SELECT name, value FROM metadata", null).use { c ->
@@ -42,7 +49,7 @@ class OfflineMap(val file: File) : Closeable {
     val center: GeoPoint? get() = bounds?.let { GeoPoint((it[1] + it[3]) / 2, (it[0] + it[2]) / 2) }
 
     /** Tile bytes (JPEG/PNG) for XYZ coordinates, or null when the file has none there. */
-    fun tile(z: Int, x: Int, y: Int): ByteArray? = runCatching {
+    override fun tile(z: Int, x: Int, y: Int): ByteArray? = runCatching {
         val row = (1 shl z) - 1 - y
         db.rawQuery(
             "SELECT tile_data FROM tiles WHERE zoom_level = ? AND tile_column = ? AND tile_row = ?",
@@ -66,6 +73,35 @@ class OfflineMap(val file: File) : Closeable {
     }.getOrDefault(emptyList())
 
     override fun close() = db.close()
+}
+
+/**
+ * Every county map on the phone, drawn as one: a tile comes from the first map that covers it, so
+ * downloading another county never hides the ones already there.
+ */
+class MapSet(val maps: List<OfflineMap>) : TileSource, Closeable {
+    override val minZoom: Int = maps.minOfOrNull { it.minZoom } ?: 0
+    override val maxZoom: Int = maps.maxOfOrNull { it.maxZoom } ?: 14
+
+    override fun tile(z: Int, x: Int, y: Int): ByteArray? {
+        val n = (1 shl z).toDouble()
+        val west = x / n * 360.0 - 180.0
+        val east = (x + 1) / n * 360.0 - 180.0
+        val north = Math.toDegrees(Math.atan(Math.sinh(Math.PI * (1 - 2.0 * y / n))))
+        val south = Math.toDegrees(Math.atan(Math.sinh(Math.PI * (1 - 2.0 * (y + 1) / n))))
+        for (m in maps) {
+            val b = m.bounds
+            // skip maps whose area does not touch this tile at all
+            if (b != null && (east < b[0] || west > b[2] || north < b[1] || south > b[3])) continue
+            m.tile(z, x, y)?.let { return it }
+        }
+        return null
+    }
+
+    /** True when at least one of the maps covers [p]. */
+    fun covers(p: GeoPoint): Boolean = maps.any { it.bounds != null && it.contains(p) }
+
+    override fun close() { maps.forEach { runCatching { it.close() } } }
 }
 
 /** Map files kept in the app's private storage, and which one is shown. */

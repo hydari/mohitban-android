@@ -114,20 +114,6 @@ fun CountyMapSuggestion(vm: GashtViewModel, fix: Fix?) {
                 }
             }
         }
-
-        // the county's map is on the phone but another (or none) is shown
-        val active = vm.activeMap
-        val showOffer = candidate != null && have && active?.file?.name != candidate.file &&
-            (active == null || (fix != null && !active.contains(fix.point)))
-        if (showOffer && candidate != null) {
-            Row(
-                Modifier.fillMaxWidth().padding(top = 10.dp).clip(RoundedCornerShape(Corners.R)).background(Color(0xFFE6F2E9)).padding(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("نقشه‌ی ${candidate.title} روی گوشی هست.", style = MaterialTheme.typography.bodySmall, color = MColors.Ink, modifier = Modifier.weight(1f))
-                SmallAction(Icons.Outlined.Map, "نمایش") { vm.selectMap(CountyMaps.local(context, candidate)) }
-            }
-        }
     }
 }
 

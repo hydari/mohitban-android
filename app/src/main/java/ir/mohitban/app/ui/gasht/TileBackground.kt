@@ -11,7 +11,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import ir.mohitban.app.gasht.Geo
-import ir.mohitban.app.gasht.OfflineMap
+import ir.mohitban.app.gasht.TileSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -25,7 +25,7 @@ import kotlin.math.roundToInt
  * in a memory cache; while a tile loads, a scaled-up lower-zoom tile (or the grid) shows instead.
  * Beyond the file's deepest zoom the deepest tiles are enlarged.
  */
-class TileBackground(private val map: OfflineMap, private val scope: CoroutineScope) : MapBackground {
+class TileBackground(private val map: TileSource, private val scope: CoroutineScope) : MapBackground {
     private val version = mutableIntStateOf(0)
     private val cache = object : LruCache<Long, ImageBitmap>(96) {}
     private val loading = HashSet<Long>()
