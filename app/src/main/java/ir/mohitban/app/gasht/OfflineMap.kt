@@ -11,8 +11,8 @@ data class MapLabel(val name: String, val kind: String, val point: GeoPoint, val
 
 /** Anything that can hand out map tiles: one map file, or several of them together. */
 interface TileSource {
-    override val minZoom: Int
-    override val maxZoom: Int
+    val minZoom: Int
+    val maxZoom: Int
     fun tile(z: Int, x: Int, y: Int): ByteArray?
 }
 
@@ -30,8 +30,8 @@ class OfflineMap(val file: File) : Closeable, TileSource {
 
     val title: String = meta["name"]?.takeIf { it.isNotBlank() } ?: file.nameWithoutExtension
     val attribution: String = meta["attribution"].orEmpty()
-    val minZoom: Int
-    val maxZoom: Int
+    override val minZoom: Int
+    override val maxZoom: Int
 
     init {
         val range = runCatching {
