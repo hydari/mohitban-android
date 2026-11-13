@@ -45,6 +45,7 @@ import ir.mohitban.app.container
 import ir.mohitban.app.ui.components.PillButton
 import ir.mohitban.app.ui.theme.MColors
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 /** Whether the ranger wants the app locked (on by default). */
@@ -86,6 +87,12 @@ object AppLock {
 /** Lives as long as the app's process: a killed or swiped-away app always asks again. */
 private object LockState {
     var unlocked by mutableStateOf(false)
+    /** The app was opened by a colleague's emergency, not by the ranger proving who they are. */
+    var viaAlert by mutableStateOf(false)
+    var alertUntil = 0L
+    var leftAfterAlert = false
+    /** How long an emergency keeps the app open without the lock. */
+    const val ALERT_WINDOW_MS = 3 * 60_000L
     var stoppedAt = 0L
     /** How long the app may stay in the background before it asks again. */
     const val GRACE_MS = 60_000L
@@ -99,11 +106,12 @@ private tailrec fun Context.fragmentActivity(): FragmentActivity? = when (this) 
 
 /**
  * Covers the app with a lock screen until the ranger proves it is them. Only after registration
- * (there is nothing to protect before), and only when the phone has some way to ask. [bypass] lets an
- * emergency from a colleague open straight away.
+ * (there is nothing to protect before), and only when the phone has some way to ask. [bypass] goes up by one
+ * for every real, verified emergency from a colleague; each one opens the app for a few minutes (and only while
+ * it stays in front) without asking.
  */
 @Composable
-fun AppLockGate(bypass: Boolean, content: @Composable () -> Unit) {
+fun AppLockGate(bypass: Int, content: @Composable () -> Unit) {
     val context = LocalContext.current
     val activity = remember(context) { context.fragmentActivity() }
     var enabled by remember { mutableStateOf(AppLockPrefs.isEnabled(context)) }
@@ -114,16 +122,30 @@ fun AppLockGate(bypass: Boolean, content: @Composable () -> Unit) {
     var resumed by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { hasData = withContext(Dispatchers.IO) { runCatching { context.container.profileRepository.getProfile() != null }.getOrDefault(true) } }
-    LaunchedEffect(bypass) { if (bypass) LockState.unlocked = true }
+    // an emergency opens the app, but only for a few minutes and only while it stays in front
+    LaunchedEffect(bypass) {
+        if (bypass > 0 && !LockState.unlocked) {
+            LockState.unlocked = true; LockState.viaAlert = true; LockState.leftAfterAlert = false
+            LockState.alertUntil = SystemClock.elapsedRealtime() + LockState.ALERT_WINDOW_MS
+        }
+    }
+    LaunchedEffect(LockState.unlocked, LockState.viaAlert) {
+        if (LockState.unlocked && LockState.viaAlert) {
+            val left = LockState.alertUntil - SystemClock.elapsedRealtime()
+            if (left > 0) delay(left)
+            if (LockState.viaAlert) { LockState.unlocked = false; LockState.viaAlert = false }
+        }
+    }
 
     val owner = LocalLifecycleOwner.current
     DisposableEffect(owner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_STOP -> { LockState.stoppedAt = SystemClock.elapsedRealtime(); resumed = false }
+                Lifecycle.Event.ON_STOP -> { LockState.stoppedAt = SystemClock.elapsedRealtime(); resumed = false; if (LockState.viaAlert) LockState.leftAfterAlert = true }
                 Lifecycle.Event.ON_START -> {
                     enabled = AppLockPrefs.isEnabled(context)
                     available = AppLock.available(context)
+                    if (LockState.leftAfterAlert) { LockState.unlocked = false; LockState.viaAlert = false; LockState.leftAfterAlert = false }
                     if (LockState.unlocked && LockState.stoppedAt > 0 && SystemClock.elapsedRealtime() - LockState.stoppedAt > LockState.GRACE_MS) LockState.unlocked = false
                 }
                 Lifecycle.Event.ON_RESUME -> resumed = true
@@ -146,7 +168,7 @@ fun AppLockGate(bypass: Boolean, content: @Composable () -> Unit) {
         message = null
         AppLock.prompt(
             a,
-            onSuccess = { asking = false; LockState.unlocked = true },
+            onSuccess = { asking = false; LockState.unlocked = true; LockState.viaAlert = false },
             onFailure = { code, text ->
                 asking = false
                 when (code) {
@@ -174,8 +196,9 @@ fun AppLockGate(bypass: Boolean, content: @Composable () -> Unit) {
             ) {
                 if (mustAsk) {
                     Column(Modifier.padding(horizontal = 32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                        Image(painterResource(R.drawable.yegan_logo), null, modifier = Modifier.size(120.dp))
-                        Text("محیط‌یار", style = MaterialTheme.typography.headlineSmall, color = MColors.Ink, modifier = Modifier.padding(top = 16.dp))
+                        // the app's own badge (it has its own empty margin, so it is drawn larger than it looks)
+                        Image(painterResource(R.drawable.ic_launcher_foreground), null, modifier = Modifier.size(200.dp))
+                        Text("محیط‌یار", style = MaterialTheme.typography.headlineSmall, color = MColors.Ink, modifier = Modifier.padding(top = 0.dp))
                         Text(
                             "برنامه قفل است. با اثر انگشت، چهره یا الگو و رمز گوشی وارد شوید.",
                             style = MaterialTheme.typography.bodyMedium, color = MColors.Muted, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp),

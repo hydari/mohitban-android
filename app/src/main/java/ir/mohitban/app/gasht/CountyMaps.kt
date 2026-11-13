@@ -19,7 +19,11 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /** One county's ready-made topographic map, as listed in the app (assets/geo/maps.json). */
-data class CountyMap(val name: String, val province: String, val file: String, val size: Long, val bounds: DoubleArray) {
+data class CountyMap(
+    val name: String, val province: String, val file: String, val size: Long, val bounds: DoubleArray,
+    /** SHA-256 (hex) of the file as downloaded; when the registry lists it, a download that differs is refused. */
+    val sha256: String = "",
+) {
     val title: String get() = "شهرستان $name"
     fun contains(p: GeoPoint) = p.lon in bounds[0]..bounds[2] && p.lat in bounds[1]..bounds[3]
 }
@@ -35,7 +39,7 @@ object CountyMaps {
             (0 until (arr?.length() ?: 0)).map { i ->
                 val o = arr!!.getJSONObject(i)
                 val b = o.getJSONArray("bounds")
-                CountyMap(o.getString("name"), o.optString("province"), o.getString("file"), o.optLong("size"), DoubleArray(4) { b.getDouble(it) })
+                CountyMap(o.getString("name"), o.optString("province"), o.getString("file"), o.optLong("size"), DoubleArray(4) { b.getDouble(it) }, o.optString("sha256"))
             }
         }.getOrDefault(emptyList())
         cache = list
@@ -75,8 +79,9 @@ object MapDownloader {
     /** The map files live only on the department's own site (served to this app alone). */
     val SOURCES = listOf("https://muhitban.ir/app/maps/")
 
-    // the host answers only requests that carry this app's access token, and the files are
-    // encrypted: a copied file is useless outside the app
+    // NOTE: these four values are inside the APK of a public repository, so anyone can read them. They only
+    // keep casual downloaders away; they are not a secret. Real protection needs the server to authenticate
+    // each user (a token per ranger that it can revoke), which the app alone cannot provide.
     private val K1 = byteArrayOf(102, 22, 21, 28, -98, -56, 57, 56, -57, 104, -122, 111, -83, 35, -109, 32, 34, 1, -40, -28, 58, 58, 37, 127, -106, 30, 23, -88, -16, 83, -36, -37)
     private val K2 = byteArrayOf(-13, -27, -74, 44, -36, -117, 99, -19, -124, -54, -42, -13, -5, -80, 72, -98, 114, -50, 62, 54, -47, -79, 26, 100, 11, -58, -102, -2, 99, -30, 22, 108)
     private val T1 = byteArrayOf(-54, -69, 90, 107, -92, -66, 47, -63, -119, 52, 26, -72, 44, 47, -15, -117, -25, -78, 26, -36, 41, -8, -61, 41, 99, 117, 33, -73, -13, 36, -79, 93, -89, 117, 15, -77)
@@ -84,6 +89,19 @@ object MapDownloader {
 
     private fun join(a: ByteArray, b: ByteArray) = ByteArray(a.size) { (a[it].toInt() xor b[it].toInt()).toByte() }
     private val token: String get() = String(join(T1, T2), Charsets.US_ASCII)
+
+    private fun sha256Hex(f: File): String {
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        f.inputStream().buffered().use { input ->
+            val buf = ByteArray(1 shl 16)
+            while (true) {
+                val k = input.read(buf)
+                if (k < 0) break
+                md.update(buf, 0, k)
+            }
+        }
+        return md.digest().joinToString("") { String.format(java.util.Locale.US, "%02x", it) }
+    }
 
     /** File layout: "MHYM1" + 16-byte IV + AES-256-CTR of the MBTiles file. */
     private fun decrypt(src: File, dst: File) {
@@ -250,6 +268,8 @@ object MapDownloader {
             if (part.length() != total) error("size")
             if (failure == null && received() != total) error("size")
             seg.delete()
+            // the registry can pin the exact bytes: a file that differs (damaged or swapped on the way) is thrown away
+            if (m.sha256.isNotBlank() && !sha256Hex(part).equals(m.sha256.trim(), ignoreCase = true)) { part.delete(); error("invalid") }
             // decrypt next to the target, check it really is a map, then put it in place
             val plain = File(target.parentFile, m.file + ".tmp")
             runCatching { decrypt(part, plain) }.onFailure { plain.delete(); part.delete(); error("invalid") }

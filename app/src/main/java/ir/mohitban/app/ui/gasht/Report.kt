@@ -73,7 +73,7 @@ fun destination(from: GeoPoint, bearing: Double, meters: Double): GeoPoint {
 private fun mapLink(p: GeoPoint) = "https://maps.google.com/?q=${String.format(java.util.Locale.US, "%.6f,%.6f", p.lat, p.lon)}"
 
 /** The readable text plus the Mohityar line that opens a colleague's app on the place. */
-fun reportMessage(kind: SosKind, profile: RangerProfile?, fix: Fix, target: GeoPoint?, note: String): String {
+fun reportMessage(kind: SosKind, profile: RangerProfile?, fix: Fix, target: GeoPoint?, note: String, teamCode: String = ""): String {
     val name = profile?.fullName.orEmpty()
     val readable = if (target == null) {
         positionMessage(kind.smsTitle, name, fix)
@@ -91,7 +91,7 @@ fun reportMessage(kind: SosKind, profile: RangerProfile?, fix: Fix, target: GeoP
         append(readable)
         if (note.isNotBlank()) append("\nتوضیح: ${note.trim()}")
         append("\n\nکد محیط‌یار:\n")
-        append(SosCodec.line(kind, name, profile?.grade.orEmpty(), profile?.station.orEmpty(), fix, target, note))
+        append(SosCodec.line(kind, name, profile?.grade.orEmpty(), profile?.station.orEmpty(), fix, target, note, teamCode))
     }
 }
 
@@ -222,7 +222,7 @@ fun ReportDialog(
             ir.mohitban.app.ui.components.DialogActions("ارسال پیامک", onOk = {
                 val f = fix ?: return@DialogActions
                 val t = if (kind == SosKind.HELP) null else target
-                openSms(context, numbers, reportMessage(kind, profile, f, t, note))
+                openSms(context, numbers, reportMessage(kind, profile, f, t, note, ir.mohitban.app.gasht.SosTeam.code(context)))
                 // the reported place is kept on the ranger's own map as well
                 if (kind != SosKind.HELP) {
                     val p = t ?: f.point

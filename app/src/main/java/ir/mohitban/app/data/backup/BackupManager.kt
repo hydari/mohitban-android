@@ -28,9 +28,13 @@ class BackupManager(
     private companion object {
         const val DATA = "data.json"
         const val FORMAT = 1
+        /** The data file and everything together may not be bigger than this when unpacked. */
+        const val LIMIT_DATA = 64L * 1024 * 1024
+        const val LIMIT_TOTAL = 1024L * 1024 * 1024
     }
 
-    suspend fun export(target: Uri) {
+    /** [password]: when given, the whole file is encrypted with it (see [BackupCrypto]). */
+    suspend fun export(target: Uri, password: String? = null) {
         val json = JSONObject()
         json.put("format", FORMAT)
         json.put("app", "mohitban")
@@ -73,8 +77,9 @@ class BackupManager(
             }
         })
 
-        val out = context.contentResolver.openOutputStream(target) ?: error("cannot open target")
-        ZipOutputStream(out.buffered()).use { zip ->
+        val raw = context.contentResolver.openOutputStream(target) ?: error("cannot open target")
+        val out = if (password.isNullOrEmpty()) raw.buffered() else BackupCrypto.encrypt(raw.buffered(), password)
+        ZipOutputStream(out).use { zip ->
             zip.putNextEntry(ZipEntry(DATA))
             zip.write(json.toString().toByteArray(Charsets.UTF_8))
             zip.closeEntry()
@@ -86,20 +91,64 @@ class BackupManager(
         }
     }
 
-    suspend fun restore(source: Uri) {
+    /** True when the file at [source] is a password-protected backup. */
+    fun isEncrypted(source: Uri): Boolean {
+        val input = context.contentResolver.openInputStream(source) ?: return false
+        return input.use { ins ->
+            val head = ByteArray(BackupCrypto.headerProbeSize)
+            var got = 0
+            while (got < head.size) {
+                val r = ins.read(head, got, head.size - got)
+                if (r < 0) break
+                got += r
+            }
+            got == head.size && BackupCrypto.looksEncrypted(head)
+        }
+    }
+
+    /** True when [password] opens the protected file at [source] (its first block is read and checked). */
+    fun passwordWorks(source: Uri, password: String): Boolean = runCatching {
+        val input = context.contentResolver.openInputStream(source) ?: return false
+        BackupCrypto.open(input.buffered(), password).use { it.read() }
+        true
+    }.getOrDefault(false)
+
+    /** Copies at most [cap] bytes; a file that claims to be bigger (a zip bomb) is refused. */
+    private fun java.io.InputStream.copyCapped(out: java.io.OutputStream, cap: Long): Long {
+        val buf = ByteArray(8192)
+        var total = 0L
+        while (true) {
+            val r = read(buf)
+            if (r < 0) break
+            total += r
+            if (total > cap) error("backup too large")
+            out.write(buf, 0, r)
+        }
+        return total
+    }
+
+    suspend fun restore(source: Uri, password: String? = null) {
         val staging = File(context.cacheDir, "restore").apply { deleteRecursively(); mkdirs() }
         var data: String? = null
         val input = context.contentResolver.openInputStream(source) ?: error("cannot open source")
-        ZipInputStream(input.buffered()).use { zip ->
+        var total = 0L
+        ZipInputStream(BackupCrypto.open(input.buffered(), password)).use { zip ->
             while (true) {
                 val e = zip.nextEntry ?: break
                 val name = e.name
                 when {
                     e.isDirectory -> Unit
-                    name == DATA -> data = zip.readBytes().toString(Charsets.UTF_8)
+                    name == DATA -> {
+                        val bytes = java.io.ByteArrayOutputStream()
+                        total += zip.copyCapped(bytes, LIMIT_DATA)
+                        data = bytes.toString("UTF-8")
+                    }
                     name.startsWith("${FileStore.MEDIA}/") && !name.contains("..") -> {
-                        val f = File(staging, name.substringAfterLast('/'))
-                        f.outputStream().use { zip.copyTo(it) }
+                        val leaf = name.substringAfterLast('/')
+                        if (leaf.isNotBlank() && !leaf.startsWith(".")) {
+                            val f = File(staging, leaf)
+                            f.outputStream().use { total += zip.copyCapped(it, LIMIT_TOTAL - total) }
+                        }
                     }
                 }
                 zip.closeEntry()
@@ -117,6 +166,12 @@ class BackupManager(
         val places = json.optJSONArray("waypoints")
         val patrols = json.optJSONArray("patrols")
 
+        // the new pictures are copied next to the old ones first, so nothing is lost if anything fails from here on
+        val root = files.mediaRoot()
+        val incoming = File(root.parentFile, root.name + ".new").apply { deleteRecursively(); mkdirs() }
+        val previous = File(root.parentFile, root.name + ".old")
+        try {
+        staging.listFiles()?.forEach { it.copyTo(File(incoming, it.name), overwrite = true) }
         db.withTransaction {
             db.fuelEntryDao().clear()
             db.profileDao().clear()
@@ -177,11 +232,20 @@ class BackupManager(
                 })
             }
         }
+        } catch (e: Exception) { incoming.deleteRecursively(); throw e }
         // track statistics are derived; recompute after restore
         if (tracks != null) db.gashtDao().getTracks().forEach { ir.mohitban.app.gasht.GashtRepository(db, files).refreshStats(it.id) }
-        // replace pictures
-        files.allMedia().forEach { it.delete() }
-        staging.listFiles()?.forEach { it.copyTo(File(files.mediaRoot(), it.name), overwrite = true) }
+        // swap the picture folders; the old one is kept until the new one is in place
+        previous.deleteRecursively()
+        if (root.renameTo(previous)) {
+            if (!incoming.renameTo(root)) { previous.renameTo(root); incoming.deleteRecursively(); error("pictures could not be replaced") }
+            previous.deleteRecursively()
+        } else {
+            // the folder could not be moved: replace the files one by one instead
+            files.allMedia().forEach { it.delete() }
+            incoming.listFiles()?.forEach { it.copyTo(File(files.mediaRoot(), it.name), overwrite = true) }
+            incoming.deleteRecursively()
+        }
         staging.deleteRecursively()
     }
 

@@ -114,6 +114,12 @@ class GashtService : Service() {
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    override fun onCreate() {
+        super.onCreate()
+        // the protected-area boundaries are parsed once; do it here, not on the main thread at the first fix
+        scope.launch(Dispatchers.IO) { runCatching { ZoneStore.load(this@GashtService) } }
+    }
     private var gpsJob: Job? = null
     private var lastAlarmAt = 0L
     private var starting = false

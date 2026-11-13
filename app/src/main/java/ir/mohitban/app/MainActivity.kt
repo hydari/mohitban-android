@@ -19,7 +19,7 @@ class MainActivity : FragmentActivity() {
     private val openShiftRequest = mutableIntStateOf(0)
     private val openGashtRequest = mutableIntStateOf(0)
     /** A colleague's emergency must open at once, so it skips the app lock. */
-    private val skipLock = mutableStateOf(false)
+    private val skipLock = mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -27,7 +27,7 @@ class MainActivity : FragmentActivity() {
         handle(intent)
         setContent {
             MohitbanTheme {
-                AppLockGate(bypass = skipLock.value) {
+                AppLockGate(bypass = skipLock.intValue) {
                     AppNavHost(openReportsRequest = openReportsRequest.intValue, openShiftRequest = openShiftRequest.intValue, openGashtRequest = openGashtRequest.intValue)
                 }
             }
@@ -45,8 +45,12 @@ class MainActivity : FragmentActivity() {
             ir.mohitban.app.reminder.ShiftReminder.OPEN_SHIFT -> openShiftRequest.intValue += 1
             ir.mohitban.app.gasht.GashtService.OPEN_GASHT -> openGashtRequest.intValue += 1
             ir.mohitban.app.gasht.SosNotifier.OPEN_SOS -> {
-                // a colleague's emergency: show over the lock screen and wake the display
-                skipLock.value = true
+                // a colleague's emergency: show over the lock screen and wake the display. The app lock is skipped only
+                // for an alert that really arrived by SMS (not for any app that sends this extra) and passed the team-code check.
+                val sosId = intent.getLongExtra(ir.mohitban.app.gasht.SosNotifier.EXTRA_ID, 0L)
+                if (ir.mohitban.app.gasht.SosStore.get(this, sosId)
+                        ?.let { it.verified && System.currentTimeMillis() - it.receivedAt < 15 * 60_000L } == true
+                ) skipLock.intValue++ // a counter, so every new real alert asks the gate again
                 if (android.os.Build.VERSION.SDK_INT >= 27) { setShowWhenLocked(true); setTurnScreenOn(true) }
                 else @Suppress("DEPRECATION") window.addFlags(
                     android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or

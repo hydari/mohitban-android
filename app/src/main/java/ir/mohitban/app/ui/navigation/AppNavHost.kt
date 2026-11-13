@@ -75,6 +75,7 @@ object Routes {
     const val GASHT = "gasht"
     const val VEHICLE = "vehicle/{id}"
     const val SOS = "sos/{id}"
+    const val HELP = "help"
 
     fun fuel(id: Long = 0L) = "fuel?entryId=$id"
     fun crop(path: String) = "crop?path=${Uri.encode(path)}"
@@ -211,12 +212,16 @@ fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0, openGasht
         composable(Routes.REPORTS) {
             ir.mohitban.app.ui.report.ReportsHub(onTab = { nav.openTab(it) }, onEdit = { nav.navigate(Routes.fuel(it)) })
         }
+        composable(Routes.HELP) {
+            ir.mohitban.app.ui.settings.HelpScreen(onBack = { nav.popBackStack() })
+        }
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 onEditProfile = { nav.navigate(Routes.EDIT_PROFILE) },
                 onEditVehicle = { nav.navigate(Routes.VEHICLES) },
                 onTab = { nav.openTab(it) },
                 onBack = null,
+                onHelp = { nav.navigate(Routes.HELP) },
                 onRestored = {
                     nav.navigate(Routes.START) { popUpTo(nav.graph.id) { inclusive = true } }
                 },

@@ -22,7 +22,13 @@ import ir.mohitban.app.reminder.ReportReminder
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.json.JSONArray
 import org.json.JSONObject
+import java.security.MessageDigest
 import java.util.Locale
+import javax.crypto.Mac
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.PBEKeySpec
+import javax.crypto.spec.SecretKeySpec
+import kotlin.math.abs
 
 /** What an emergency SMS reports. */
 enum class SosKind(val code: Int, val title: String, val smsTitle: String, val color: Long, val target: String, val done: String) {
@@ -51,6 +57,8 @@ data class SosAlert(
     val note: String = "",
     /** when it was marked found / dealt with */
     val resolvedAt: Long? = null,
+    /** False when the team has a code and this message did not carry a valid signature (it may be forged). */
+    val verified: Boolean = true,
 ) {
     /** The place to go to. */
     val focus: GeoPoint get() = target ?: point
@@ -59,33 +67,61 @@ data class SosAlert(
 /**
  * The emergency SMS carries one machine line besides the readable text, so a colleague's phone
  * with Mohityar can open the app on the exact place:
- *   MHY2|kind|lat|lon|accuracy|unix seconds|name|grade|station|target lat|target lon|note
+ *   MHY2|kind|lat|lon|accuracy|unix seconds|name|grade|station|target lat|target lon|note|signature
  * (MHY1, without kind/target/note, is still read).
+ * The signature (12 hex characters of an HMAC-SHA256 keyed by the code the team shares) is added when a
+ * team code is set; a receiver with a team code treats a message without a valid, recent signature as
+ * unverified, because anybody who knows the format could otherwise send a false alarm.
  * Phones without the app just see the text and the map link.
  */
 object SosCodec {
     private const val TAG1 = "MHY1|"
     private const val TAG2 = "MHY2|"
+    private const val SIG_LEN = 12
+    private const val FIELDS_BEFORE_SIG = 11
+
+    /** A signed message older than this is refused, so a recorded message cannot be replayed later. */
+    private const val MAX_AGE_MS = 48 * 3_600_000L
+    private val SALT = "mohityar-sos-v1".toByteArray(Charsets.UTF_8)
+    private val keys = java.util.concurrent.ConcurrentHashMap<String, ByteArray>()
 
     private fun clean(s: String, max: Int = 40) = s.replace('|', ' ').replace('\n', ' ').trim().take(max)
     private fun c(v: Double) = String.format(Locale.US, "%.5f", v)
 
-    fun line(kind: SosKind, name: String, grade: String, station: String, f: Fix, target: GeoPoint?, note: String): String = TAG2 + listOf(
-        kind.code.toString(), c(f.point.lat), c(f.point.lon),
-        f.accuracy?.toInt()?.toString().orEmpty(),
-        (f.time / 1000).toString(),
-        clean(name), clean(grade), clean(station),
-        target?.let { c(it.lat) }.orEmpty(), target?.let { c(it.lon) }.orEmpty(),
-        clean(note, 80),
-    ).joinToString("|")
+    private fun key(code: String): ByteArray = keys.getOrPut(code) {
+        val spec = PBEKeySpec(code.toCharArray(), SALT, 60_000, 256)
+        try { SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1").generateSecret(spec).encoded } finally { spec.clearPassword() }
+    }
+
+    /** The first 12 hex characters of HMAC-SHA256 over [payload], keyed by the team code. */
+    fun sign(payload: String, teamCode: String): String {
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(key(teamCode.trim()), "HmacSHA256"))
+        return mac.doFinal(payload.toByteArray(Charsets.UTF_8)).take(SIG_LEN / 2).joinToString("") { String.format(Locale.US, "%02x", it) }
+    }
+
+    fun line(
+        kind: SosKind, name: String, grade: String, station: String, f: Fix, target: GeoPoint?, note: String, teamCode: String = "",
+    ): String {
+        val payload = TAG2 + listOf(
+            kind.code.toString(), c(f.point.lat), c(f.point.lon),
+            f.accuracy?.toInt()?.toString().orEmpty(),
+            (f.time / 1000).toString(),
+            clean(name), clean(grade), clean(station),
+            target?.let { c(it.lat) }.orEmpty(), target?.let { c(it.lon) }.orEmpty(),
+            clean(note, 80),
+        ).joinToString("|")
+        return if (teamCode.isBlank()) payload else payload + "|" + sign(payload, teamCode)
+    }
 
     private fun ok(lat: Double, lon: Double) = lat in -90.0..90.0 && lon in -180.0..180.0
 
-    fun decode(body: String, from: String, receivedAt: Long): SosAlert? {
+    fun decode(body: String, from: String, receivedAt: Long, teamCode: String = ""): SosAlert? {
         val v2 = body.indexOf(TAG2)
         val v1 = body.indexOf(TAG1)
         val start = if (v2 >= 0) v2 + TAG2.length else if (v1 >= 0) v1 + TAG1.length else return null
-        var parts = body.substring(start).lineSequence().first().split('|').map { it.trim() }
+        val all = body.substring(start).lineSequence().first().split('|').map { it.trim() }
+        var parts = all
         val kind = if (v2 >= 0) SosKind.of(parts.firstOrNull()?.toIntOrNull() ?: 0).also { parts = parts.drop(1) } else SosKind.HELP
         if (parts.size < 4) return null
         val lat = parts[0].toDoubleOrNull() ?: return null
@@ -94,13 +130,33 @@ object SosCodec {
         val sent = parts.getOrNull(3)?.toLongOrNull()?.times(1000) ?: receivedAt
         val tLat = parts.getOrNull(7)?.toDoubleOrNull()
         val tLon = parts.getOrNull(8)?.toDoubleOrNull()
+
+        var verified = true
+        if (teamCode.isNotBlank()) {
+            val sig = all.getOrNull(FIELDS_BEFORE_SIG)?.lowercase()
+            verified = v2 >= 0 && sig != null && sig.length == SIG_LEN &&
+                MessageDigest.isEqual(sig.toByteArray(Charsets.UTF_8), sign(TAG2 + all.take(FIELDS_BEFORE_SIG).joinToString("|"), teamCode).toByteArray(Charsets.UTF_8)) &&
+                abs(receivedAt - sent) <= MAX_AGE_MS
+        }
         return SosAlert(
             id = receivedAt, from = from,
             name = parts.getOrNull(4).orEmpty(), grade = parts.getOrNull(5).orEmpty(), station = parts.getOrNull(6).orEmpty(),
             point = GeoPoint(lat, lon), accuracy = parts[2].toIntOrNull(), sentAt = sent, receivedAt = receivedAt,
             kind = kind, target = if (tLat != null && tLon != null && ok(tLat, tLon)) GeoPoint(tLat, tLon) else null,
-            note = parts.getOrNull(9).orEmpty(),
+            note = parts.getOrNull(9).orEmpty(), verified = verified,
         )
+    }
+}
+
+/** The code the team shares, so that a real emergency message can be told from a forged one. */
+object SosTeam {
+    private const val PREFS = "sos_team"
+    private const val KEY = "code"
+    const val MIN_LENGTH = 6
+
+    fun code(context: Context): String = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, "").orEmpty()
+    fun setCode(context: Context, code: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, code.trim()).apply()
     }
 }
 
@@ -114,7 +170,7 @@ object SosStore {
     private fun toJson(a: SosAlert) = JSONObject().apply {
         put("id", a.id); put("from", a.from); put("name", a.name); put("grade", a.grade); put("station", a.station)
         put("lat", a.point.lat); put("lon", a.point.lon); a.accuracy?.let { put("acc", it) }; put("sent", a.sentAt); put("recv", a.receivedAt)
-        put("kind", a.kind.code); a.target?.let { put("tlat", it.lat); put("tlon", it.lon) }; put("note", a.note); a.resolvedAt?.let { put("done", it) }
+        put("kind", a.kind.code); a.target?.let { put("tlat", it.lat); put("tlon", it.lon) }; put("note", a.note); a.resolvedAt?.let { put("done", it) }; put("ver", a.verified)
     }
 
     private fun fromJson(o: JSONObject) = SosAlert(
@@ -124,6 +180,7 @@ object SosStore {
         target = if (o.has("tlat") && o.has("tlon")) GeoPoint(o.getDouble("tlat"), o.getDouble("tlon")) else null,
         note = o.optString("note"),
         resolvedAt = if (o.has("done")) o.optLong("done") else null,
+        verified = o.optBoolean("ver", true),
     )
 
     fun all(context: Context): List<SosAlert> = runCatching {
@@ -153,7 +210,11 @@ object SosStore {
 
     /** Open alerts of the last two days (shown on the Gasht map). */
     fun active(context: Context): List<SosAlert> =
-        all(context).filter { it.resolvedAt == null && System.currentTimeMillis() - it.receivedAt < 48 * 3_600_000L }
+        all(context).filter { it.verified && it.resolvedAt == null && System.currentTimeMillis() - it.receivedAt < 48 * 3_600_000L }
+
+    /** The same message again (a replay, or a doubled delivery). */
+    fun isDuplicate(context: Context, a: SosAlert): Boolean =
+        all(context).any { it.sentAt == a.sentAt && it.kind == a.kind && it.point == a.point }
 
     /** Bumped on every change, so screens can reload. */
     val version = MutableStateFlow(0)
@@ -170,7 +231,8 @@ class SosReceiver : BroadcastReceiver() {
         // the parts of a long message arrive together; join them per sender
         msgs.filterNotNull().groupBy { it.originatingAddress.orEmpty() }.forEach { (from, parts) ->
             val body = parts.joinToString("") { it.messageBody.orEmpty() }
-            val alert = SosCodec.decode(body, from, System.currentTimeMillis()) ?: return@forEach
+            val alert = SosCodec.decode(body, from, System.currentTimeMillis(), SosTeam.code(context)) ?: return@forEach
+            if (SosStore.isDuplicate(context, alert)) return@forEach
             SosStore.add(context, alert)
             SosNotifier.show(context, alert)
         }
@@ -179,6 +241,7 @@ class SosReceiver : BroadcastReceiver() {
 
 object SosNotifier {
     private const val CHANNEL_ID = "sos_alarm"
+    private const val CHANNEL_UNVERIFIED = "sos_unverified"
     const val OPEN_SOS = "open_sos"
     const val EXTRA_ID = "sos_id"
 
@@ -197,6 +260,11 @@ object SosNotifier {
             )
         }
         context.getSystemService(NotificationManager::class.java)?.createNotificationChannel(ch)
+        context.getSystemService(NotificationManager::class.java)?.createNotificationChannel(
+            NotificationChannel(CHANNEL_UNVERIFIED, "پیامک اضطراری تأییدنشده", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "پیامکی که شبیه هشدار اضطراری است ولی با کد تیم شما تأیید نشد"
+            },
+        )
     }
 
     fun openIntent(context: Context, id: Long): Intent = Intent(context, MainActivity::class.java).apply {
@@ -211,6 +279,20 @@ object SosNotifier {
     fun show(context: Context, a: SosAlert) {
         channel(context)
         val pi = PendingIntent.getActivity(context, notificationId(a.id), openIntent(context, a.id), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        if (!a.verified) {
+            // no alarm, no full-screen: it may be forged. It stays in the list so a real message from a colleague whose code differs is not lost.
+            val warn = "از ${a.from}؛ با کد تیم شما تأیید نشد و ممکن است جعلی باشد. قبل از اقدام با فرستنده تماس بگیرید."
+            val quiet = NotificationCompat.Builder(context, CHANNEL_UNVERIFIED)
+                .setSmallIcon(R.drawable.ic_stat_leaf)
+                .setContentTitle("پیامک اضطراری تأییدنشده")
+                .setContentText(warn)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(warn))
+                .setAutoCancel(true)
+                .setContentIntent(pi)
+                .build()
+            runCatching { NotificationManagerCompat.from(context).notify(notificationId(a.id), quiet) }
+            return
+        }
         val who = a.name.ifBlank { a.from }
         val text = when (a.kind) {
             SosKind.HELP -> "$who نیاز به کمک دارد. برای دیدن محل او روی نقشه بزنید."

@@ -64,7 +64,7 @@ object WeatherService {
             "&timezone=auto&forecast_days=5&wind_speed_unit=kmh"
 
     private fun sources(p: GeoPoint): List<String> {
-        val ll = String.format(Locale.US, "latitude=%.4f&longitude=%.4f", p.lat, p.lon)
+        val ll = String.format(Locale.US, "latitude=%.2f&longitude=%.2f", p.lat, p.lon) // ~1 km: enough for a forecast, not a ranger's exact spot
         return listOf(
             "https://api.open-meteo.com/v1/forecast?$ll&$FIELDS",
             "https://muhitban.ir/app/weather.php?$ll",

@@ -22,10 +22,20 @@ class FileStore(private val context: Context) {
     private val mediaDir: File get() = File(context.filesDir, MEDIA).apply { mkdirs() }
     val cacheDir: File get() = File(context.cacheDir, "out").apply { mkdirs() }
 
+    /**
+     * Turns a stored path into a file, but only inside the app's own media folder. A path such as
+     * "../databases/mohitban.db" or any absolute path elsewhere (it could come from a tampered backup)
+     * gives null, so it can be neither shown nor deleted.
+     */
+    private fun safeFile(path: String): File? = runCatching {
+        val root = mediaDir.canonicalFile
+        val f = (if (path.startsWith("/")) File(path) else File(context.filesDir, path)).canonicalFile
+        f.takeIf { it.path.startsWith(root.path + File.separator) }
+    }.getOrNull()
+
     fun resolve(path: String?): File? {
         if (path.isNullOrBlank()) return null
-        val f = if (path.startsWith("/")) File(path) else File(context.filesDir, path)
-        return f.takeIf { it.exists() }
+        return safeFile(path)?.takeIf { it.exists() }
     }
 
     private fun relative(file: File): String = "$MEDIA/${file.name}"
@@ -78,8 +88,7 @@ class FileStore(private val context: Context) {
 
     fun delete(path: String?) {
         if (path.isNullOrBlank()) return
-        val f = if (path.startsWith("/")) File(path) else File(context.filesDir, path)
-        runCatching { f.delete() }
+        safeFile(path)?.let { f -> runCatching { f.delete() } }
     }
 
     fun uriFor(file: File): Uri =

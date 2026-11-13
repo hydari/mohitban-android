@@ -49,9 +49,15 @@ import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.Icon
+import ir.mohitban.app.ui.components.safeBottomInsets
 import ir.mohitban.app.ui.components.safeBottomPadding
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.material.icons.outlined.Timeline
+import androidx.compose.material.icons.outlined.Build
+import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.MyLocation
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -119,6 +125,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import ir.mohitban.app.ui.components.clay
 import ir.mohitban.app.ui.components.clayInset
@@ -208,6 +215,9 @@ class GashtViewModel(private val c: AppContainer) : ViewModel() {
     /** County suggestions the ranger closed with «بعداً» (until the screen is left). */
     var dismissedMaps by mutableStateOf(setOf<String>())
 
+    /** One map load at a time: a quick second request (a download finishing during start-up) waits for the first. */
+    private val mapLock = kotlinx.coroutines.sync.Mutex()
+
     init {
         loadMaps(ir.mohitban.app.gasht.MapStore.active(ctx), goTo = false)
         // a county map that finished downloading joins the others and the view moves to it
@@ -231,24 +241,28 @@ class GashtViewModel(private val c: AppContainer) : ViewModel() {
 
     /** Opens every map file on the phone together; [focus] is the one to take the view to when [goTo]. */
     private fun loadMaps(focus: java.io.File?, goTo: Boolean) {
-        viewModelScope.launch {
-            val old = mapSet
-            val opened = withContext(Dispatchers.IO) {
-                val files = ir.mohitban.app.gasht.MapStore.list(ctx)
-                val list = files.mapNotNull { f -> runCatching { ir.mohitban.app.gasht.OfflineMap(f) }.getOrNull() }
-                Triple(files, list, list.flatMap { it.labels() })
-            }
-            val (files, list, names) = opened
-            maps = files
-            val set = if (list.isEmpty()) null else ir.mohitban.app.gasht.MapSet(list)
-            mapSet = set
-            labels = names
-            background = set?.let { TileBackground(it, viewModelScope) } ?: GridBackground
-            activeMap = list.firstOrNull { it.file.path == focus?.path } ?: list.firstOrNull()
-            ir.mohitban.app.gasht.MapStore.setActive(ctx, activeMap?.file)
-            if (goTo) goToMap(activeMap)
-            if (old != null && old !== set) withContext(Dispatchers.IO) { runCatching { old.close() } }
+        viewModelScope.launch { mapLock.withLock { reloadMaps(focus, goTo) } }
+    }
+
+    private suspend fun reloadMaps(focus: java.io.File?, goTo: Boolean) {
+        val old = mapSet
+        val opened = withContext(Dispatchers.IO) {
+            val files = ir.mohitban.app.gasht.MapStore.list(ctx)
+            val list = files.mapNotNull { f -> runCatching { ir.mohitban.app.gasht.OfflineMap(f) }.getOrNull() }
+            // counties that touch each other repeat the places along their common border
+            val names = list.flatMap { it.labels() }.distinctBy { Triple(it.name, Math.round(it.point.lat * 1000), Math.round(it.point.lon * 1000)) }
+            Triple(files, list, names)
         }
+        val (files, list, names) = opened
+        maps = files
+        val set = if (list.isEmpty()) null else ir.mohitban.app.gasht.MapSet(list)
+        mapSet = set
+        labels = names
+        background = set?.let { TileBackground(it, viewModelScope) } ?: GridBackground
+        activeMap = list.firstOrNull { it.file.path == focus?.path } ?: list.firstOrNull()
+        ir.mohitban.app.gasht.MapStore.setActive(ctx, activeMap?.file)
+        if (goTo) goToMap(activeMap)
+        if (old != null && old !== set) withContext(Dispatchers.IO) { runCatching { old.close() } }
     }
 
     private fun goToMap(m: ir.mohitban.app.gasht.OfflineMap?) {
@@ -286,13 +300,15 @@ class GashtViewModel(private val c: AppContainer) : ViewModel() {
 
     fun deleteMap(file: java.io.File) {
         viewModelScope.launch {
-            val keep = activeMap?.file?.takeIf { it.path != file.path }
-            // the old set is released before the file goes, then the rest are opened again
-            val old = mapSet
-            mapSet = null; activeMap = null; background = GridBackground
-            withContext(Dispatchers.IO) { runCatching { old?.close() }; ir.mohitban.app.gasht.MapStore.delete(ctx, file) }
-            maps = ir.mohitban.app.gasht.MapStore.list(ctx)
-            loadMaps(keep, goTo = false)
+            mapLock.withLock {
+                val keep = activeMap?.file?.takeIf { it.path != file.path }
+                // the old set is released before the file goes, then the rest are opened again
+                val old = mapSet
+                mapSet = null; activeMap = null; background = GridBackground
+                withContext(Dispatchers.IO) { runCatching { old?.close() }; ir.mohitban.app.gasht.MapStore.delete(ctx, file) }
+                maps = ir.mohitban.app.gasht.MapStore.list(ctx)
+                reloadMaps(keep, goTo = false)
+            }
         }
     }
 
@@ -448,7 +464,13 @@ fun GashtScreen(onTab: (ir.mohitban.app.ui.components.MainTab) -> Unit) {
     }
     LaunchedEffect(Unit) { if (!permitted) requestPermission() }
     Box(Modifier.fillMaxSize().background(MColors.Bg)) {
-    Column(Modifier.fillMaxSize().padding(bottom = 88.dp).safeBottomPadding()) {
+    if (vm.tab == 0) {
+        // the map fills the whole screen; its panels float over it
+        MapTab(
+            vm, onAllow = { requestPermission() },
+            onSettings = { runCatching { context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))) } },
+        )
+    } else Column(Modifier.fillMaxSize().padding(bottom = 88.dp).safeBottomPadding()) {
         TopBar("گشت‌یار", onBack = null)
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf("نقشه", "مسیرها", "نقاط", "ابزارها").forEachIndexed { i, t ->
@@ -472,7 +494,6 @@ fun GashtScreen(onTab: (ir.mohitban.app.ui.components.MainTab) -> Unit) {
             })
         }
         when (vm.tab) {
-            0 -> MapTab(vm)
             1 -> TracksTab(vm)
             2 -> PlacesTab(vm)
             else -> ToolsTab(vm)
@@ -505,7 +526,7 @@ private fun PermissionCard(onAllow: () -> Unit, onSettings: () -> Unit) {
 // ============================================================================ map tab
 
 @Composable
-private fun MapTab(vm: GashtViewModel) {
+private fun MapTab(vm: GashtViewModel, onAllow: () -> Unit, onSettings: () -> Unit) {
     val context = LocalContext.current
     val fix by vm.fix.collectAsStateWithLifecycle()
     val sats by vm.satellites.collectAsStateWithLifecycle()
@@ -528,7 +549,52 @@ private fun MapTab(vm: GashtViewModel) {
     val sosVer by ir.mohitban.app.gasht.SosStore.version.collectAsStateWithLifecycle()
     val sosAlerts = remember(sosVer) { ir.mohitban.app.gasht.SosStore.active(context) }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+    val permitted by vm.hasPermission.collectAsStateWithLifecycle()
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    var topPx by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    var bottomPx by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    // the app's bottom bar (Home / Gasht / Reports / Settings) sits under the map's lower edge
+    val barSpace = 88.dp + with(density) { safeBottomInsets().getBottom(density).toDp() }
+
+    Box(Modifier.fillMaxSize()) {
+        val target = guide.target
+        val mapTracks = buildList {
+            vm.shown.forEach { id ->
+                val pts = vm.trackPoints[id] ?: return@forEach
+                val isTarget = target is GuideTarget.Track && target.trackId == id
+                val src = tracks.firstOrNull { it.id == id }?.source
+                add(MapTrack(id, pts, if (isTarget) Color(0xFFE08A1E) else if (src == TrackSource.IMPORTED) Color(0xFF2F7FC1) else Color(0xFF239B56), if (isTarget) 9f else 6f, highlight = isTarget))
+            }
+            if (target is GuideTarget.Track && target.trackId !in vm.shown) add(MapTrack(target.trackId, target.points, Color(0xFFE08A1E), 9f, true))
+            if (live.size > 1) add(MapTrack(-1, live, Color(0xFFC62828), 7f, true))
+        }
+        val mapPlaces = places.map { MapPlace(it.name, it.geo(), Color(0xFF7B4FB5), target is GuideTarget.Place && target.name == it.name) } +
+            listOfNotNull((target as? GuideTarget.Place)?.let { t -> MapPlace(t.name, t.point, Color(0xFFE08A1E), true).takeIf { places.none { p -> p.name == t.name } } }) +
+            listOfNotNull(held?.takeIf { heldMenu || addAt != null || reportAt != null }?.let { MapPlace("نقطه‌ی انتخابی", it, Color(0xFF2F7FC1), true) })
+        TrackCanvas(
+            mapTracks, mapPlaces, fix, heading,
+            modifier = Modifier.fillMaxSize(),
+            fitKey = vm.fitKey,
+            background = vm.background,
+            labels = vm.labels,
+            attribution = vm.activeMap?.attribution.orEmpty(),
+            initialCenter = vm.activeMap?.center,
+            zones = vm.mapZones, // the borders of the protected areas are always shown
+            fitPoints = vm.fitPoints,
+            alerts = sosAlerts.map { a ->
+                MapAlert(a.focus, Color(a.kind.color), if (a.kind == ir.mohitban.app.gasht.SosKind.HELP) a.name.ifBlank { "کمک" } else a.kind.title)
+            },
+            topInset = with(density) { topPx.toDp() },
+            bottomInset = barSpace + with(density) { bottomPx.toDp() },
+            onLongPress = { p -> held = p; heldMenu = true },
+        )
+        // ---- top: warnings, my position, shortcuts ----
+        Column(
+            Modifier.align(Alignment.TopCenter).fillMaxWidth().onSizeChanged { topPx = it.height }
+                .statusBarsPadding().padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (!permitted) PermissionCard(onAllow = onAllow, onSettings = onSettings)
         // GPS switched off: a red, pulsing warning that stays until it is turned on
         var gpsOn by remember { mutableStateOf(GpsLocation.isGpsOn(context)) }
         LaunchedEffect(Unit) { while (true) { gpsOn = GpsLocation.isGpsOn(context); delay(1500) } }
@@ -556,241 +622,50 @@ private fun MapTab(vm: GashtViewModel) {
             }
         }
 
-        // ---- the map: big, with its buttons on it ----
-        val target = guide.target
-        val mapTracks = buildList {
-            vm.shown.forEach { id ->
-                val pts = vm.trackPoints[id] ?: return@forEach
-                val isTarget = target is GuideTarget.Track && target.trackId == id
-                val src = tracks.firstOrNull { it.id == id }?.source
-                add(MapTrack(id, pts, if (isTarget) Color(0xFFE08A1E) else if (src == TrackSource.IMPORTED) Color(0xFF2F7FC1) else Color(0xFF239B56), if (isTarget) 9f else 6f, highlight = isTarget))
-            }
-            if (target is GuideTarget.Track && target.trackId !in vm.shown) add(MapTrack(target.trackId, target.points, Color(0xFFE08A1E), 9f, true))
-            if (live.size > 1) add(MapTrack(-1, live, Color(0xFFC62828), 7f, true))
-        }
-        val mapPlaces = places.map { MapPlace(it.name, it.geo(), Color(0xFF7B4FB5), target is GuideTarget.Place && target.name == it.name) } +
-            listOfNotNull((target as? GuideTarget.Place)?.let { t -> MapPlace(t.name, t.point, Color(0xFFE08A1E), true).takeIf { places.none { p -> p.name == t.name } } }) +
-            listOfNotNull(held?.takeIf { heldMenu || addAt != null || reportAt != null }?.let { MapPlace("نقطه‌ی انتخابی", it, Color(0xFF2F7FC1), true) })
-        val permitted by vm.hasPermission.collectAsStateWithLifecycle()
-        var fullscreen by remember { mutableStateOf(false) }
-        val mapHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.68f).dp.coerceAtLeast(400.dp)
-        val mapBox: @Composable (Modifier, Boolean) -> Unit = { mod, full ->
-            Box(mod) {
-                TrackCanvas(
-                    mapTracks, mapPlaces, fix, heading,
-                    modifier = Modifier.fillMaxSize(),
-                    fitKey = vm.fitKey,
-                    background = vm.background,
-                    labels = vm.labels,
-                    attribution = vm.activeMap?.attribution.orEmpty(),
-                    initialCenter = vm.activeMap?.center,
-                    zones = if (vm.showZones) vm.mapZones else emptyList(),
-                    fitPoints = vm.fitPoints,
-                    alerts = sosAlerts.map { a ->
-                        MapAlert(a.focus, Color(a.kind.color), if (a.kind == ir.mohitban.app.gasht.SosKind.HELP) a.name.ifBlank { "کمک" } else a.kind.title)
-                    },
-                    onLongPress = { p -> held = p; heldMenu = true },
-                )
-                // where I am, and whether that is inside a protected area (start side)
-                fix?.let { f ->
-                    Column(Modifier.align(Alignment.TopStart).padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Box(
-                            Modifier.clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.94f))
-                                .border(1.dp, MColors.Line, RoundedCornerShape(10.dp)).padding(horizontal = 10.dp, vertical = 6.dp),
-                        ) { LtrText(CoordFormat.decimal(f.point), style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)) }
-                        if (vm.zones.isNotEmpty()) {
-                            val zs = remember(f.point, vm.zones) { ir.mohitban.app.gasht.ZoneStore.status(vm.zones, f.point) }
-                            val inside = zs.inside
-                            if (inside != null || zs.nearest != null) {
-                                Row(
-                                    Modifier.clip(RoundedCornerShape(10.dp)).background(if (inside != null) Color(0xE61F8A4C) else Color(0xE6C62828)).padding(horizontal = 10.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Icon(if (inside != null) Icons.Outlined.Shield else Icons.Outlined.WarningAmber, null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                    Text(
-                                        " " + (inside?.title?.let { "داخل $it" } ?: "خارج از مناطق"),
-                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = Color.White, maxLines = 1,
-                                    )
-                                }
-                            }
-                        }
-                        if (record.active) {
-                            Row(
-                                Modifier.clip(RoundedCornerShape(10.dp)).background(Color(0xE6C62828)).padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                ir.mohitban.app.ui.components.PulseDot(Color.White, size = 9.dp, active = !record.paused)
-                                Text(
-                                    "  ضبط: ${CoordFormat.meters(record.distance).fa()}",
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = Color.White,
-                                )
-                            }
-                        }
-                    }
-                }
-                // the tools (end side)
-                Column(Modifier.align(Alignment.TopEnd).padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    MapToolButton(if (full) Icons.Outlined.FullscreenExit else Icons.Outlined.Fullscreen) { fullscreen = !full }
-                    MapToolButton(Icons.Outlined.Layers) { mapsDialog = true }
-                    if (vm.zones.isNotEmpty()) MapToolButton(Icons.Outlined.Shield, active = vm.showZones) { vm.showZones = !vm.showZones }
-                    MapToolButton(Icons.Outlined.AddLocationAlt, enabled = fix != null) { addPlace = true }
-                    MapToolButton(Icons.Outlined.ContentCopy, enabled = fix != null) {
-                        fix?.let { copyText(context, "${CoordFormat.decimal(it.point)}\nUTM ${CoordFormat.utm(it.point)}") }
-                    }
-                    MapToolButton(Icons.Outlined.Share, enabled = fix != null) {
-                        fix?.let { shareText(context, positionMessage("موقعیت محیط‌بان", name, it)) }
-                    }
-                    if (!record.active) {
-                        MapToolButton(Icons.Outlined.FiberManualRecord, tint = Color(0xFFC62828), enabled = permitted) {
-                            if (GpsLocation.isGpsOn(context)) GashtSession.startRecording(context)
-                            else runCatching { context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-                        }
-                    }
-                }
+            PositionPanel(vm, fix, sats, name)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                MapChip(Icons.Outlined.Timeline, "مسیرها") { vm.tab = 1 }
+                MapChip(Icons.Outlined.Place, "نقاط") { vm.tab = 2 }
+                MapChip(Icons.Outlined.Build, "ابزارها") { vm.tab = 3 }
+                Spacer(Modifier.weight(1f))
+                MapToolButton(Icons.Outlined.Layers) { mapsDialog = true }
+                MapToolButton(Icons.Outlined.AddLocationAlt, enabled = fix != null) { addPlace = true }
             }
         }
-        mapBox(Modifier.fillMaxWidth().height(mapHeight).clip(RoundedCornerShape(14.dp)), false)
-        if (fullscreen) {
-            androidx.compose.ui.window.Dialog(
-                onDismissRequest = { fullscreen = false },
-                properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-            ) {
-                Box(Modifier.fillMaxSize().background(MColors.Bg)) {
-                    mapBox(Modifier.fillMaxSize().statusBarsPadding().padding(top = 6.dp).safeBottomPadding(), true)
-                }
-            }
-        }
-        // a county's map offer or download progress sits right under the map
-        CountyMapSuggestion(vm, fix)
-        run {
-            val set = vm.mapSet
-            val fx = fix
-            if (set != null && fx != null && !set.covers(fx.point)) {
-                Text("شما خارج از محدوده‌ی نقشه‌های دانلودشده هستید.", style = MaterialTheme.typography.labelSmall, color = MColors.Amber, modifier = Modifier.padding(top = 4.dp))
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-
-        // ---- position ----
-        AppCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircleIcon(Icons.Outlined.GpsFixed, Color(0xFF1E6FD9), Color.White, size = 30.dp, iconSize = 16.dp)
-                    Text(" موقعیت من", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
-                    Spacer(Modifier.weight(1f))
+        // ---- bottom: offers, alerts, guidance and the record button ----
+        Column(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = barSpace).onSizeChanged { bottomPx = it.height }
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            CountyMapSuggestion(vm, fix)
+            run {
+                val set = vm.mapSet
+                val fx = fix
+                if (set != null && fx != null && !set.covers(fx.point)) {
                     Text(
-                        listOf("درجه اعشاری", "درجه‌دقیقه‌ثانیه", "UTM")[vm.format] + "  ⇄",
-                        style = MaterialTheme.typography.labelMedium, color = MColors.Green,
-                        modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { vm.format = (vm.format + 1) % 3 }.padding(6.dp),
+                        "شما خارج از محدوده‌ی نقشه‌های دانلودشده هستید.", style = MaterialTheme.typography.labelSmall, color = MColors.Amber,
+                        modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.94f)).padding(horizontal = 10.dp, vertical = 5.dp),
                     )
                 }
-                val f = fix
-                if (f == null) {
+            }
+            sosAlerts.forEach { a ->
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.95f))
+                        .border(1.dp, Color(a.kind.color).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                        .clickable { ir.mohitban.app.gasht.SosStore.open.value = a.id }.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
-                        "در حال یافتن موقعیت… در فضای باز بمانید (اولین بار ممکن است چند دقیقه طول بکشد).",
-                        style = MaterialTheme.typography.bodySmall, color = MColors.Muted, textAlign = TextAlign.Center, modifier = Modifier.padding(vertical = 12.dp),
+                        "${a.kind.title}: ${a.name.ifBlank { a.from }}" + (fix?.let { " — ${CoordFormat.meters(Geo.distance(it.point, a.focus)).fa()}" } ?: ""),
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = Color(a.kind.color), modifier = Modifier.weight(1f),
                     )
-                } else {
-                    LtrText(
-                        when (vm.format) { 0 -> CoordFormat.decimal(f.point); 1 -> CoordFormat.dms(f.point); else -> CoordFormat.utm(f.point) },
-                        Modifier.fillMaxWidth().padding(top = 8.dp),
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
-                    )
-                    val age = (System.currentTimeMillis() - f.time) / 1000
-                    val info = listOfNotNull(
-                        f.point.ele?.let { "ارتفاع ${it.toInt().fa()} متر" },
-                        f.accuracy?.let { "دقت ±${it.toInt().fa()} متر" },
-                        sats?.let { "ماهواره ${it.first.fa()} از ${it.second.fa()}" },
-                    ).joinToString(" | ")
-                    Text(info, style = MaterialTheme.typography.labelMedium, color = MColors.Muted, modifier = Modifier.padding(top = 4.dp))
-                    if (age > 30) Text("آخرین موقعیت ${durationText(age * 1000)} پیش", style = MaterialTheme.typography.labelSmall, color = MColors.Amber)
-                    // province, county and nearest settlement, from the built-in OpenStreetMap data
-                    val where by androidx.compose.runtime.produceState<ir.mohitban.app.gasht.Whereabouts.Result?>(null, (f.point.lat * 500).toInt(), (f.point.lon * 500).toInt()) {
-                        value = withContext(Dispatchers.Default) { runCatching { ir.mohitban.app.gasht.Whereabouts.locate(context, f.point) }.getOrNull() }
-                    }
-                    where?.takeIf { !it.isEmpty }?.let { w ->
-                        val parts = listOfNotNull(w.province?.let { "استان $it" }, w.county?.let { "شهرستان $it" })
-                        if (parts.isNotEmpty()) {
-                            Text(parts.joinToString(" | "), style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = MColors.Ink, modifier = Modifier.padding(top = 6.dp), textAlign = TextAlign.Center)
-                        }
-                        w.place?.let { pl ->
-                            val d = w.placeDistance ?: 0.0
-                            Text(
-                                if (d < 700) "در ${pl.label}" else "${CoordFormat.meters(d).fa()} از ${pl.label}",
-                                style = MaterialTheme.typography.labelMedium, color = MColors.Muted, textAlign = TextAlign.Center,
-                            )
-                        }
-                    }
-                    // which protected area the ranger is in
-                    if (vm.zones.isNotEmpty()) {
-                        val zs = remember(f.point, vm.zones) { ir.mohitban.app.gasht.ZoneStore.status(vm.zones, f.point) }
-                        val inside = zs.inside
-                        val text = when {
-                            inside != null -> "داخل ${inside.title}" + (zs.distance?.let { " — ${CoordFormat.meters(it).fa()} تا مرز" } ?: "")
-                            zs.nearest != null -> "خارج از مناطق — ${zs.nearest.title} در ${CoordFormat.meters(zs.distance ?: 0.0).fa()}"
-                            else -> ""
-                        }
-                        if (text.isNotEmpty()) {
-                            // green inside a protected area, red outside
-                            val bg by androidx.compose.animation.animateColorAsState(if (inside != null) Color(0xFF1F8A4C) else Color(0xFFC62828), label = "zoneBg")
-                            Row(
-                                Modifier.padding(top = 8.dp).clip(RoundedCornerShape(12.dp)).background(bg).padding(horizontal = 12.dp, vertical = 7.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(if (inside != null) Icons.Outlined.Shield else Icons.Outlined.WarningAmber, null, tint = Color.White, modifier = Modifier.size(18.dp))
-                                Text(
-                                    "  $text", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                    color = Color.White, textAlign = TextAlign.Center,
-                                )
-                            }
-                        }
-                    }
-                }
-                Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SmallAction(Icons.Outlined.ContentCopy, "کپی", Modifier.weight(1f), enabled = f != null) {
-                        f?.let { copyText(context, "${CoordFormat.decimal(it.point)}\nUTM ${CoordFormat.utm(it.point)}") }
-                    }
-                    SmallAction(Icons.Outlined.Share, "ارسال", Modifier.weight(1f), enabled = f != null) {
-                        f?.let { shareText(context, positionMessage("موقعیت محیط‌بان", name, it)) }
-                    }
-                    SmallAction(Icons.Outlined.AddLocationAlt, "ثبت نقطه", Modifier.weight(1f), enabled = f != null) { addPlace = true }
+                    Text("جزئیات", style = MaterialTheme.typography.labelSmall, color = MColors.Muted)
                 }
             }
+            if (target != null) GuidePanel(vm, fix, heading, Modifier)
+            RecordBar(vm)
         }
-
-        if (vm.zones.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                ChoiceChip(if (vm.showZones) "مرز مناطق: روشن" else "مرز مناطق: خاموش", vm.showZones, Modifier.weight(1f)) { vm.showZones = !vm.showZones }
-            }
-        }
-        Text(
-            "برای ثبت نقطه یا گزارش شکارچی و آتش‌سوزی، انگشت را روی نقشه نگه دارید.",
-            style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 4.dp),
-        )
-        sosAlerts.forEach { a ->
-            Row(
-                Modifier.fillMaxWidth().padding(top = 6.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                    .background(Color(a.kind.color).copy(alpha = 0.10f)).clickable { ir.mohitban.app.gasht.SosStore.open.value = a.id }
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "${a.kind.title}: ${a.name.ifBlank { a.from }}" + (fix?.let { " — ${CoordFormat.meters(Geo.distance(it.point, a.focus)).fa()}" } ?: ""),
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = Color(a.kind.color), modifier = Modifier.weight(1f),
-                )
-                Text("جزئیات", style = MaterialTheme.typography.labelSmall, color = MColors.Muted)
-            }
-        }
-        if (vm.shown.isEmpty() && target == null && !record.active) {
-            Text(
-                "برای دیدن مسیرها از زبانه‌ی «مسیرها» گزینه‌ی نمایش را بزنید. با دو انگشت بزرگ‌نمایی کنید.",
-                style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 6.dp),
-            )
-        }
-
-        if (target != null) GuidePanel(vm, fix, heading, Modifier.padding(top = 12.dp))
-        RecordPanel(vm, Modifier.padding(top = 12.dp))
-        Spacer(Modifier.height(30.dp))
     }
 
     if (mapsDialog) MapsDialog(vm, onDismiss = { mapsDialog = false })
@@ -801,6 +676,108 @@ private fun MapTab(vm: GashtViewModel) {
     }
     if (addPlace) {
         fix?.let { f -> AddPlaceDialog(vm, f.point, onDismiss = { addPlace = false }) } ?: run { addPlace = false }
+    }
+}
+
+/** A white pill on the map that opens another part of the patrol screen. */
+@Composable
+private fun MapChip(icon: ImageVector, text: String, onClick: () -> Unit) {
+    Row(
+        Modifier.height(44.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.96f))
+            .border(1.dp, MColors.Line, RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, tint = MColors.Green, modifier = Modifier.size(20.dp))
+        Text(" $text", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = MColors.Ink)
+    }
+}
+
+@Composable
+private fun PanelIconButton(icon: ImageVector, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier.size(38.dp).clip(CircleShape).then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, null, tint = if (enabled) MColors.Green else MColors.Hint, modifier = Modifier.size(20.dp)) }
+}
+
+/** «My position» at the top of the map: coordinates, accuracy, where I am and which protected area. */
+@Composable
+private fun PositionPanel(vm: GashtViewModel, fix: Fix?, sats: Pair<Int, Int>?, name: String) {
+    val context = LocalContext.current
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.95f))
+            .border(1.dp, MColors.Line, RoundedCornerShape(16.dp)).padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // the location icon: green when my position is found, red when not
+            Icon(Icons.Outlined.MyLocation, null, tint = if (fix != null) Color(0xFF1F8A4C) else Color(0xFFC62828), modifier = Modifier.size(22.dp))
+            Text(" موقعیت من", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
+            Text(
+                listOf("درجه اعشاری", "درجه‌دقیقه‌ثانیه", "UTM")[vm.format] + "  ⇄",
+                style = MaterialTheme.typography.labelMedium, color = MColors.Green,
+                modifier = Modifier.padding(start = 6.dp).clip(RoundedCornerShape(8.dp)).clickable { vm.format = (vm.format + 1) % 3 }.padding(6.dp),
+            )
+            Spacer(Modifier.weight(1f))
+            PanelIconButton(Icons.Outlined.ContentCopy, enabled = fix != null) {
+                fix?.let { copyText(context, "${CoordFormat.decimal(it.point)}\nUTM ${CoordFormat.utm(it.point)}") }
+            }
+            PanelIconButton(Icons.Outlined.Share, enabled = fix != null) {
+                fix?.let { shareText(context, positionMessage("موقعیت محیط‌بان", name, it)) }
+            }
+        }
+        if (fix == null) {
+            Text(
+                "در حال یافتن موقعیت… در فضای باز بمانید (بار اول ممکن است چند دقیقه طول بکشد).",
+                style = MaterialTheme.typography.bodySmall, color = MColors.Muted, modifier = Modifier.padding(vertical = 4.dp),
+            )
+            return@Column
+        }
+        LtrText(
+            when (vm.format) { 0 -> CoordFormat.decimal(fix.point); 1 -> CoordFormat.dms(fix.point); else -> CoordFormat.utm(fix.point) },
+            Modifier.fillMaxWidth(),
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+        )
+        val age = (System.currentTimeMillis() - fix.time) / 1000
+        val info = listOfNotNull(
+            fix.point.ele?.let { "ارتفاع ${it.toInt().fa()} متر" },
+            fix.accuracy?.let { "دقت ±${it.toInt().fa()} متر" },
+            sats?.let { "ماهواره ${it.first.fa()} از ${it.second.fa()}" },
+        ).joinToString(" | ")
+        Text(info, style = MaterialTheme.typography.labelMedium, color = MColors.Muted, modifier = Modifier.padding(top = 2.dp))
+        if (age > 30) Text("آخرین موقعیت ${durationText(age * 1000)} پیش", style = MaterialTheme.typography.labelSmall, color = MColors.Amber)
+        // province, county and the nearest settlement, from the built-in OpenStreetMap data
+        val where by androidx.compose.runtime.produceState<ir.mohitban.app.gasht.Whereabouts.Result?>(null, (fix.point.lat * 500).toInt(), (fix.point.lon * 500).toInt()) {
+            value = withContext(Dispatchers.Default) { runCatching { ir.mohitban.app.gasht.Whereabouts.locate(context, fix.point) }.getOrNull() }
+        }
+        where?.takeIf { !it.isEmpty }?.let { w ->
+            val parts = listOfNotNull(w.province?.let { "استان $it" }, w.county?.let { "شهرستان $it" })
+            val near = w.place?.let { pl ->
+                val d = w.placeDistance ?: 0.0
+                if (d < 700) "در ${pl.label}" else "${CoordFormat.meters(d).fa()} از ${pl.label}"
+            }
+            val line = (parts + listOfNotNull(near)).joinToString(" | ")
+            if (line.isNotBlank()) Text(line, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = MColors.Ink, modifier = Modifier.padding(top = 2.dp))
+        }
+        // which protected area I am in: green inside, red outside (the borders are always on)
+        if (vm.zones.isNotEmpty()) {
+            val zs = remember(fix.point, vm.zones) { ir.mohitban.app.gasht.ZoneStore.status(vm.zones, fix.point) }
+            val inside = zs.inside
+            val text = when {
+                inside != null -> "داخل ${inside.title}" + (zs.distance?.let { " — ${CoordFormat.meters(it).fa()} تا مرز" } ?: "")
+                zs.nearest != null -> "خارج از مناطق — ${zs.nearest.title} در ${CoordFormat.meters(zs.distance ?: 0.0).fa()}"
+                else -> ""
+            }
+            if (text.isNotEmpty()) {
+                val bg by androidx.compose.animation.animateColorAsState(if (inside != null) Color(0xFF1F8A4C) else Color(0xFFC62828), label = "zoneBg")
+                Row(
+                    Modifier.padding(top = 6.dp).clip(RoundedCornerShape(10.dp)).background(bg).padding(horizontal = 10.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(if (inside != null) Icons.Outlined.Shield else Icons.Outlined.WarningAmber, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Text("  $text", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = Color.White)
+                }
+            }
+        }
     }
 }
 
@@ -947,72 +924,43 @@ fun ChoiceChip(text: String, selected: Boolean, modifier: Modifier = Modifier, o
 // ============================================================================ recording
 
 @Composable
-private fun RecordPanel(vm: GashtViewModel, modifier: Modifier) {
+private fun RecordBar(vm: GashtViewModel, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val record by vm.record.collectAsStateWithLifecycle()
     val permitted by vm.hasPermission.collectAsStateWithLifecycle()
     var confirmStop by remember { mutableStateOf(false) }
     if (!record.active) {
-        // recording needs the phone's location (GPS) switched on first
+        // recording needs the phone's location (GPS) switched on first; the red warning at the top says so
         var gpsOn by remember { mutableStateOf(GpsLocation.isGpsOn(context)) }
         LaunchedEffect(Unit) { while (true) { gpsOn = GpsLocation.isGpsOn(context); delay(1500) } }
         PillButton(
-            "شروع ضبط مسیر گشت", { if (GpsLocation.isGpsOn(context)) GashtSession.startRecording(context) else gpsOn = false }, modifier,
+            "شروع ضبط مسیر گشت", { if (GpsLocation.isGpsOn(context)) GashtSession.startRecording(context) else gpsOn = false }, modifier.fillMaxWidth(),
             icon = Icons.Outlined.FiberManualRecord, enabled = permitted && gpsOn,
         )
-        if (permitted && !gpsOn) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp)
-                    .clip(RoundedCornerShape(ir.mohitban.app.ui.theme.Corners.R))
-                    .background(MColors.ErrorBg)
-                    .clickable {
-                        runCatching { context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) }
-                    }
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Outlined.LocationOff, null, tint = MColors.Error, modifier = Modifier.size(22.dp))
-                Column(Modifier.weight(1f).padding(start = 10.dp)) {
-                    Text(
-                        "برای ضبط مسیر، ابتدا موقعیت مکانی (GPS) گوشی را روشن کنید.",
-                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = MColors.Error,
-                    )
-                    Text(
-                        "برای باز کردن تنظیمات موقعیت مکانی اینجا را بزنید. بعد از روشن کردن، دکمه‌ی ضبط فعال می‌شود.",
-                        style = MaterialTheme.typography.labelSmall, color = MColors.Ink, modifier = Modifier.padding(top = 2.dp),
-                    )
-                }
-            }
-        }
-        Text(
-            "ضبط با خاموش شدن صفحه هم ادامه پیدا می‌کند. برای مصرف کمتر باتری، بعد از گشت آن را پایان دهید.",
-            style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 6.dp),
-        )
-        return
-    }
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(record.active) { while (true) { now = System.currentTimeMillis(); delay(1000) } }
-    AppCard(modifier.fillMaxWidth()) {
-        Column(Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ir.mohitban.app.ui.components.PulseDot(if (record.paused) MColors.Amber else MColors.Error, size = 12.dp, active = !record.paused)
+    } else {
+        var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+        LaunchedEffect(record.active) { while (true) { now = System.currentTimeMillis(); delay(1000) } }
+        Row(
+            modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.96f))
+                .border(1.dp, MColors.Line, RoundedCornerShape(16.dp)).padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ir.mohitban.app.ui.components.PulseDot(if (record.paused) MColors.Amber else MColors.Error, size = 12.dp, active = !record.paused)
+            Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
                 Text(
-                    if (record.paused) "  ضبط متوقف موقت" else "  در حال ضبط مسیر",
+                    if (record.paused) "ضبط متوقف موقت" else "در حال ضبط مسیر",
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                 )
+                Text(
+                    "${CoordFormat.meters(record.distance).fa()}  |  ${durationText(now - record.startedAt)}",
+                    style = MaterialTheme.typography.labelMedium, color = MColors.Muted,
+                )
             }
-            Row(Modifier.fillMaxWidth().padding(top = 10.dp)) {
-                Stat("مسافت", CoordFormat.meters(record.distance).fa(), Modifier.weight(1f))
-                Stat("مدت", durationText(now - record.startedAt), Modifier.weight(1f))
-                Stat("نقاط", record.points.fa(), Modifier.weight(1f))
+            RecordRound(if (record.paused) Icons.Outlined.PlayArrow else Icons.Outlined.Pause, if (record.paused) MColors.Green else MColors.Amber) {
+                if (record.paused) GashtSession.resumeRecording(context) else GashtSession.pauseRecording(context)
             }
-            Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (record.paused) SmallAction(Icons.Outlined.PlayArrow, "ادامه ضبط", Modifier.weight(1f)) { GashtSession.resumeRecording(context) }
-                else SmallAction(Icons.Outlined.Pause, "توقف موقت", Modifier.weight(1f), color = MColors.Amber) { GashtSession.pauseRecording(context) }
-                SmallAction(Icons.Outlined.Stop, "پایان و ذخیره", Modifier.weight(1f), color = MColors.Error) { confirmStop = true }
-            }
+            Spacer(Modifier.size(8.dp))
+            RecordRound(Icons.Outlined.Stop, MColors.Error) { confirmStop = true }
         }
     }
     if (confirmStop) {
@@ -1037,6 +985,14 @@ private fun RecordPanel(vm: GashtViewModel, modifier: Modifier) {
                 }, onCancel = { confirmStop = false })
             },
         )
+    }
+}
+
+
+@Composable
+private fun RecordRound(icon: ImageVector, color: Color, onClick: () -> Unit) {
+    Box(Modifier.size(46.dp).clip(CircleShape).background(color.copy(alpha = 0.14f)).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+        Icon(icon, null, tint = color, modifier = Modifier.size(26.dp))
     }
 }
 

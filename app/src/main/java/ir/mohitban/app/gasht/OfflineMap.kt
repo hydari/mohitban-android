@@ -89,10 +89,17 @@ class MapSet(val maps: List<OfflineMap>) : TileSource, Closeable {
         val east = (x + 1) / n * 360.0 - 180.0
         val north = Math.toDegrees(Math.atan(Math.sinh(Math.PI * (1 - 2.0 * y / n))))
         val south = Math.toDegrees(Math.atan(Math.sinh(Math.PI * (1 - 2.0 * (y + 1) / n))))
-        for (m in maps) {
+        val centreLat = (north + south) / 2
+        val centreLon = (west + east) / 2
+        // a tile on the border of two counties comes first from the map that covers its centre (the bigger part of it)
+        for (pass in 0..1) for (m in maps) {
             val b = m.bounds
-            // skip maps whose area does not touch this tile at all
-            if (b != null && (east < b[0] || west > b[2] || north < b[1] || south > b[3])) continue
+            if (b != null) {
+                // skip maps whose area does not touch this tile at all
+                if (east < b[0] || west > b[2] || north < b[1] || south > b[3]) continue
+                val centreInside = centreLon in b[0]..b[2] && centreLat in b[1]..b[3]
+                if ((pass == 0) != centreInside) continue
+            } else if (pass == 0) continue
             m.tile(z, x, y)?.let { return it }
         }
         return null

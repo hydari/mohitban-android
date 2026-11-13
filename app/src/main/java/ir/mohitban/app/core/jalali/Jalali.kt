@@ -108,7 +108,11 @@ object Jalali {
         return Cal(leap, gy, march)
     }
 
-    fun isLeapYear(jy: Int): Boolean = jalCal(jy, false).leap == 0
+    /** Years the calendar code is defined for; anything outside (a damaged date) is pulled to the nearest one instead of crashing. */
+    const val MIN_YEAR = 1
+    const val MAX_YEAR = 3000
+
+    fun isLeapYear(jy: Int): Boolean = jalCal(jy.coerceIn(MIN_YEAR, MAX_YEAR), false).leap == 0
 
     fun monthLength(jy: Int, jm: Int): Int = when {
         jm <= 6 -> 31
@@ -136,11 +140,12 @@ object Jalali {
     }
 
     fun toJdn(jy: Int, jm: Int, jd: Int): Int {
-        val r = jalCal(jy, true)
+        val r = jalCal(jy.coerceIn(MIN_YEAR, MAX_YEAR), true)
         return gregorianToJdn(r.gy, 3, r.march) + (jm - 1) * 31 - (jm / 7) * (jm - 7) + jd - 1
     }
 
-    fun fromJdn(jdn: Int): JalaliDate {
+    fun fromJdn(jdnIn: Int): JalaliDate {
+        val jdn = jdnIn.coerceIn(toJdn(MIN_YEAR, 1, 1), toJdn(MAX_YEAR, 12, 29))
         val gy = jdnToGregorian(jdn).first
         var jy = gy - 621
         val r = jalCal(jy, false)

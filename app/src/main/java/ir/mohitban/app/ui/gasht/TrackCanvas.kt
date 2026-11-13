@@ -144,6 +144,9 @@ fun TrackCanvas(
     zones: List<MapZone> = emptyList(),
     fitPoints: List<GeoPoint> = emptyList(),
     alerts: List<MapAlert> = emptyList(),
+    /** Room the screen keeps free on top / at the bottom (panels laid over the map): the compass, scale and buttons stay clear of them. */
+    topInset: androidx.compose.ui.unit.Dp = 0.dp,
+    bottomInset: androidx.compose.ui.unit.Dp = 0.dp,
     onLongPress: ((GeoPoint) -> Unit)? = null,
 ) {
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -280,23 +283,29 @@ fun TrackCanvas(
                 if (t.highlight) drawPath(drawn, Color.White, style = Stroke(t.width + 5f, cap = StrokeCap.Round, join = StrokeJoin.Round))
                 drawPath(drawn, t.color, style = Stroke(t.width, cap = StrokeCap.Round, join = StrokeJoin.Round))
                 val s = v.toScreen(t.xs.first(), t.ys.first())
-                drawCircle(Color.White, 9f, s); drawCircle(Color(0xFF239B56), 6.5f, s)
+                // start: a green disc with a play mark; end: a red disc with a stop mark
+                drawCircle(Color.White, 11f, s); drawCircle(Color(0xFF239B56), 8.5f, s)
+                drawPath(Path().apply { moveTo(s.x - 3f, s.y - 4.5f); lineTo(s.x + 4.5f, s.y); lineTo(s.x - 3f, s.y + 4.5f); close() }, Color.White)
                 if (t.xs.size > 1) {
                     val e = v.toScreen(t.xs.last(), t.ys.last())
-                    drawCircle(Color.White, 9f, e); drawCircle(Color(0xFFC62828), 6.5f, e)
+                    drawCircle(Color.White, 11f, e); drawCircle(Color(0xFFC62828), 8.5f, e)
+                    drawRect(Color.White, Offset(e.x - 3.5f, e.y - 3.5f), Size(7f, 7f))
                 }
             }
 
-            // places
+            // places: map pins (the tip is the place)
             for (pl in places) {
                 val p = v.toScreen(Geo.mercatorX(pl.point.lon), Geo.mercatorY(pl.point.lat))
-                if (p.x < -50 || p.y < -50 || p.x > this.size.width + 50 || p.y > this.size.height + 50) continue
-                val r = if (pl.highlight) 11f else 8f
-                val diamond = Path().apply { moveTo(p.x, p.y - r); lineTo(p.x + r, p.y); lineTo(p.x, p.y + r); lineTo(p.x - r, p.y); close() }
-                drawPath(diamond, Color.White, style = Stroke(5f))
-                drawPath(diamond, pl.color)
-                val layout = measurer.measure(pl.name, TextStyle(fontSize = 10.sp, fontFamily = AppFonts.family(), fontWeight = FontWeight.Bold, color = MColors.Ink))
-                drawText(layout, topLeft = Offset(p.x - layout.size.width / 2, p.y + r + 2))
+                if (p.x < -50 || p.y < -90 || p.x > this.size.width + 50 || p.y > this.size.height + 50) continue
+                drawPin(p, pl.color, if (pl.highlight) 12f else 9f)
+                val layout = measurer.measure(
+                    pl.name,
+                    TextStyle(
+                        fontSize = 10.sp, fontFamily = AppFonts.family(), fontWeight = FontWeight.Bold, color = MColors.Ink,
+                        shadow = androidx.compose.ui.graphics.Shadow(Color.White, Offset(0f, 0f), 6f),
+                    ),
+                )
+                drawText(layout, topLeft = Offset(p.x - layout.size.width / 2, p.y + 3))
             }
 
             // a colleague in need: a red pin (it blinks on the layer above)
@@ -333,9 +342,10 @@ fun TrackCanvas(
                         drawPath(cone, androidx.compose.ui.graphics.Brush.radialGradient(listOf(Color(0x882F7FC1), Color(0x002F7FC1)), center = p, radius = 74f))
                     }
                 }
-                drawCircle(Color(0x33000000), 14f, p + Offset(0f, 2f))
-                drawCircle(Color.White, 13f, p)
-                drawCircle(Color(0xFF1E6FD9), 9f, p)
+                drawCircle(Color(0x33000000), 16f, p + Offset(0f, 2f))
+                drawCircle(Color.White, 15f, p)
+                drawCircle(Color(0xFF1E6FD9), 11f, p)
+                drawCircle(Color.White, 3.5f, p)
             }
 
             // named places from the map file (towns first; villages, peaks, springs when zoomed in)
@@ -369,13 +379,16 @@ fun TrackCanvas(
                 }
             }
 
-            drawScale(v, measurer)
+            val bottomPx = bottomInset.toPx()
+            drawScale(v, measurer, bottomPx)
             if (attribution.isNotBlank()) {
                 val layout = measurer.measure(attribution, TextStyle(fontSize = 7.sp, color = Color(0xCC3D4A42), fontFamily = AppFonts.family()), constraints = androidx.compose.ui.unit.Constraints(maxWidth = (this.size.width * 0.62f).toInt()))
-                drawRect(Color(0xB3FFFFFF), topLeft = Offset(0f, 0f), size = Size(layout.size.width + 8f, layout.size.height + 4f))
-                drawText(layout, topLeft = Offset(4f, 2f))
+                val ax = this.size.width - layout.size.width - 8f
+                val ay = this.size.height - bottomPx - layout.size.height - 4f
+                drawRect(Color(0xB3FFFFFF), topLeft = Offset(ax - 4f, ay - 2f), size = Size(layout.size.width + 8f, layout.size.height + 4f))
+                drawText(layout, topLeft = Offset(ax, ay))
             }
-            drawNorth(measurer)
+            drawNorth(measurer, topInset.toPx())
         }
 
         // the "you are here" pulse on its own layer, so the map itself is not redrawn every frame
@@ -403,11 +416,12 @@ fun TrackCanvas(
                 }
             }
         }
-        Column(Modifier.align(Alignment.BottomEnd).padding(8.dp)) {
+        Column(Modifier.align(Alignment.CenterEnd).padding(top = topInset, bottom = bottomInset).padding(8.dp)) {
             MapButton(Icons.Outlined.Add) { mpp = (mpp / 1.6).coerceAtLeast(0.2) }
             MapButton(Icons.Outlined.Remove) { mpp = (mpp * 1.6).coerceAtMost(5000.0) }
             MapButton(Icons.Outlined.ZoomOutMap) { fitAll() }
-            MapButton(Icons.Outlined.MyLocation, active = follow) {
+            // the location icon: green while my position is found and the map follows it, red otherwise
+            MapButton(Icons.Outlined.MyLocation, tint = if (fix != null && follow) Color(0xFF1F8A4C) else Color(0xFFC62828)) {
                 follow = true
                 fix?.let { cx = Geo.mercatorX(it.point.lon); cy = Geo.mercatorY(it.point.lat) }
                 if (mpp > 20) mpp = 3.0
@@ -417,27 +431,42 @@ fun TrackCanvas(
 }
 
 @Composable
-private fun MapButton(icon: ImageVector, active: Boolean = false, onClick: () -> Unit) {
+private fun MapButton(icon: ImageVector, tint: Color = MColors.Ink, onClick: () -> Unit) {
     Box(
         Modifier
             .padding(top = 6.dp)
-            .size(40.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (active) Color(0xFF1E6FD9) else Color.White)
-            .border(1.dp, MColors.Line, RoundedCornerShape(10.dp))
+            .size(44.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.White.copy(alpha = 0.96f))
+            .border(1.dp, MColors.Line, RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
-    ) { Icon(icon, null, tint = if (active) Color.White else MColors.Ink, modifier = Modifier.size(20.dp)) }
+    ) { Icon(icon, null, tint = tint, modifier = Modifier.size(24.dp)) }
 }
 
-private fun DrawScope.drawScale(v: Viewport, measurer: androidx.compose.ui.text.TextMeasurer) {
+/** A map pin: [tip] is the place and the round head sits above it. */
+private fun DrawScope.drawPin(tip: Offset, color: Color, r: Float) {
+    val head = Offset(tip.x, tip.y - 2f * r)
+    val drop = Path().apply {
+        moveTo(tip.x, tip.y)
+        lineTo(head.x - r * 0.866f, head.y + r * 0.5f)
+        arcTo(androidx.compose.ui.geometry.Rect(head.x - r, head.y - r, head.x + r, head.y + r), 150f, 240f, false)
+        close()
+    }
+    drawPath(drop, Color(0x33000000), style = Stroke(r * 0.7f, join = StrokeJoin.Round))
+    drawPath(drop, Color.White, style = Stroke(r * 0.45f, join = StrokeJoin.Round))
+    drawPath(drop, color)
+    drawCircle(Color.White, r * 0.42f, head)
+}
+
+private fun DrawScope.drawScale(v: Viewport, measurer: androidx.compose.ui.text.TextMeasurer, bottomPx: Float = 0f) {
     val ground = v.groundMetersPerPx()
     val target = 110 * ground
     val pow10 = 10.0.pow(floor(log10(target)))
     val meters = listOf(1.0, 2.0, 5.0).map { it * pow10 }.lastOrNull { it <= target } ?: pow10
     val px = (meters / ground).toFloat()
     val x0 = 16f
-    val y0 = size.height - 18f
+    val y0 = size.height - 18f - bottomPx
     drawLine(Color.Black, Offset(x0, y0), Offset(x0 + px, y0), 3f)
     drawLine(Color.Black, Offset(x0, y0 - 7), Offset(x0, y0 + 1), 3f)
     drawLine(Color.Black, Offset(x0 + px, y0 - 7), Offset(x0 + px, y0 + 1), 3f)
@@ -446,8 +475,8 @@ private fun DrawScope.drawScale(v: Viewport, measurer: androidx.compose.ui.text.
     drawText(layout, topLeft = Offset(x0, y0 - 8 - layout.size.height))
 }
 
-private fun DrawScope.drawNorth(measurer: androidx.compose.ui.text.TextMeasurer) {
-    val c = Offset(size.width - 26f, 30f)
+private fun DrawScope.drawNorth(measurer: androidx.compose.ui.text.TextMeasurer, topPx: Float = 0f) {
+    val c = Offset(size.width - 26f, 34f + topPx)
     val tri = Path().apply { moveTo(c.x, c.y - 16); lineTo(c.x + 9, c.y + 10); lineTo(c.x, c.y + 4); lineTo(c.x - 9, c.y + 10); close() }
     drawCircle(Color.White, 22f, c)
     drawPath(tri, Color(0xFFC62828))

@@ -232,6 +232,10 @@ fun SosScreen(id: Long, onBack: () -> Unit, onGuide: () -> Unit) {
                     }
                 }
             }
+            if (!a.verified) Text(
+                "این پیامک با کد تیم شما تأیید نشد و ممکن است جعلی باشد. قبل از اقدام با فرستنده تماس بگیرید.",
+                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = Color(0xFFC62828), modifier = Modifier.padding(top = 10.dp),
+            )
             if (a.target != null) Text(a.kind.target, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = tint, modifier = Modifier.padding(top = 10.dp))
             LtrText(CoordFormat.decimal(a.focus), Modifier.fillMaxWidth().padding(top = if (a.target != null) 0.dp else 10.dp), style = MaterialTheme.typography.bodyMedium)
             LtrText("UTM " + CoordFormat.utm(a.focus), Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyMedium)
