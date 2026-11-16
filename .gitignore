@@ -10,8 +10,14 @@
 .cxx/
 *.keystore
 *.jks
+# Python caches of the map scripts
+__pycache__/
+*.pyc
 # fonts are downloaded automatically at build time
 /app/src/main/assets/fonts/*.ttf
 
 # protected-area boundaries are decrypted only inside CI (see private/)
 app/src/main/assets/zones/
+
+# the package for the host (made by the workflow, never committed)
+/update-package/

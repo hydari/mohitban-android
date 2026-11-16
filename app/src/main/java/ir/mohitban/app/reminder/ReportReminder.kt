@@ -133,6 +133,8 @@ object ReportReminder {
 class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         runCatching { ReportReminder.check(applicationContext) }
+        // a new version on the host: at most every few hours, and only when the phone has internet (fails quietly otherwise)
+        runCatching { ir.mohitban.app.update.AppUpdate.check(applicationContext) }
         return Result.success()
     }
 }

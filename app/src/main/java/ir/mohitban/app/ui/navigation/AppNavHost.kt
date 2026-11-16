@@ -45,6 +45,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import ir.mohitban.app.R
 import ir.mohitban.app.container
+import ir.mohitban.app.core.text.fa
 import ir.mohitban.app.ui.alerts.AlertTarget
 import ir.mohitban.app.ui.alerts.AlertsScreen
 import ir.mohitban.app.ui.components.MainTab
@@ -107,10 +108,52 @@ private fun NavHostController.openTab(tab: MainTab) {
 }
 
 @Composable
-fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0, openGashtRequest: Int = 0) {
+fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0, openGashtRequest: Int = 0, openUpdateRequest: Int = 0) {
     val nav = rememberNavController()
     val context = LocalContext.current
     var started by remember { mutableStateOf(false) }
+
+    // a new version on the host: checked by itself when the app opens (if the phone has internet); the ranger is
+    // told once per version with a dialog, and the update itself is in settings
+    val update by ir.mohitban.app.update.AppUpdate.state.collectAsState()
+    var updateAsked by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(started) {
+        // the app is open, so the dialog below tells the ranger (the notification is for the background check)
+        if (started) ir.mohitban.app.update.AppUpdate.check(context.applicationContext, notify = false)
+    }
+    LaunchedEffect(openUpdateRequest, started) {
+        if (openUpdateRequest > 0 && started) { updateAsked = (update as? ir.mohitban.app.update.UpdateState.Available)?.release?.versionCode; nav.openTab(MainTab.SETTINGS) }
+    }
+    val offered = (update as? ir.mohitban.app.update.UpdateState.Available)?.release
+    // only over the app itself: never over the lock screen or an emergency alert
+    val appOpen = ir.mohitban.app.security.AppLockStatus.open
+    if (started && appOpen && offered != null && updateAsked != offered.versionCode &&
+        ir.mohitban.app.update.UpdatePrompt.shouldAsk(context, offered.versionCode)
+    ) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { updateAsked = offered.versionCode; ir.mohitban.app.update.UpdatePrompt.asked(context, offered.versionCode) },
+            title = { Text("نسخه‌ی جدید محیط‌یار") },
+            text = {
+                Text(
+                    "نسخه‌ی ${offered.versionName.fa()} آماده است. برای استفاده از امکانات و اصلاحات تازه، برنامه را به‌روز کنید." +
+                        (if (offered.notes.isNotBlank()) "\n\n${offered.notes}" else ""),
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    updateAsked = offered.versionCode
+                    ir.mohitban.app.update.UpdatePrompt.asked(context, offered.versionCode)
+                    nav.openTab(MainTab.SETTINGS)
+                }) { Text("به‌روزرسانی") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    updateAsked = offered.versionCode
+                    ir.mohitban.app.update.UpdatePrompt.asked(context, offered.versionCode)
+                }) { Text("بعداً") }
+            },
+        )
+    }
 
     // a tap on the quarterly-report reminder opens the reports tab
     LaunchedEffect(openReportsRequest, started) {

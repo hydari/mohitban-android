@@ -1,8 +1,12 @@
 package ir.mohitban.app.security
 
+import android.app.Activity
+import android.app.KeyguardManager
 import android.content.Context
 import android.content.ContextWrapper
+import android.os.Build
 import android.os.SystemClock
+import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
@@ -24,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -87,11 +92,16 @@ object AppLock {
 /** Lives as long as the app's process: a killed or swiped-away app always asks again. */
 private object LockState {
     var unlocked by mutableStateOf(false)
-    /** The app was opened by a colleague's emergency, not by the ranger proving who they are. */
-    var viaAlert by mutableStateOf(false)
+    /**
+     * A colleague's emergency shown on its own: only that alert (its map, distance and actions) is visible,
+     * never the rest of the app, until the ranger proves who they are. Null when there is none.
+     */
+    var alertId by mutableStateOf<Long?>(null)
+    /** The alert was opened over the phone's own lock screen (the phone itself was locked). */
+    var alertOverKeyguard = false
     var alertUntil = 0L
     var leftAfterAlert = false
-    /** How long an emergency keeps the app open without the lock. */
+    /** How long an emergency stays on screen without the lock. */
     const val ALERT_WINDOW_MS = 3 * 60_000L
     var stoppedAt = 0L
     /** How long the app may stay in the background before it asks again. */
@@ -104,14 +114,38 @@ private tailrec fun Context.fragmentActivity(): FragmentActivity? = when (this) 
     else -> null
 }
 
+/** True while the app itself is on screen (not the lock, nor an emergency alert alone); the app's own dialogs wait for it. */
+object AppLockStatus {
+    var open by mutableStateOf(false)
+        internal set
+}
+
+/** Stops showing the app over the phone's lock screen (turned on only for a colleague's emergency). */
+fun Activity.leaveLockScreen() {
+    if (Build.VERSION.SDK_INT >= 27) {
+        setShowWhenLocked(false)
+        setTurnScreenOn(false)
+    } else {
+        @Suppress("DEPRECATION")
+        window.clearFlags(
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
+        )
+    }
+}
+
+private fun phoneLocked(context: Context): Boolean =
+    runCatching { ContextCompat.getSystemService(context, KeyguardManager::class.java)?.isKeyguardLocked == true }.getOrDefault(false)
+
 /**
  * Covers the app with a lock screen until the ranger proves it is them. Only after registration
  * (there is nothing to protect before), and only when the phone has some way to ask. [bypass] goes up by one
- * for every real, verified emergency from a colleague; each one opens the app for a few minutes (and only while
- * it stays in front) without asking.
+ * for every real, verified emergency from a colleague ([bypassAlertId]). An emergency never opens the whole app:
+ * for a few minutes (and only while it stays in front) it shows just that alert. The same happens when the
+ * phone itself is locked, even if the app lock is off, so nobody holding a locked phone can reach the ranger's data.
  */
 @Composable
-fun AppLockGate(bypass: Int, content: @Composable () -> Unit) {
+fun AppLockGate(bypass: Int, bypassAlertId: Long = 0L, content: @Composable () -> Unit) {
     val context = LocalContext.current
     val activity = remember(context) { context.fragmentActivity() }
     var enabled by remember { mutableStateOf(AppLockPrefs.isEnabled(context)) }
@@ -121,19 +155,31 @@ fun AppLockGate(bypass: Int, content: @Composable () -> Unit) {
     var asking by remember { mutableStateOf(false) }
     var resumed by remember { mutableStateOf(false) }
 
+    fun closeAlert() {
+        if (LockState.alertId == null) return
+        LockState.alertId = null
+        if (LockState.alertOverKeyguard) activity?.leaveLockScreen()
+        LockState.alertOverKeyguard = false
+    }
+
     LaunchedEffect(Unit) { hasData = withContext(Dispatchers.IO) { runCatching { context.container.profileRepository.getProfile() != null }.getOrDefault(true) } }
-    // an emergency opens the app, but only for a few minutes and only while it stays in front
+    // an emergency shows only its own alert, for a few minutes and only while the app stays in front
     LaunchedEffect(bypass) {
-        if (bypass > 0 && !LockState.unlocked) {
-            LockState.unlocked = true; LockState.viaAlert = true; LockState.leftAfterAlert = false
-            LockState.alertUntil = SystemClock.elapsedRealtime() + LockState.ALERT_WINDOW_MS
+        if (bypass > 0) {
+            val overKeyguard = phoneLocked(context)
+            if (overKeyguard || !LockState.unlocked) {
+                LockState.alertId = bypassAlertId
+                LockState.alertOverKeyguard = overKeyguard
+                LockState.leftAfterAlert = false
+                LockState.alertUntil = SystemClock.elapsedRealtime() + LockState.ALERT_WINDOW_MS
+            }
         }
     }
-    LaunchedEffect(LockState.unlocked, LockState.viaAlert) {
-        if (LockState.unlocked && LockState.viaAlert) {
+    LaunchedEffect(LockState.alertId) {
+        if (LockState.alertId != null) {
             val left = LockState.alertUntil - SystemClock.elapsedRealtime()
             if (left > 0) delay(left)
-            if (LockState.viaAlert) { LockState.unlocked = false; LockState.viaAlert = false }
+            closeAlert()
         }
     }
 
@@ -141,11 +187,11 @@ fun AppLockGate(bypass: Int, content: @Composable () -> Unit) {
     DisposableEffect(owner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_STOP -> { LockState.stoppedAt = SystemClock.elapsedRealtime(); resumed = false; if (LockState.viaAlert) LockState.leftAfterAlert = true }
+                Lifecycle.Event.ON_STOP -> { LockState.stoppedAt = SystemClock.elapsedRealtime(); resumed = false; if (LockState.alertId != null) LockState.leftAfterAlert = true }
                 Lifecycle.Event.ON_START -> {
                     enabled = AppLockPrefs.isEnabled(context)
                     available = AppLock.available(context)
-                    if (LockState.leftAfterAlert) { LockState.unlocked = false; LockState.viaAlert = false; LockState.leftAfterAlert = false }
+                    if (LockState.leftAfterAlert) { LockState.leftAfterAlert = false; closeAlert() }
                     if (LockState.unlocked && LockState.stoppedAt > 0 && SystemClock.elapsedRealtime() - LockState.stoppedAt > LockState.GRACE_MS) LockState.unlocked = false
                 }
                 Lifecycle.Event.ON_RESUME -> resumed = true
@@ -158,8 +204,12 @@ fun AppLockGate(bypass: Int, content: @Composable () -> Unit) {
     }
 
     val mustAsk = enabled && available && hasData == true && !LockState.unlocked
+    // only the emergency itself, never the rest of the app, while the ranger has not proved who they are
+    // (or while the phone itself is still locked)
+    val alertOnly = LockState.alertId != null && (LockState.alertOverKeyguard || mustAsk)
     // before the answer about registration is known nothing is shown, so the dashboard never flashes
-    val covered = hasData == null || mustAsk
+    val covered = hasData == null || mustAsk || alertOnly
+    SideEffect { AppLockStatus.open = !covered }
 
     fun ask() {
         val a = activity ?: run { LockState.unlocked = true; return }
@@ -168,7 +218,7 @@ fun AppLockGate(bypass: Int, content: @Composable () -> Unit) {
         message = null
         AppLock.prompt(
             a,
-            onSuccess = { asking = false; LockState.unlocked = true; LockState.viaAlert = false },
+            onSuccess = { asking = false; LockState.unlocked = true },
             onFailure = { code, text ->
                 asking = false
                 when (code) {
@@ -182,7 +232,7 @@ fun AppLockGate(bypass: Int, content: @Composable () -> Unit) {
     }
 
     // ask by itself as soon as the lock screen is in front
-    LaunchedEffect(mustAsk, resumed) { if (mustAsk && resumed) ask() }
+    LaunchedEffect(mustAsk, resumed, alertOnly) { if (mustAsk && resumed && !alertOnly) ask() }
 
     Box(Modifier.fillMaxSize()) {
         content()
@@ -194,7 +244,11 @@ fun AppLockGate(bypass: Int, content: @Composable () -> Unit) {
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
                 contentAlignment = Alignment.Center,
             ) {
-                if (mustAsk) {
+                val alertId = LockState.alertId
+                if (alertOnly && alertId != null) {
+                    // leaving the alert (back or "guide me there") goes to the lock: the rest of the app needs the ranger
+                    ir.mohitban.app.ui.gasht.SosScreen(id = alertId, onBack = { closeAlert() }, onGuide = { closeAlert() })
+                } else if (mustAsk) {
                     Column(Modifier.padding(horizontal = 32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                         // the app's own badge (it has its own empty margin, so it is drawn larger than it looks)
                         Image(painterResource(R.drawable.ic_launcher_foreground), null, modifier = Modifier.size(200.dp))

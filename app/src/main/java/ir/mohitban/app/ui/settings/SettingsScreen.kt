@@ -239,7 +239,7 @@ fun SettingsScreen(
                     Column(Modifier.padding(14.dp)) {
                         Text("کد تیم برای پیامک اضطراری", style = MaterialTheme.typography.titleSmall)
                         Text(
-                            "همه‌ی همکاران یک کد یکسان وارد کنند. پیامک‌های اضطراری امضا می‌شوند و پیامکی که امضای درست نداشته باشد هشدار جعلی حساب می‌شود. خالی بگذارید تا بررسی خاموش باشد.",
+                            "همه‌ی همکاران یک کد یکسان وارد کنند. پیامک‌های اضطراری امضا می‌شوند و پیامکی که امضای درست نداشته باشد هشدار جعلی حساب می‌شود. اگر خالی بماند، هر کسی که قالب پیام را بداند می‌تواند هشدار جعلی بفرستد؛ پس حتماً آن را تنظیم کنید.",
                             style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
                         )
                         ir.mohitban.app.ui.components.MField(
@@ -249,6 +249,9 @@ fun SettingsScreen(
                         )
                     }
                 }
+
+                SectionTitle("به‌روزرسانی برنامه")
+                UpdateCard()
 
                 SectionTitle("درباره")
                 var showDev by remember { mutableStateOf(false) }

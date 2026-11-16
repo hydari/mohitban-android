@@ -45,17 +45,22 @@ jobs:
             openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in private/zones-azarbaijan-sharghi.geojson.gz.enc \
               -out app/src/main/assets/zones/bundled.geojson.gz -pass env:MOHITBAN_KEY_PASSWORD
             echo "zones: $(stat -c %s app/src/main/assets/zones/bundled.geojson.gz) bytes"
+            # key of the encrypted in-app update (update/AppUpdate.kt, tools/pack_update.py), derived from the same
+            # secret so no second secret is needed; as slow to guess backwards as the keystore file itself
+            UPDATE_KEY=$(python3 -c "import hashlib,os;print(hashlib.pbkdf2_hmac('sha256',os.environ['MOHITBAN_KEY_PASSWORD'].encode(),b'mohityar-update-v1',200000).hex())")
+            echo "::add-mask::$UPDATE_KEY"
+            echo "MOHITBAN_UPDATE_KEY=$UPDATE_KEY" >> "$GITHUB_ENV"
           else
             echo "::warning::Secret MOHITBAN_KEY_PASSWORD is missing - the APK is signed with a temporary debug key."
           fi
 
-      - name: Build release APK
+      - name: Build release APK (tests first)
         env:
           MOHITBAN_KEY_PASSWORD: ${{ secrets.MOHITBAN_KEY_PASSWORD }}
         run: |
           chmod +x gradlew
           set -o pipefail
-          ./gradlew assembleRelease 2>&1 | tee build.log
+          ./gradlew testReleaseUnitTest assembleRelease 2>&1 | tee build.log
 
       - name: Report build errors
         if: failure()
@@ -69,22 +74,41 @@ jobs:
           mkdir -p out
           cp app/build/outputs/apk/release/*.apk out/Mohityar.apk
 
+      - name: Package for the update host (muhitban.ir/app/application)
+        run: |
+          if [ -z "$MOHITBAN_UPDATE_KEY" ]; then
+            echo "::warning::No update key (secret missing) - no package for the host."
+            exit 0
+          fi
+          pip install --quiet cryptography
+          # the version is read from the APK itself, so it always matches app/build.gradle.kts
+          AAPT=$(ls "$ANDROID_HOME"/build-tools/*/aapt 2>/dev/null | sort -V | tail -1)
+          BADGING=$("$AAPT" dump badging out/Mohityar.apk | head -1)
+          VERSION_CODE=$(echo "$BADGING" | grep -oP "versionCode='\K[0-9]+")
+          VERSION_NAME=$(echo "$BADGING" | grep -oP "versionName='\K[^']+")
+          echo "APK version: $VERSION_NAME ($VERSION_CODE)"
+          [ -n "$VERSION_CODE" ] || { echo "::error::could not read the APK version"; exit 1; }
+          NOTES="$(git log -1 --pretty=%s)"
+          python3 tools/pack_update.py out/Mohityar.apk "$VERSION_CODE" "$VERSION_NAME" update-package "$NOTES"
+          (cd update-package && zip -q -r ../out/Mohityar-host.zip . )
+          ls -la update-package
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Mohityar-APK-${{ github.run_number }}
-          path: out/*.apk
+          path: out/*
           retention-days: 30
 
-      - name: Publish release (public download link)
+      - name: Publish release (download link)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           # one stable release "v1.0": the previous build is replaced by the newest one
           # (map releases such as map-azarbaijan-sharghi are left alone)
           gh release delete v1.0 --repo "${{ github.repository }}" --cleanup-tag -y || true
-          gh release create v1.0 out/Mohityar.apk \
+          gh release create v1.0 out/Mohityar.apk $( [ -f out/Mohityar-host.zip ] && echo out/Mohityar-host.zip ) \
             --repo "${{ github.repository }}" \
-            --title "محیط‌یار نسخه ۱.۰.۰" \
-            --notes "فایل Mohityar.apk را دانلود و روی گوشی نصب کنید. (ساخت شماره ${{ github.run_number }})" \
+            --title "محیط‌یار نسخه 1.1.${{ github.run_number }}" \
+            --notes "Mohityar.apk: نصب مستقیم روی گوشی. Mohityar-host.zip: بسته‌ی به‌روزرسانی برای آپلود در پوشه‌ی app/application هاست (محتوای zip را همان‌جا باز کنید). (ساخت شماره ${{ github.run_number }})" \
             --latest

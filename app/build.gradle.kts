@@ -16,13 +16,20 @@ android {
         applicationId = "ir.mohitban.app"
         minSdk = 21
         targetSdk = 35
-        // every GitHub build gets a higher version so it installs as an update
-        val run = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
-        versionCode = run
-        versionName = "1.0.0"
+        // every GitHub build gets a higher version so it installs as an update. The base (1000) keeps the numbers
+        // above those of the older builds (which used the bare run number) and leaves room should the run counter
+        // ever start again (new repository or workflow): then raise versionBase above the last published code.
+        val run = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0
+        val versionBase = 1000
+        versionCode = versionBase + run
+        versionName = "1.1.$run"
         vectorDrawables { useSupportLibrary = true }
         // only Persian and English UI strings from libraries (smaller APK, nothing visible changes)
         resourceConfigurations += listOf("fa", "en")
+        // key of the encrypted in-app update (see update/AppUpdate.kt); made by the workflow from the repository
+        // secret, never stored in the code. Empty in local builds: the update check is then switched off.
+        val updateKey = System.getenv("MOHITBAN_UPDATE_KEY").orEmpty().filter { it.isLetterOrDigit() }
+        buildConfigField("String", "UPDATE_KEY", "\"$updateKey\"")
     }
 
     // A fixed release key so every new APK installs as an update over the previous one.
@@ -43,9 +50,8 @@ android {
     }
 
     buildTypes {
-        debug {
-            if (hasReleaseKey) signingConfig = signingConfigs.getByName("mohitban")
-        }
+        // debug builds keep the debug key on purpose: a debuggable APK signed with the release key could be
+        // installed over the real app and its data read out with "run-as"
         release {
             // R8 removes unused library code/resources (mostly the large icon set); the app's own
             // classes are kept as-is in proguard-rules.pro so behaviour does not change
@@ -61,7 +67,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
     packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
 }
 
