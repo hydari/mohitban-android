@@ -79,6 +79,22 @@ object PdfKit {
         return layout.height.toFloat()
     }
 
+    /** Height [paragraph] would use for the same arguments, without drawing. */
+    fun measure(s: String, width: Float, p: TextPaint, spacing: Float = 1.25f): Float {
+        if (s.isEmpty()) return 0f
+        val layout = if (android.os.Build.VERSION.SDK_INT >= 23) {
+            StaticLayout.Builder.obtain(s, 0, s.length, p, width.toInt())
+                .setTextDirection(TextDirectionHeuristics.RTL)
+                .setLineSpacing(0f, spacing)
+                .setIncludePad(false)
+                .build()
+        } else {
+            @Suppress("DEPRECATION")
+            StaticLayout(s, p, width.toInt(), Layout.Alignment.ALIGN_NORMAL, spacing, 0f, false)
+        }
+        return layout.height.toFloat()
+    }
+
     fun dotted(width: Float = 0.9f, color: Int = LINE) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         this.color = color
         strokeWidth = width

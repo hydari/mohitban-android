@@ -452,7 +452,7 @@ fun LtrText(text: String, modifier: Modifier = Modifier, style: androidx.compose
 // ============================================================================ screen
 
 @Composable
-fun GashtScreen(onTab: (ir.mohitban.app.ui.components.MainTab) -> Unit) {
+fun GashtScreen(onTab: (ir.mohitban.app.ui.components.MainTab) -> Unit, onDaily: () -> Unit = {}) {
     val vm = appViewModel(key = "gasht") { c, _ -> GashtViewModel(c) }
     val context = LocalContext.current
     val permitted by vm.hasPermission.collectAsStateWithLifecycle()
@@ -496,7 +496,7 @@ fun GashtScreen(onTab: (ir.mohitban.app.ui.components.MainTab) -> Unit) {
         when (vm.tab) {
             1 -> TracksTab(vm)
             2 -> PlacesTab(vm)
-            else -> ToolsTab(vm)
+            else -> ToolsTab(vm, onDaily)
         }
     }
     ir.mohitban.app.ui.components.BottomBar(ir.mohitban.app.ui.components.MainTab.GASHT, onTab, Modifier.align(Alignment.BottomCenter))
@@ -753,7 +753,7 @@ private fun PositionPanel(vm: GashtViewModel, fix: Fix?, sats: Pair<Int, Int>?, 
             val parts = listOfNotNull(w.province?.let { "استان $it" }, w.county?.let { "شهرستان $it" })
             val near = w.place?.let { pl ->
                 val d = w.placeDistance ?: 0.0
-                if (d < 700) "در ${pl.label}" else "${CoordFormat.meters(d).fa()} از ${pl.label}"
+                if (w.inside) "در ${pl.label}" else "${CoordFormat.meters(d).fa()} از ${pl.label}"
             }
             val line = (parts + listOfNotNull(near)).joinToString(" | ")
             if (line.isNotBlank()) Text(line, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = MColors.Ink, modifier = Modifier.padding(top = 2.dp))

@@ -41,12 +41,60 @@ object Whereabouts {
         }
     }
 
-    data class Result(val province: String?, val county: String?, val place: Settlement?, val placeDistance: Double?) {
+    /**
+     * [place]: the settlement the ranger is in (when [inside]) or else the nearest one, [placeDistance] metres from
+     * its centre. [placeLabel] says it the way a person would: "شهر تبریز", "روستای X" or "حوالی روستای X".
+     */
+    data class Result(
+        val province: String?, val county: String?, val place: Settlement?, val placeDistance: Double?,
+        val inside: Boolean = false,
+    ) {
         val isEmpty get() = province == null && county == null && place == null
+
+        val placeLabel: String?
+            get() {
+                val p = place ?: return null
+                val d = placeDistance ?: return p.label
+                return when {
+                    inside -> p.label
+                    d < 15_000 -> "حوالی ${p.label}"
+                    else -> null
+                }
+            }
     }
 
     @Volatile private var areas: List<Area>? = null
     @Volatile private var places: List<Settlement>? = null
+    /** Cities and towns with the radius they cover on the ground (OSM keeps only their centre point). */
+    @Volatile private var towns: List<Pair<Settlement, Double>>? = null
+
+    private const val CITY_RADIUS = 4_000.0
+    private const val TOWN_RADIUS = 2_500.0
+    private const val VILLAGE_RADIUS = 1_200.0
+    private const val HAMLET_RADIUS = 600.0
+
+    /**
+     * How far each city / town reaches. Its neighbourhoods (place=suburb) lie inside it, so the farthest one
+     * nearest to that city tells its size: Tehran reaches far, a small town only its default radius.
+     */
+    private fun townsWithRadius(all: List<Settlement>): List<Pair<Settlement, Double>> {
+        val list = all.filter { it.kind == 'c' || it.kind == 't' }
+        val radius = DoubleArray(list.size) { if (list[it].kind == 'c') CITY_RADIUS else TOWN_RADIUS }
+        for (s in all) {
+            if (s.kind != 's') continue
+            var best = -1
+            var bestD = Double.MAX_VALUE
+            for (i in list.indices) {
+                val t = list[i]
+                if (kotlin.math.abs(t.lat - s.lat) > 0.25 || kotlin.math.abs(t.lon - s.lon) > 0.3) continue
+                val d = Geo.distance(GeoPoint(s.lat, s.lon), GeoPoint(t.lat, t.lon))
+                if (d < bestD) { bestD = d; best = i }
+            }
+            val limit = if (best >= 0 && list[best].kind == 'c') 25_000.0 else 8_000.0
+            if (best >= 0 && bestD < limit) radius[best] = maxOf(radius[best], bestD + 1_000)
+        }
+        return list.indices.map { list[it] to radius[it] }
+    }
 
     fun available(context: Context): Boolean = runCatching { context.assets.list("geo")?.any { it.startsWith("admin.geojson") } == true }.getOrDefault(false)
 
@@ -63,6 +111,7 @@ object Whereabouts {
                 if (f.size < 4) null else Settlement(f[0].firstOrNull() ?: 'v', f[1].toDoubleOrNull() ?: return@mapNotNull null, f[2].toDoubleOrNull() ?: return@mapNotNull null, f[3])
             }?.toList() ?: emptyList()
         }
+        if (towns == null) towns = townsWithRadius(places.orEmpty())
     }
 
     private fun parseAreas(json: String): List<Area> {
@@ -125,16 +174,34 @@ object Whereabouts {
         val a = areas.orEmpty()
         val province = a.firstOrNull { it.level == 4 && it.contains(p.lat, p.lon) }?.name?.let { clean(it, "استان") }
         val county = a.firstOrNull { it.level == 5 && it.contains(p.lat, p.lon) }?.name?.let { clean(it, "شهرستان") }
-        var best: Settlement? = null
-        var bestD = Double.MAX_VALUE
-        for (s in places.orEmpty()) {
-            if (kotlin.math.abs(s.lat - p.lat) > 0.12 || kotlin.math.abs(s.lon - p.lon) > 0.15) continue
-            // towns count as "nearer" so a village on a city's edge does not hide the city
-            val d = Geo.distance(p, GeoPoint(s.lat, s.lon)) * (if (s.kind == 'c') 0.5 else if (s.kind == 't') 0.75 else 1.0)
-            if (d < bestD) { bestD = d; best = s }
+        // 1) inside a city or town: it always wins over the villages around (and inside) it.
+        //    Of several, the one whose centre is relatively nearest (a city before a town at the same share).
+        var city: Settlement? = null
+        var cityD = 0.0
+        var cityShare = Double.MAX_VALUE
+        for ((s, r) in towns.orEmpty()) {
+            if (kotlin.math.abs(s.lat - p.lat) > 0.3 || kotlin.math.abs(s.lon - p.lon) > 0.35) continue
+            val d = Geo.distance(p, GeoPoint(s.lat, s.lon))
+            if (d > r) continue
+            val share = d / r * (if (s.kind == 'c') 0.8 else 1.0)
+            if (share < cityShare) { cityShare = share; city = s; cityD = d }
         }
-        val realD = best?.let { Geo.distance(p, GeoPoint(it.lat, it.lon)) }
-        return Result(province, county, best, realD)
+        if (city != null) return Result(province, county, city, cityD, inside = true)
+
+        // 2) otherwise the village or hamlet the ranger is in, else simply the nearest settlement ("حوالی …")
+        var nearest: Settlement? = null
+        var nearestD = Double.MAX_VALUE
+        var inVillage: Settlement? = null
+        var inVillageD = Double.MAX_VALUE
+        for (s in places.orEmpty()) {
+            if (kotlin.math.abs(s.lat - p.lat) > 0.15 || kotlin.math.abs(s.lon - p.lon) > 0.18) continue
+            val d = Geo.distance(p, GeoPoint(s.lat, s.lon))
+            if (d < nearestD) { nearestD = d; nearest = s }
+            val r = when (s.kind) { 'v' -> VILLAGE_RADIUS; 'h' -> HAMLET_RADIUS; else -> 0.0 }
+            if (d <= r && d < inVillageD) { inVillageD = d; inVillage = s }
+        }
+        if (inVillage != null) return Result(province, county, inVillage, inVillageD, inside = true)
+        return Result(province, county, nearest, nearest?.let { nearestD })
     }
 }
 

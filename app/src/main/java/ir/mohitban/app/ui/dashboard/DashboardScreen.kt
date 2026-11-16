@@ -29,6 +29,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.DirectionsCar
@@ -185,6 +186,7 @@ fun DashboardScreen(
     onShift: () -> Unit,
     onGasht: () -> Unit,
     onTab: (MainTab) -> Unit,
+    onDaily: () -> Unit = {},
 ) {
     val vm = appViewModel { c, _ -> DashboardViewModel(c.profileRepository, c.fuelRepository, c.settingsRepository) }
     val state by vm.state.collectAsStateWithLifecycle()
@@ -342,6 +344,25 @@ fun DashboardScreen(
                         )
                     }
                     if (rec.active) PulseDot(Color(0xFFE5483B), Modifier.padding(end = 2.dp), size = 10.dp, active = !rec.paused)
+                    Icon(
+                        Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = MColors.Muted,
+                        modifier = Modifier.padding(start = 6.dp, end = 14.dp).size(20.dp),
+                    )
+                }
+
+                // ---------- daily patrol report ----------
+                GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).height(DashH).staggerIn(5, "dash"), dark = true, onClick = onDaily) {
+                    CircleIcon(
+                        Icons.AutoMirrored.Outlined.Assignment, Color(0xFF6A5ACD), Color.White,
+                        size = DashIcon, iconSize = 23.dp, modifier = Modifier.padding(start = 14.dp),
+                    )
+                    Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                        Text("گزارش روزانه گشت", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Ink)
+                        Text(
+                            "فرم رسمی پایش روزانه: گونه‌ها، تخلفات، امضا و ارسال",
+                            style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
                     Icon(
                         Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = MColors.Muted,
                         modifier = Modifier.padding(start = 6.dp, end = 14.dp).size(20.dp),

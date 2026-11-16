@@ -129,14 +129,21 @@ fun WeatherCard(here: GeoPoint?, home: Pair<GeoPoint, String>?) {
     // re-ask only after moving about 5 km
     val key = point?.let { (it.lat * 20).toInt() to (it.lon * 20).toInt() }
     LaunchedEffect(Unit) { if (weather == null) weather = withContext(Dispatchers.IO) { WeatherService.saved(context) } }
+    suspend fun nameOf(p: GeoPoint): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val w = ir.mohitban.app.gasht.Whereabouts.locate(context, p)
+            listOfNotNull(w.placeLabel, w.county?.let { "شهرستان $it" }).joinToString("، ").ifBlank { null }
+        }.getOrNull()
+    }
+    // the place name follows the ranger closely (about every 500 m), the forecast only every few kilometres
+    val nameKey = here?.let { (it.lat * 200).toInt() to (it.lon * 200).toInt() }
+    LaunchedEffect(nameKey) {
+        val p = here ?: return@LaunchedEffect
+        nameOf(p)?.let { placeName = it }
+    }
     LaunchedEffect(key, tick) {
         val p = point ?: return@LaunchedEffect
-        val name = if (here != null) withContext(Dispatchers.IO) {
-            runCatching {
-                val w = ir.mohitban.app.gasht.Whereabouts.locate(context, p)
-                listOfNotNull(w.place?.takeIf { (w.placeDistance ?: 1e9) < 15_000 }?.label, w.county?.let { "شهرستان $it" }).joinToString("، ").ifBlank { null }
-            }.getOrNull()
-        } else home?.second
+        val name = if (here != null) nameOf(p) else home?.second
         placeName = name
         val saved = weather
         val fresh = saved != null && tick == 0 && System.currentTimeMillis() - saved.fetchedAt < 20 * 60_000L && Geo.distance(saved.point, p) < 5_000

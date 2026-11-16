@@ -77,10 +77,15 @@ object Routes {
     const val VEHICLE = "vehicle/{id}"
     const val SOS = "sos/{id}"
     const val HELP = "help"
+    const val DAILY = "daily"
+    const val DAILY_EDIT = "daily_edit?id={id}"
+    const val DAILY_VIEW = "daily_view/{id}"
 
     fun fuel(id: Long = 0L) = "fuel?entryId=$id"
     fun crop(path: String) = "crop?path=${Uri.encode(path)}"
     fun vehicle(id: Long) = "vehicle/$id"
+    fun dailyEdit(id: Long = 0L) = "daily_edit?id=$id"
+    fun dailyView(id: Long) = "daily_view/$id"
 }
 
 private const val RECEIPT_KEY = "cropped_receipt"
@@ -249,7 +254,39 @@ fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0, openGasht
                 onAlerts = { nav.navigate(Routes.ALERTS) },
                 onShift = { nav.navigate(Routes.SHIFT) },
                 onGasht = { nav.openTab(MainTab.GASHT) },
+                onDaily = { nav.navigate(Routes.DAILY) },
                 onTab = { nav.openTab(it) },
+            )
+        }
+        // ---------------- daily patrol report
+        composable(Routes.DAILY) {
+            ir.mohitban.app.ui.daily.DailyReportsScreen(
+                onBack = { nav.popBackStack() },
+                onNew = { nav.navigate(Routes.dailyEdit()) },
+                onOpen = { nav.navigate(Routes.dailyView(it)) },
+            )
+        }
+        composable(Routes.DAILY_EDIT, arguments = listOf(navArgument("id") { type = NavType.LongType; defaultValue = 0L })) { entry ->
+            val id = entry.arguments?.getLong("id") ?: 0L
+            val newVehicle by entry.savedStateHandle.getStateFlow<Long?>(VEHICLE_KEY, null).collectAsState()
+            ir.mohitban.app.ui.daily.DailyReportEditScreen(
+                id = id,
+                newVehicleId = newVehicle,
+                onVehicleConsumed = { entry.savedStateHandle[VEHICLE_KEY] = null },
+                onAddVehicle = { nav.navigate(Routes.vehicle(0L)) },
+                onBack = { nav.popBackStack() },
+                onSaved = { saved ->
+                    // the form replaces the editor, so "back" from the form returns to the list
+                    nav.navigate(Routes.dailyView(saved)) { popUpTo(Routes.DAILY_EDIT) { inclusive = true } }
+                },
+            )
+        }
+        composable(Routes.DAILY_VIEW, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
+            val id = entry.arguments?.getLong("id") ?: 0L
+            ir.mohitban.app.ui.daily.DailyReportViewScreen(
+                id = id,
+                onBack = { if (!nav.popBackStack()) nav.navigate(Routes.HOME) },
+                onEdit = { nav.navigate(Routes.dailyEdit(it)) },
             )
         }
         composable(Routes.REPORTS) {
@@ -323,7 +360,7 @@ fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0, openGasht
             )
         }
         composable(Routes.GASHT) {
-            ir.mohitban.app.ui.gasht.GashtScreen(onTab = { nav.openTab(it) })
+            ir.mohitban.app.ui.gasht.GashtScreen(onTab = { nav.openTab(it) }, onDaily = { nav.navigate(Routes.DAILY) })
         }
         composable(Routes.SOS, arguments = listOf(navArgument("id") { type = NavType.LongType })) { e ->
             ir.mohitban.app.ui.gasht.SosScreen(

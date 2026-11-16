@@ -25,6 +25,7 @@ class AppContainer(context: Context) {
     val fuelRepository: FuelRepository = FuelRepositoryImpl(db, files)
     val fuelForm = FuelFormRenderer(context, files)
     val quarterReport = QuarterReportRenderer(context, files)
+    val dailyReport = ir.mohitban.app.pdf.DailyReportRenderer(context, files)
     val backup = BackupManager(context, db, files)
     val gasht = ir.mohitban.app.gasht.GashtRepository(db, files)
 }

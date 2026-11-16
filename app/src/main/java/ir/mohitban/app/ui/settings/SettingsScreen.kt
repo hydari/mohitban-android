@@ -247,6 +247,7 @@ fun SettingsScreen(
                             placeholder = "کد طولانی و غیرقابل‌حدس", maxLength = 40,
                             error = if (teamCode.isNotBlank() && teamCode.trim().length < ir.mohitban.app.gasht.SosTeam.MIN_LENGTH) "حداقل ${ir.mohitban.app.gasht.SosTeam.MIN_LENGTH.fa()} نویسه" else null,
                         )
+                        ir.mohitban.app.ui.gasht.SosReadinessList(Modifier.padding(top = 4.dp))
                     }
                 }
 

@@ -25,6 +25,8 @@ import ir.mohitban.app.container
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Assignment
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.AddLocationAlt
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.FlashlightOn
@@ -70,10 +72,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
 @Composable
-fun ToolsTab(vm: GashtViewModel) {
+fun ToolsTab(vm: GashtViewModel, onDaily: () -> Unit = {}) {
     val fix by vm.fix.collectAsStateWithLifecycle()
     val compass by vm.compass.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+        DailyReportEntry(onDaily)
         EmergencyCard(vm, fix, trueHeading(compass, fix))
         WeatherCard(fix?.point, rememberHomePlace())
         CompassCard(trueHeading(compass, fix), compass != null, fix?.point)
@@ -82,6 +85,21 @@ fun ToolsTab(vm: GashtViewModel) {
         SunCard(fix?.point)
         TorchCard()
         Spacer(Modifier.height(30.dp))
+    }
+}
+
+/** The daily patrol report, from گشت‌یار as well as from the dashboard. */
+@Composable
+private fun DailyReportEntry(onClick: () -> Unit) {
+    AppCard(Modifier.fillMaxWidth().padding(bottom = 12.dp), onClick = onClick) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            ir.mohitban.app.ui.components.CircleIcon(Icons.AutoMirrored.Outlined.Assignment, Color(0xFF6A5ACD), Color.White, size = 40.dp, iconSize = 21.dp)
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                Text("گزارش روزانه گشت", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Ink)
+                Text("ثبت، امضا، نمایش و ارسال فرم رسمی پایش امروز", style = MaterialTheme.typography.labelSmall, color = MColors.Muted)
+            }
+            androidx.compose.material3.Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = MColors.Muted, modifier = Modifier.size(20.dp))
+        }
     }
 }
 
@@ -187,16 +205,8 @@ private fun SosReceiveSection() {
         }, Modifier.padding(top = 8.dp))
     } else {
         Text("فعال است: پیامک اضطراری همکاران، برنامه را روی محل آن‌ها باز می‌کند.", style = MaterialTheme.typography.labelSmall, color = Color(0xFF1B7F3B), modifier = Modifier.padding(top = 4.dp))
-        if (!fullScreen && Build.VERSION.SDK_INT >= 34) {
-            Text("برای باز شدن خودکار روی صفحه‌ی قفل، اجازه‌ی «اعلان تمام‌صفحه» را بدهید.", style = MaterialTheme.typography.labelSmall, color = MColors.Amber, modifier = Modifier.padding(top = 4.dp))
-            SmallAction(Icons.Outlined.Sos, "اجازه‌ی تمام‌صفحه", Modifier.padding(top = 6.dp), color = MColors.Error) {
-                runCatching {
-                    context.startActivity(
-                        Intent(android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:${context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                    )
-                }
-            }
-        }
+        // everything else the phone must allow so a closed app is opened too
+        SosReadinessList()
     }
     if (alerts.isNotEmpty()) {
         Text("هشدارهای دریافت‌شده", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = MColors.Ink, modifier = Modifier.padding(top = 10.dp))
@@ -405,7 +415,7 @@ private fun SunCard(here: GeoPoint?) {
             runCatching {
                 val w = ir.mohitban.app.gasht.Whereabouts.locate(context, p)
                 listOfNotNull(
-                    w.place?.takeIf { (w.placeDistance ?: 1e9) < 15_000 }?.label,
+                    w.placeLabel,
                     w.county?.let { "شهرستان $it" },
                 ).joinToString("، ").ifBlank { null }
             }.getOrNull()

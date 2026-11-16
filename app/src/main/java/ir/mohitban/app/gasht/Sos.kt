@@ -318,6 +318,8 @@ object SosNotifier {
         runCatching { NotificationManagerCompat.from(context).notify(notificationId(a.id), n) }
         // if the app is already open, go straight to the map
         SosStore.open.value = a.id
+        // closed or in the background while the phone is in use: open the alert screen right away
+        SosWake.bringToFront(context, openIntent(context, a.id))
     }
 
     fun cancel(context: Context, id: Long) = runCatching { NotificationManagerCompat.from(context).cancel(notificationId(id)) }

@@ -72,11 +72,34 @@ class SignatureState {
     val hasNewDrawing: Boolean get() = strokes.isNotEmpty() || current.isNotEmpty()
     val isEmpty: Boolean get() = !hasNewDrawing && existing == null
 
-    internal fun start(p: Offset) { current.clear(); current.add(p); version++ }
-    internal fun move(p: Offset) { current.add(p); version++ }
+    private var lastRaw = Offset.Zero
+
+    internal fun start(p: Offset) { current.clear(); current.add(p); lastRaw = p; version++ }
+
+    /**
+     * Follows the finger a little behind (a low-pass filter), so the small shakes of a hand on glass are evened out,
+     * and skips points that hardly moved; [smoothPath] then draws soft curves through what is left.
+     */
+    internal fun move(p: Offset) {
+        lastRaw = p
+        val prev = current.lastOrNull() ?: run { start(p); return }
+        val s = prev + (p - prev) * SMOOTHING
+        if ((s - prev).getDistance() < MIN_STEP) return
+        current.add(s); version++
+    }
+
     internal fun end() {
+        // the filter lags behind; finish exactly where the finger was lifted
+        val last = current.lastOrNull()
+        if (last != null && (lastRaw - last).getDistance() >= MIN_STEP) current.add(lastRaw)
         if (current.isNotEmpty()) strokes.add(current.toList())
         current.clear(); version++
+    }
+
+    private companion object {
+        /** 1 = no smoothing; lower is softer but follows the finger more slowly. */
+        const val SMOOTHING = 0.45f
+        const val MIN_STEP = 1.5f
     }
     internal fun liveStroke(): List<Offset> = current
 
@@ -108,16 +131,36 @@ class SignatureState {
         }
         for (s in strokes) {
             val path = APath()
-            s.forEachIndexed { i, p ->
-                val x = (p.x - minX) * scale
-                val y = (p.y - minY) * scale
-                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-            }
-            if (s.size == 1) path.lineTo((s[0].x - minX) * scale + 0.5f, (s[0].y - minY) * scale + 0.5f)
+            val pts = s.map { Offset((it.x - minX) * scale, (it.y - minY) * scale) }
+            smoothPath(pts, path::moveTo, path::quadTo, path::lineTo)
             c.drawPath(path, paint)
         }
         return bmp
     }
+}
+
+/**
+ * A soft line through [points]: quadratic curves from the middle of one step to the middle of the next, using each
+ * point as the control point, so corners of the finger's path become round instead of jagged.
+ */
+internal inline fun smoothPath(
+    points: List<Offset>,
+    moveTo: (Float, Float) -> Unit,
+    quadTo: (Float, Float, Float, Float) -> Unit,
+    lineTo: (Float, Float) -> Unit,
+) {
+    if (points.isEmpty()) return
+    val first = points[0]
+    moveTo(first.x, first.y)
+    if (points.size == 1) { lineTo(first.x + 0.5f, first.y + 0.5f); return }
+    if (points.size == 2) { lineTo(points[1].x, points[1].y); return }
+    for (i in 1 until points.size - 1) {
+        val c = points[i]
+        val n = points[i + 1]
+        quadTo(c.x, c.y, (c.x + n.x) / 2f, (c.y + n.y) / 2f)
+    }
+    val last = points.last()
+    lineTo(last.x, last.y)
 }
 
 @Composable
@@ -187,9 +230,7 @@ fun SignaturePad(
                 fun draw(points: List<Offset>) {
                     if (points.isEmpty()) return
                     val p = Path()
-                    p.moveTo(points[0].x, points[0].y)
-                    for (i in 1 until points.size) p.lineTo(points[i].x, points[i].y)
-                    if (points.size == 1) p.lineTo(points[0].x + 0.5f, points[0].y + 0.5f)
+                    smoothPath(points, p::moveTo, p::quadraticTo, p::lineTo)
                     drawPath(p, Color(0xFF102040), style = stroke)
                 }
                 state.strokes.forEach { draw(it) }
@@ -259,9 +300,7 @@ fun BigSignatureCanvas(state: SignatureState, modifier: Modifier = Modifier) {
             fun draw(points: List<Offset>) {
                 if (points.isEmpty()) return
                 val p = Path()
-                p.moveTo(points[0].x, points[0].y)
-                for (i in 1 until points.size) p.lineTo(points[i].x, points[i].y)
-                if (points.size == 1) p.lineTo(points[0].x + 0.5f, points[0].y + 0.5f)
+                smoothPath(points, p::moveTo, p::quadraticTo, p::lineTo)
                 drawPath(p, Color(0xFF102040), style = stroke)
             }
             state.strokes.forEach { draw(it) }

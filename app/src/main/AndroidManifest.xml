@@ -18,6 +18,10 @@
          without the Mohityar line are ignored and nothing is stored -->
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- the emergency opens the app by itself while the phone is in use (gasht/SosWake.kt), and the phone must not
+         put the app to sleep so the SMS still reaches it -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- reminders of the calendar notes at the time the ranger chose -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
