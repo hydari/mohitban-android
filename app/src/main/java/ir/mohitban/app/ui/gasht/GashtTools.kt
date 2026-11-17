@@ -29,6 +29,7 @@ import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.AddLocationAlt
 import androidx.compose.material.icons.outlined.Explore
+import androidx.compose.material.icons.outlined.ImageSearch
 import androidx.compose.material.icons.outlined.FlashlightOn
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Delete
@@ -72,11 +73,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
 @Composable
-fun ToolsTab(vm: GashtViewModel, onDaily: () -> Unit = {}) {
+fun ToolsTab(vm: GashtViewModel, onDaily: () -> Unit = {}, onIdentify: () -> Unit = {}) {
     val fix by vm.fix.collectAsStateWithLifecycle()
     val compass by vm.compass.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         DailyReportEntry(onDaily)
+        IdentifyEntry(onIdentify)
         EmergencyCard(vm, fix, trueHeading(compass, fix))
         WeatherCard(fix?.point, rememberHomePlace())
         CompassCard(trueHeading(compass, fix), compass != null, fix?.point)
@@ -99,6 +101,21 @@ private fun DailyReportEntry(onClick: () -> Unit) {
                 Text("ثبت، امضا، نمایش و ارسال فرم رسمی پایش امروز", style = MaterialTheme.typography.labelSmall, color = MColors.Muted)
             }
             androidx.compose.material3.Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = MColors.Muted, modifier = Modifier.size(20.dp))
+        }
+    }
+}
+
+/** Offline bird recognition from a photo. */
+@Composable
+private fun IdentifyEntry(onClick: () -> Unit) {
+    AppCard(Modifier.fillMaxWidth().padding(bottom = 12.dp), onClick = onClick) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            ir.mohitban.app.ui.components.CircleIcon(Icons.Outlined.ImageSearch, Color(0xFF1F9A8A), Color.White, size = 40.dp, iconSize = 21.dp)
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                Text("شناسایی پرنده با هوش مصنوعی", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Ink)
+                Text("عکس بگیرید؛ بدون اینترنت نام و اطلاعات گونه را ببینید", style = MaterialTheme.typography.labelSmall, color = MColors.Muted)
+            }
+            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = MColors.Muted, modifier = Modifier.size(20.dp))
         }
     }
 }

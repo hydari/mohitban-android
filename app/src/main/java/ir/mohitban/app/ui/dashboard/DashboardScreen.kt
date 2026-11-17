@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.outlined.Assessment
+import androidx.compose.material.icons.outlined.ImageSearch
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.LocalGasStation
@@ -187,6 +188,7 @@ fun DashboardScreen(
     onGasht: () -> Unit,
     onTab: (MainTab) -> Unit,
     onDaily: () -> Unit = {},
+    onIdentify: () -> Unit = {},
 ) {
     val vm = appViewModel { c, _ -> DashboardViewModel(c.profileRepository, c.fuelRepository, c.settingsRepository) }
     val state by vm.state.collectAsStateWithLifecycle()
@@ -362,6 +364,22 @@ fun DashboardScreen(
                             "فرم رسمی پایش روزانه: گونه‌ها، تخلفات، امضا و ارسال",
                             style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 2.dp),
                         )
+                    }
+                    Icon(
+                        Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = MColors.Muted,
+                        modifier = Modifier.padding(start = 6.dp, end = 14.dp).size(20.dp),
+                    )
+                }
+
+                // ---------- offline bird recognition ----------
+                GlassCard(Modifier.fillMaxWidth().padding(top = 12.dp).height(DashH).staggerIn(5, "dash"), dark = true, onClick = onIdentify) {
+                    CircleIcon(
+                        Icons.Outlined.ImageSearch, Color(0xFF1F9A8A), Color.White,
+                        size = DashIcon, iconSize = 23.dp, modifier = Modifier.padding(start = 14.dp),
+                    )
+                    Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                        Text("شناسایی پرنده", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Ink)
+                        Text("با هوش مصنوعی و بدون اینترنت", style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 2.dp))
                     }
                     Icon(
                         Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = MColors.Muted,

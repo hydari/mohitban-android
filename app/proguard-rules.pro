@@ -10,3 +10,7 @@
 -dontwarn org.jetbrains.annotations.**
 -dontwarn javax.annotation.**
 -dontwarn kotlin.reflect.jvm.internal.**
+
+# TensorFlow Lite is reached from native code by name
+-keep class org.tensorflow.lite.** { *; }
+-dontwarn org.tensorflow.lite.**

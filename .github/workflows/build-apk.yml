@@ -62,6 +62,14 @@ jobs:
           set -o pipefail
           ./gradlew testReleaseUnitTest assembleRelease 2>&1 | tee build.log
 
+      - name: Check the species model
+        run: |
+          if [ -f app/src/main/assets/ai/birds_v1.tflite ]; then
+            echo "AI model: $(stat -c %s app/src/main/assets/ai/birds_v1.tflite) bytes"
+          else
+            echo "::warning::The bird model could not be downloaded - this APK has no offline species recogniser. See README (شناسایی گونه)."
+          fi
+
       - name: Report build errors
         if: failure()
         run: |

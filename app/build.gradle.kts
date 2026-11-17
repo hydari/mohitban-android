@@ -26,6 +26,8 @@ android {
         vectorDrawables { useSupportLibrary = true }
         // only Persian and English UI strings from libraries (smaller APK, nothing visible changes)
         resourceConfigurations += listOf("fa", "en")
+        // native code (the offline species recogniser, TensorFlow Lite) only for real phones: keeps the APK small
+        ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a") }
         // key of the encrypted in-app update (see update/AppUpdate.kt); made by the workflow from the repository
         // secret, never stored in the code. Empty in local builds: the update check is then switched off.
         val updateKey = System.getenv("MOHITBAN_UPDATE_KEY").orEmpty().filter { it.isLetterOrDigit() }
@@ -99,6 +101,8 @@ dependencies {
     implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.kotlinx.coroutines.android)
+    // offline species recognition from a photo (ai/SpeciesClassifier.kt)
+    implementation(libs.tensorflow.lite)
     debugImplementation(libs.androidx.ui.tooling)
     testImplementation(libs.junit)
 }
@@ -142,4 +146,82 @@ val downloadFonts by tasks.registering {
         }
     }
 }
-tasks.named("preBuild") { dependsOn(downloadFonts) }
+/*
+ * The offline bird recogniser: Google's AIY "birds_V1" model (MobileNet, 965 species, Apache 2.0), about 3.5 MB.
+ * It is downloaded once at build time into assets/ai (not kept in the repository). If no address answers, the
+ * build still succeeds and the app says the recogniser is not in this version. To add it by hand, put the file
+ * as app/src/main/assets/ai/birds_v1.tflite, or upload it once to a release "ai-models" of this repository.
+ */
+fun isTflite(b: ByteArray) = b.size > 8 && String(b, 4, 4, Charsets.US_ASCII) == "TFL3"
+
+/** The .tflite inside a plain, gzip or tar.gz download (Kaggle hands out a tar.gz). */
+fun extractTflite(raw: ByteArray): ByteArray? {
+    var data = raw
+    if (data.size > 2 && data[0] == 0x1f.toByte() && data[1] == 0x8b.toByte()) {
+        data = java.util.zip.GZIPInputStream(data.inputStream()).use { it.readBytes() }
+    }
+    if (isTflite(data)) return data
+    var off = 0
+    while (off + 512 <= data.size) {
+        val name = String(data, off, 100, Charsets.US_ASCII).trimEnd('\u0000')
+        if (name.isEmpty()) break
+        val size = String(data, off + 124, 12, Charsets.US_ASCII).trim('\u0000', ' ').toLongOrNull(8) ?: 0L
+        val start = off + 512
+        if (name.endsWith(".tflite") && start + size <= data.size) {
+            val f = data.copyOfRange(start, start + size.toInt())
+            if (isTflite(f)) return f
+        }
+        off = start + (((size + 511) / 512) * 512).toInt()
+    }
+    return null
+}
+
+val downloadAiModel by tasks.registering {
+    val target = file("src/main/assets/ai/birds_v1.tflite")
+    outputs.file(target)
+    doLast {
+        if (target.exists() && isTflite(target.readBytes())) return@doLast
+        target.parentFile.mkdirs()
+        val urls = listOf(
+            "https://github.com/hydari/mohitban-android/releases/download/ai-models/birds_v1.tflite",
+            "https://www.kaggle.com/api/v1/models/google/aiy/tfLite/vision-classifier-birds-v1/3/download",
+            "https://tfhub.dev/google/lite-model/aiy/vision/classifier/birds_V1/3?lite-format=tflite",
+        )
+        for (u in urls) {
+            try {
+                var url = URI(u).toURL()
+                var bytes: ByteArray? = null
+                // follow redirects by hand (also across hosts)
+                for (hop in 0 until 6) {
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.instanceFollowRedirects = false
+                    conn.connectTimeout = 20_000
+                    conn.readTimeout = 60_000
+                    conn.setRequestProperty("User-Agent", "Mohityar-build")
+                    val code = conn.responseCode
+                    if (code in 300..399) {
+                        val next = conn.getHeaderField("Location") ?: break
+                        url = URI(url.toString()).resolve(next).toURL()
+                        conn.disconnect()
+                        continue
+                    }
+                    if (code == 200) bytes = conn.inputStream.use { it.readBytes() }
+                    conn.disconnect()
+                    break
+                }
+                val model = bytes?.let { extractTflite(it) }
+                if (model != null) {
+                    target.writeBytes(model)
+                    logger.lifecycle("AI model: ${model.size} bytes from $u")
+                    return@doLast
+                }
+                logger.warn("AI model: no model at $u")
+            } catch (e: Exception) {
+                logger.warn("AI model download failed from $u: ${e.message}")
+            }
+        }
+        logger.warn("AI model not available; the app is built without the species recogniser.")
+    }
+}
+
+tasks.named("preBuild") { dependsOn(downloadFonts, downloadAiModel) }

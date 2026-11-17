@@ -78,6 +78,7 @@ object Routes {
     const val SOS = "sos/{id}"
     const val HELP = "help"
     const val DAILY = "daily"
+    const val IDENTIFY = "identify"
     const val DAILY_EDIT = "daily_edit?id={id}"
     const val DAILY_VIEW = "daily_view/{id}"
 
@@ -255,10 +256,14 @@ fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0, openGasht
                 onShift = { nav.navigate(Routes.SHIFT) },
                 onGasht = { nav.openTab(MainTab.GASHT) },
                 onDaily = { nav.navigate(Routes.DAILY) },
+                onIdentify = { nav.navigate(Routes.IDENTIFY) },
                 onTab = { nav.openTab(it) },
             )
         }
         // ---------------- daily patrol report
+        composable(Routes.IDENTIFY) {
+            ir.mohitban.app.ui.ai.IdentifyScreen(onBack = { nav.popBackStack() })
+        }
         composable(Routes.DAILY) {
             ir.mohitban.app.ui.daily.DailyReportsScreen(
                 onBack = { nav.popBackStack() },
@@ -360,7 +365,7 @@ fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0, openGasht
             )
         }
         composable(Routes.GASHT) {
-            ir.mohitban.app.ui.gasht.GashtScreen(onTab = { nav.openTab(it) }, onDaily = { nav.navigate(Routes.DAILY) })
+            ir.mohitban.app.ui.gasht.GashtScreen(onTab = { nav.openTab(it) }, onDaily = { nav.navigate(Routes.DAILY) }, onIdentify = { nav.navigate(Routes.IDENTIFY) })
         }
         composable(Routes.SOS, arguments = listOf(navArgument("id") { type = NavType.LongType })) { e ->
             ir.mohitban.app.ui.gasht.SosScreen(

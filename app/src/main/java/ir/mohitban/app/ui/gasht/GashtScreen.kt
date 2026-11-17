@@ -452,7 +452,7 @@ fun LtrText(text: String, modifier: Modifier = Modifier, style: androidx.compose
 // ============================================================================ screen
 
 @Composable
-fun GashtScreen(onTab: (ir.mohitban.app.ui.components.MainTab) -> Unit, onDaily: () -> Unit = {}) {
+fun GashtScreen(onTab: (ir.mohitban.app.ui.components.MainTab) -> Unit, onDaily: () -> Unit = {}, onIdentify: () -> Unit = {}) {
     val vm = appViewModel(key = "gasht") { c, _ -> GashtViewModel(c) }
     val context = LocalContext.current
     val permitted by vm.hasPermission.collectAsStateWithLifecycle()
@@ -496,7 +496,7 @@ fun GashtScreen(onTab: (ir.mohitban.app.ui.components.MainTab) -> Unit, onDaily:
         when (vm.tab) {
             1 -> TracksTab(vm)
             2 -> PlacesTab(vm)
-            else -> ToolsTab(vm, onDaily)
+            else -> ToolsTab(vm, onDaily, onIdentify)
         }
     }
     ir.mohitban.app.ui.components.BottomBar(ir.mohitban.app.ui.components.MainTab.GASHT, onTab, Modifier.align(Alignment.BottomCenter))

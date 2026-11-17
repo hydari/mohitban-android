@@ -15,6 +15,8 @@ __pycache__/
 *.pyc
 # fonts are downloaded automatically at build time
 /app/src/main/assets/fonts/*.ttf
+# the species model is downloaded at build time as well
+/app/src/main/assets/ai/*.tflite
 
 # protected-area boundaries are decrypted only inside CI (see private/)
 app/src/main/assets/zones/
