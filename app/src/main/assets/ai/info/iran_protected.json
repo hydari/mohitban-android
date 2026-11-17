@@ -1,0 +1,299 @@
+{
+ "note": "گونه‌های مورد توجه و حمایت‌شده در ایران؛ فهرست باید با فهرست رسمی سازمان حفاظت محیط زیست تطبیق داده شود",
+ "species": [
+  {
+   "sci": "Panthera pardus saxicolor",
+   "fa": "پلنگ ایرانی",
+   "group": "پستاندار",
+   "iucn": "EN",
+   "model": null
+  },
+  {
+   "sci": "Acinonyx jubatus venaticus",
+   "fa": "یوزپلنگ آسیایی",
+   "group": "پستاندار",
+   "iucn": "CR",
+   "model": null
+  },
+  {
+   "sci": "Equus hemionus onager",
+   "fa": "گورخر ایرانی",
+   "group": "پستاندار",
+   "iucn": "EN",
+   "model": null
+  },
+  {
+   "sci": "Gazella subgutturosa",
+   "fa": "جیران (آهوی ایرانی)",
+   "group": "پستاندار",
+   "iucn": "VU",
+   "model": null
+  },
+  {
+   "sci": "Capra aegagrus",
+   "fa": "بز وحشی (کل)",
+   "group": "پستاندار",
+   "iucn": "VU",
+   "model": null
+  },
+  {
+   "sci": "Ovis gmelini",
+   "fa": "قوچ و میش ارمنی (اوریال)",
+   "group": "پستاندار",
+   "iucn": "VU",
+   "model": null
+  },
+  {
+   "sci": "Ursus arctos",
+   "fa": "خرس قهوه‌ای",
+   "group": "پستاندار",
+   "iucn": "LC",
+   "model": null
+  },
+  {
+   "sci": "Ursus thibetanus gedrosianus",
+   "fa": "خرس سیاه آسیایی (بلوچی)",
+   "group": "پستاندار",
+   "iucn": "VU",
+   "model": null
+  },
+  {
+   "sci": "Lynx lynx",
+   "fa": "سیاه‌گوش اوراسیایی",
+   "group": "پستاندار",
+   "iucn": "LC",
+   "model": null
+  },
+  {
+   "sci": "Hyaena hyaena",
+   "fa": "کفتار راه‌راه",
+   "group": "پستاندار",
+   "iucn": "NT",
+   "model": null
+  },
+  {
+   "sci": "Lutra lutra",
+   "fa": "سمور آبی",
+   "group": "پستاندار",
+   "iucn": "NT",
+   "model": null
+  },
+  {
+   "sci": "Dugong dugon",
+   "fa": "دوگونگ",
+   "group": "پستاندار دریایی",
+   "iucn": "VU",
+   "model": null
+  },
+  {
+   "sci": "Pusa caspica",
+   "fa": "فک (سگ‌ماهی خزر)",
+   "group": "پستاندار دریایی",
+   "iucn": "EN",
+   "model": null
+  },
+  {
+   "sci": "Cervus elaphus maral",
+   "fa": "مرال",
+   "group": "پستاندار",
+   "iucn": "LC",
+   "model": null
+  },
+  {
+   "sci": "Chlamydotis macqueenii",
+   "fa": "هوبره",
+   "group": "پرنده",
+   "iucn": "VU",
+   "model": null
+  },
+  {
+   "sci": "Leucogeranus leucogeranus",
+   "fa": "درنای سیبری",
+   "group": "پرنده",
+   "iucn": "CR",
+   "model": null
+  },
+  {
+   "sci": "Gypaetus barbatus",
+   "fa": "هما",
+   "group": "پرنده",
+   "iucn": "NT",
+   "model": null
+  },
+  {
+   "sci": "Aegypius monachus",
+   "fa": "کرکس سیاه",
+   "group": "پرنده",
+   "iucn": "NT",
+   "model": null
+  },
+  {
+   "sci": "Neophron percnopterus",
+   "fa": "کرکس مصری",
+   "group": "پرنده",
+   "iucn": "EN",
+   "model": null
+  },
+  {
+   "sci": "Gyps fulvus",
+   "fa": "دال",
+   "group": "پرنده",
+   "iucn": "LC",
+   "model": "birds"
+  },
+  {
+   "sci": "Falco cherrug",
+   "fa": "بالابان",
+   "group": "پرنده",
+   "iucn": "EN",
+   "model": null
+  },
+  {
+   "sci": "Falco naumanni",
+   "fa": "دلیجه‌ی کوچک",
+   "group": "پرنده",
+   "iucn": "LC",
+   "model": null
+  },
+  {
+   "sci": "Pelecanus crispus",
+   "fa": "پلیکان خاکستری",
+   "group": "پرنده",
+   "iucn": "NT",
+   "model": null
+  },
+  {
+   "sci": "Oxyura leucocephala",
+   "fa": "اردک سرسفید",
+   "group": "پرنده",
+   "iucn": "EN",
+   "model": null
+  },
+  {
+   "sci": "Otis tarda",
+   "fa": "میش‌مرغ",
+   "group": "پرنده",
+   "iucn": "VU",
+   "model": null
+  },
+  {
+   "sci": "Branta ruficollis",
+   "fa": "غاز قرمزسینه",
+   "group": "پرنده",
+   "iucn": "VU",
+   "model": null
+  },
+  {
+   "sci": "Aquila heliaca",
+   "fa": "عقاب شاهی",
+   "group": "پرنده",
+   "iucn": "VU",
+   "model": null
+  },
+  {
+   "sci": "Aquila nipalensis",
+   "fa": "عقاب صحرایی",
+   "group": "پرنده",
+   "iucn": "EN",
+   "model": null
+  },
+  {
+   "sci": "Clanga clanga",
+   "fa": "عقاب تالابی بزرگ",
+   "group": "پرنده",
+   "iucn": "VU",
+   "model": null
+  },
+  {
+   "sci": "Anser erythropus",
+   "fa": "غاز کوچک‌منقار",
+   "group": "پرنده",
+   "iucn": "VU",
+   "model": null
+  },
+  {
+   "sci": "Tetrax tetrax",
+   "fa": "میش‌مرغ کوچک",
+   "group": "پرنده",
+   "iucn": "NT",
+   "model": null
+  },
+  {
+   "sci": "Aythya ferina",
+   "fa": "اردک سرحنایی",
+   "group": "پرنده",
+   "iucn": "VU",
+   "model": "birds"
+  },
+  {
+   "sci": "Phoenicopterus roseus",
+   "fa": "فلامینگوی بزرگ",
+   "group": "پرنده",
+   "iucn": "LC",
+   "model": "birds"
+  },
+  {
+   "sci": "Tetraogallus caspius",
+   "fa": "کبک دری",
+   "group": "پرنده",
+   "iucn": "LC",
+   "model": null
+  },
+  {
+   "sci": "Taxus baccata",
+   "fa": "سرخدار",
+   "group": "گیاه و درخت",
+   "iucn": "LC",
+   "model": "plants"
+  },
+  {
+   "sci": "Neurergus kaiseri",
+   "fa": "سمندر لرستان",
+   "group": "دوزیست",
+   "iucn": "CR",
+   "model": null
+  },
+  {
+   "sci": "Mauremys caspica",
+   "fa": "لاک‌پشت برکه‌ای خزری",
+   "group": "خزنده",
+   "iucn": "NT",
+   "model": null
+  },
+  {
+   "sci": "Testudo graeca",
+   "fa": "لاک‌پشت مهمیزدار",
+   "group": "خزنده",
+   "iucn": "VU",
+   "model": null
+  },
+  {
+   "sci": "Huso huso",
+   "fa": "تاس‌ماهی بالوگا",
+   "group": "ماهی",
+   "iucn": "CR",
+   "model": null
+  },
+  {
+   "sci": "Acipenser persicus",
+   "fa": "تاس‌ماهی ایرانی",
+   "group": "ماهی",
+   "iucn": "CR",
+   "model": null
+  },
+  {
+   "sci": "Acipenser nudiventris",
+   "fa": "تاس‌ماهی ماهی‌خاویاری",
+   "group": "ماهی",
+   "iucn": "CR",
+   "model": null
+  },
+  {
+   "sci": "Salmo trutta caspius",
+   "fa": "ماهی آزاد خزری",
+   "group": "ماهی",
+   "iucn": "EN",
+   "model": null
+  }
+ ]
+}

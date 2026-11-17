@@ -314,6 +314,19 @@ private fun BestCard(g: SpeciesGuess, saved: Boolean, onKeep: () -> Unit, onDail
                     Text(percent(g.probability), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black), color = Color.White)
                 }
             }
+            if (i?.protected == true) {
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 10.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFFDECEC)).padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Outlined.WarningAmber, null, tint = MColors.Error, modifier = Modifier.size(20.dp))
+                    Text(
+                        if (i.approx) "  اگر این جانور همان گونه باشد، در ایران حفاظت‌شده است؛ پیش از هر اقدام تأیید کنید و مشاهده را گزارش دهید."
+                        else "  گونه‌ی حفاظت‌شده در ایران: مشاهده‌ی آن را فوراً به اداره‌ی حفاظت محیط زیست گزارش کنید و هرگونه آزار یا شکار تخلف است.",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Error,
+                    )
+                }
+            }
             when {
                 i != null -> {
                     if (i.approx) Note("این مدل گونه‌ی دقیق را ندارد؛ نزدیک‌ترین گروه نشان داده شده و احتمال اشتباه بیشتر است.", MColors.Amber)

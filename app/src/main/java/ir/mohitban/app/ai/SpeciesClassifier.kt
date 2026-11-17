@@ -38,6 +38,8 @@ data class SpeciesInfo(
     val group: String = "",
     /** The model has no class for this exact species; this is the nearest look-alike group. */
     val approx: Boolean = false,
+    /** Protected in Iran (the environment organisation's list): a sighting must be reported. */
+    val protected: Boolean = false,
 ) {
     val iucnTitle: String get() = when (iucn) {
         "LC" -> "کمترین نگرانی (LC)"
@@ -94,8 +96,10 @@ sealed interface Recognition {
 object SpeciesClassifier {
     private const val DIR = "ai"
     /** How much likelier a species (or genus) with Persian information is taken to be. */
-    private const val SPECIES_PRIOR = 3f
+    private const val SPECIES_PRIOR = 2.5f
     private const val GENUS_PRIOR = 1.5f
+    /** Protected species of Iran are weighted above the rest: they matter most to the ranger. */
+    private const val PROTECTED_PRIOR = 4f
 
     private class Pack(
         val category: Category,
@@ -122,6 +126,7 @@ object SpeciesClassifier {
     private fun infoOf(o: JSONObject) = SpeciesInfo(
         fa = o.optString("fa"), kind = o.optString("kind"), note = o.optString("note"), iucn = o.optString("iucn"),
         iran = o.optString("iran"), habitat = o.optString("habitat"), group = o.optString("group"), approx = o.optBoolean("approx"),
+        protected = o.optBoolean("protected"),
     )
 
     @Synchronized
@@ -237,6 +242,7 @@ object SpeciesClassifier {
             if (i == p.background) probs[i] else {
                 val sci = p.scientific.getOrNull(i).orEmpty()
                 probs[i] * when {
+                    p.species[sci]?.protected == true -> PROTECTED_PRIOR
                     p.species.containsKey(sci) -> SPECIES_PRIOR
                     p.genus.containsKey(sci.substringBefore(' ')) -> GENUS_PRIOR
                     else -> 1f
