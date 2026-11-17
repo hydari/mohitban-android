@@ -1,5 +1,6 @@
 import java.net.HttpURLConnection
 import java.net.URI
+import java.util.zip.GZIPInputStream
 
 plugins {
     alias(libs.plugins.android.application)
@@ -158,7 +159,7 @@ fun isTflite(b: ByteArray) = b.size > 8 && String(b, 4, 4, Charsets.US_ASCII) ==
 fun extractTflite(raw: ByteArray): ByteArray? {
     var data = raw
     if (data.size > 2 && data[0] == 0x1f.toByte() && data[1] == 0x8b.toByte()) {
-        data = java.util.zip.GZIPInputStream(data.inputStream()).use { it.readBytes() }
+        data = GZIPInputStream(data.inputStream()).use { it.readBytes() }
     }
     if (isTflite(data)) return data
     var off = 0
