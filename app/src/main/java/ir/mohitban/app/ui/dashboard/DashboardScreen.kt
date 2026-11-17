@@ -378,8 +378,8 @@ fun DashboardScreen(
                         size = DashIcon, iconSize = 23.dp, modifier = Modifier.padding(start = 14.dp),
                     )
                     Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                        Text("شناسایی پرنده", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Ink)
-                        Text("با هوش مصنوعی و بدون اینترنت", style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 2.dp))
+                        Text("شناسایی با هوش مصنوعی", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Ink)
+                        Text("پرنده، گیاه، درخت، حشره و جانوران؛ بدون اینترنت", style = MaterialTheme.typography.labelSmall, color = MColors.Muted, modifier = Modifier.padding(top = 2.dp))
                     }
                     Icon(
                         Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = MColors.Muted,

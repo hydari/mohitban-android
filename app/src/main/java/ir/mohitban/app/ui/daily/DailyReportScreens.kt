@@ -218,6 +218,11 @@ fun DailyReportEditScreen(
                 p?.protectedArea?.let { ir.mohitban.app.domain.model.AreaTypes.title(it) }?.takeIf { it.isNotBlank() },
             ).joinToString("")
         }
+        // species sent from the recognition screen wait here until the form opens
+        withContext(Dispatchers.IO) { ir.mohitban.app.ai.PendingWildlife.take(context) }.forEach { name ->
+            val i = wildlife.indexOfFirst { it.species == name }
+            if (i >= 0) wildlife[i] = wildlife[i].copy(count = wildlife[i].count + 1) else wildlife += WildlifeCount(name, 1)
+        }
         loaded = true
     }
     // a vehicle just registered from this form is picked at once

@@ -112,8 +112,8 @@ private fun IdentifyEntry(onClick: () -> Unit) {
         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             ir.mohitban.app.ui.components.CircleIcon(Icons.Outlined.ImageSearch, Color(0xFF1F9A8A), Color.White, size = 40.dp, iconSize = 21.dp)
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                Text("شناسایی پرنده با هوش مصنوعی", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Ink)
-                Text("عکس بگیرید؛ بدون اینترنت نام و اطلاعات گونه را ببینید", style = MaterialTheme.typography.labelSmall, color = MColors.Muted)
+                Text("شناسایی با هوش مصنوعی", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MColors.Ink)
+                Text("پرنده، گیاه، درخت، حشره و جانوران را از روی عکس بشناسید", style = MaterialTheme.typography.labelSmall, color = MColors.Muted)
             }
             Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = MColors.Muted, modifier = Modifier.size(20.dp))
         }

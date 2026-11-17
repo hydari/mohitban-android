@@ -79,6 +79,7 @@ object Routes {
     const val HELP = "help"
     const val DAILY = "daily"
     const val IDENTIFY = "identify"
+    const val OBSERVATIONS = "observations"
     const val DAILY_EDIT = "daily_edit?id={id}"
     const val DAILY_VIEW = "daily_view/{id}"
 
@@ -262,7 +263,10 @@ fun AppNavHost(openReportsRequest: Int = 0, openShiftRequest: Int = 0, openGasht
         }
         // ---------------- daily patrol report
         composable(Routes.IDENTIFY) {
-            ir.mohitban.app.ui.ai.IdentifyScreen(onBack = { nav.popBackStack() })
+            ir.mohitban.app.ui.ai.IdentifyScreen(onBack = { nav.popBackStack() }, onHistory = { nav.navigate(Routes.OBSERVATIONS) })
+        }
+        composable(Routes.OBSERVATIONS) {
+            ir.mohitban.app.ui.ai.ObservationsScreen(onBack = { nav.popBackStack() })
         }
         composable(Routes.DAILY) {
             ir.mohitban.app.ui.daily.DailyReportsScreen(

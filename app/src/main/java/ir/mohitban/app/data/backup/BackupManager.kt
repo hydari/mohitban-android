@@ -80,6 +80,8 @@ class BackupManager(
         // daily patrol reports (their signatures are pictures in the media folder, written below)
         json.put("dailyReports", ir.mohitban.app.daily.DailyReportStore.toJsonArray(ir.mohitban.app.daily.DailyReportStore.all(context)))
 
+        json.put("observations", ir.mohitban.app.ai.ObservationStore.toJsonArray(ir.mohitban.app.ai.ObservationStore.all(context)))
+
         val raw = context.contentResolver.openOutputStream(target) ?: error("cannot open target")
         val out = if (password.isNullOrEmpty()) raw.buffered() else BackupCrypto.encrypt(raw.buffered(), password)
         ZipOutputStream(out).use { zip ->
@@ -168,6 +170,7 @@ class BackupManager(
         val tracks = json.optJSONArray("tracks")
         val places = json.optJSONArray("waypoints")
         val patrols = json.optJSONArray("patrols")
+        val observations = json.optJSONArray("observations")?.let { ir.mohitban.app.ai.ObservationStore.fromJsonArray(it) }
         val dailyReports = json.optJSONArray("dailyReports")?.let { ir.mohitban.app.daily.DailyReportStore.fromJsonArray(it) }
 
         // the new pictures are copied next to the old ones first, so nothing is lost if anything fails from here on
@@ -239,6 +242,7 @@ class BackupManager(
         } catch (e: Exception) { incoming.deleteRecursively(); throw e }
         // older backups have no daily reports: keep the phone's in that case
         dailyReports?.let { ir.mohitban.app.daily.DailyReportStore.replaceAll(context, it) }
+        observations?.let { ir.mohitban.app.ai.ObservationStore.replaceAll(context, it) }
         // track statistics are derived; recompute after restore
         if (tracks != null) db.gashtDao().getTracks().forEach { ir.mohitban.app.gasht.GashtRepository(db, files).refreshStats(it.id) }
         // swap the picture folders; the old one is kept until the new one is in place
